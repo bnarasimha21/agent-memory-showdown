@@ -1,8 +1,8 @@
 # Agent Memory Showdown
 
-A publication-ready benchmark that stress-tests four LangChain memory backends
-across a 50-turn synthetic conversation and measures recall accuracy, retrieval
-latency, and token cost.
+**Which memory backend keeps agents sharp at scale?**
+
+A benchmark that stress-tests four LangChain memory backends across a 50-turn synthetic conversation and measures recall accuracy, retrieval latency, and token cost.
 
 ## Architecture
 
@@ -10,17 +10,18 @@ latency, and token cost.
 flowchart TD
     E[".env / env vars"] --> C[config.py]
     C --> HN[harness.py]
-    HN --> DS[dataset.py\n50-turn synthetic convo\nseeded facts @ turns 3,10,25,40]
+    HN --> DS[dataset.py\n50-turn synthetic convo\nseeded facts @ turns 1,3,7,12,18,25,30,35,40,45]
     DS --> HN
     HN --> B1[BufferMemoryBackend\nConversationBufferMemory]
     HN --> B2[SummaryMemoryBackend\nConversationSummaryMemory]
     HN --> B3[QdrantMemoryBackend\nVectorStore via Qdrant]
     HN --> B4[PGVectorMemoryBackend\nVectorStore via pgvector]
-    B1 & B2 --> LLM[LLM\nOpenAI or Ollama]
+    B1 & B2 --> LLM[Claude via\nDO Serverless Inference]
     B3 --> LLM
     B3 --> QD[(Qdrant\nDocker)]
     B4 --> LLM
-    B4 --> PG[(PostgreSQL\npgvector\nDocker)]
+    B4 --> PG[(PostgreSQL\npgvector)]
+    B3 & B4 --> EMB[DO Serverless\nEmbeddings]
     HN --> RS[results/benchmark_*.json]
     RS --> VIZ[visualize.py]
     VIZ --> C1[memory_decay_curve.html/.png]
@@ -28,51 +29,71 @@ flowchart TD
     VIZ --> C3[cost_table.md]
 ```
 
+## Infrastructure
+
+- **Compute:** Single DigitalOcean Droplet (8GB RAM / 4 vCPU, Ubuntu 24.04)
+- **LLM:** Claude via DigitalOcean Serverless Inference API
+- **Embeddings:** DigitalOcean Serverless Inference embedding models
+- **Vector DB:** Qdrant (Docker) on the Droplet
+- **Relational + Vector:** PostgreSQL 16 + pg_vector extension on the Droplet
+
 ## Memory Backends
 
 | Backend | Strategy | Strength | Weakness |
 |---------|----------|----------|---------|
 | `buffer` | Full conversation history | Perfect recall short-term | Context blows up, high cost |
-| `summary` | LLM-compressed summary | Low token cost | Lossy - facts may be summarized away |
-| `qdrant` | Semantic vector search (Qdrant) | Fast, accurate retrieval, low cost | Requires Docker / Qdrant service |
+| `summary` | LLM-compressed summary | Low token cost | Lossy — facts may be summarized away |
+| `qdrant` | Semantic vector search (Qdrant) | Fast, accurate retrieval, low cost | Requires Qdrant service |
 | `pgvector` | Semantic vector search (PostgreSQL) | SQL-native, easy ops | Slightly slower than Qdrant at scale |
 
 ## Benchmark Design
 
-- **50-turn synthetic conversation** generated deterministically (random seed).
-- **Facts seeded** at turns 3, 10, 25, and 40 (known answer keys for scoring).
-- **Recall probe** at turn 50: "What is Alice's favorite color?" etc.
-- **Scoring**: `correct` (exact answer key match), `partial`, or `failed`.
-- **10 runs per backend** for statistical significance. Reports mean and std dev.
-- **Token usage** tracked per run. Cost estimated at gpt-3.5-turbo pricing.
+- **50-turn synthetic conversation** — multi-topic (travel planning, tech preferences, personal details, work projects)
+- **10 facts planted** at turns: 1, 3, 7, 12, 18, 25, 30, 35, 40, 45
+- **Example facts:**
+  - "My dog's name is Baxter"
+  - "I'm allergic to shellfish"
+  - "My flight to Tokyo is on March 15th"
+  - "The project deadline is April 30th"
+- **Recall quizzed** at turns 15, 25, 35, and 50 (builds the memory decay curve)
+- **Scoring:** exact match (1.0) / partial match (0.5) / miss (0.0)
+- **5 runs per backend** for statistical reliability
 
-## Sample Output
+## Metrics
 
-```
-=== BENCHMARK SUMMARY ===
+| Metric | Description |
+|--------|-------------|
+| Recall Accuracy | Score at turns 15, 25, 35, 50 (the decay curve) |
+| Retrieval Latency | Time to fetch memory context per turn (ms) |
+| Total Tokens Used | Input + output tokens across 50 turns |
+| Cost per 1000 Conversations | Extrapolated from token usage at standard pricing |
+| Memory Storage Size | Data volume per backend |
 
-buffer       latency=  312.4+/-45.2ms  recall= 62.5%  cost/1K=$36.8400
-summary      latency=  890.7+/-112.3ms  recall= 60.0%  cost/1K=$9.6200
-qdrant       latency=  145.8+/-28.4ms  recall= 97.5%  cost/1K=$5.3000
-pgvector     latency=  168.2+/-35.1ms  recall= 90.0%  cost/1K=$5.5600
-```
+## Visualizations
 
-See `results/benchmark_example.json` and `results/charts/` for full sample output.
+### Memory Decay Curve
+Line chart: recall accuracy (y-axis) vs. conversation turn (x-axis). One line per backend. Vector backends should hold a flat line; buffer drops sharply for early-seeded facts once the context window fills.
+
+### Latency Bar Chart
+Average retrieval latency per backend with error bars (std dev).
+
+### Cost Table
+Estimated USD cost per 1,000 conversations based on average token usage.
 
 ## Setup
 
 ### Prerequisites
 
 - Docker and Docker Compose
-- Python 3.11+ (for local runs)
-- OpenAI API key OR a running Ollama instance
+- Python 3.11+
+- DigitalOcean Serverless Inference API key
 
 ### Quick Start (Docker)
 
 ```bash
 # 1. Copy and populate the env file
 cp .env.example .env
-# Edit .env: set OPENAI_API_KEY or configure OLLAMA_*
+# Edit .env: set DO_API_KEY
 
 # 2. Run the full benchmark (starts Qdrant + Postgres automatically)
 make run
@@ -104,7 +125,7 @@ make run-quick
 python run_benchmark.py --help
 
   --backends  buffer summary qdrant pgvector  (subset of backends)
-  --runs      N    number of runs per backend (default: 10)
+  --runs      N    number of runs per backend (default: 5)
   --turns     N    conversation turns per run (default: 50)
   --results-dir    output directory           (default: results/)
   --no-viz         skip chart generation
@@ -121,10 +142,10 @@ agent_memory_showdown/
 ├── requirements.txt
 ├── .env.example
 ├── src/
-│   ├── config.py             # env-driven config
+│   ├── config.py             # env-driven config (DO API key, DB URIs)
 │   ├── dataset.py            # synthetic conversation generator
 │   ├── harness.py            # benchmark runner + aggregator
-│   ├── llm_factory.py        # LLM + embeddings factory
+│   ├── llm_factory.py        # Claude + embeddings via DO inference
 │   ├── visualize.py          # Plotly + Matplotlib charts
 │   └── backends/
 │       ├── base.py           # BaseMemoryBackend, scoring helpers
@@ -133,6 +154,7 @@ agent_memory_showdown/
 │       ├── qdrant_memory.py  # VectorStoreRetrieverMemory via Qdrant
 │       └── pgvector_memory.py# VectorStoreRetrieverMemory via pgvector
 ├── scripts/
+│   ├── setup_droplet.sh      # Provision Qdrant + Postgres on DO Droplet
 │   └── init_pgvector.sql     # DB schema for pgvector backend
 └── results/
     ├── benchmark_example.json
@@ -144,26 +166,27 @@ agent_memory_showdown/
         └── cost_table.md
 ```
 
-## Visualizations
+## Execution Plan
 
-### Memory Decay Curve
-Line chart: recall accuracy (y-axis) vs. turn at which the fact was seeded
-(x-axis). One line per backend. Vector backends hold a flat line; buffer drops
-sharply for early-seeded facts once the context window fills.
-
-### Latency Bar Chart
-Average retrieval latency per backend with error bars (std dev). Qdrant is
-fastest; summary is slowest due to the extra summarization LLM call.
-
-### Cost Table
-Estimated USD cost per 1,000 conversations based on average token usage.
+1. Provision DO Droplet + install Qdrant (Docker) and PostgreSQL + pg_vector
+2. Set up repo + dependencies
+3. Build the conversation generator + fact planting
+4. Implement the 4 memory backends (Claude via DO inference)
+5. Run benchmark (5 runs per backend)
+6. Collect metrics + generate charts
+7. Write up findings
 
 ## Tech Stack
 
 - Python 3.11+
 - LangChain 0.2
+- Claude (via DigitalOcean Serverless Inference)
+- DO Serverless Inference embedding models
 - Qdrant client 1.11
 - pgvector 0.3 + psycopg2
-- sentence-transformers (all-MiniLM-L6-v2 for embeddings, free, local)
 - Plotly 5 + Matplotlib 3.9
 - Docker Compose
+
+## Status
+
+**Planning** — Infrastructure and code to be updated for DO + Claude.
