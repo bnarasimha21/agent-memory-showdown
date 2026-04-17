@@ -20,6 +20,7 @@ class TurnMetrics:
 class RecallResult:
     probe: str
     seeded_at_turn: int
+    probed_at_turn: int
     response: str
     score: str  # "correct" | "partial" | "failed"
     answer_key: str

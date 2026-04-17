@@ -26,7 +26,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("benchmark")
 
-# Add project root to path when running outside Docker
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.config import config
@@ -105,7 +104,6 @@ def main():
         viz_dir = Path(args.results_dir) / "charts"
         generate_all(results_path, viz_dir)
 
-    # Print a quick summary table to stdout
     print("\n=== BENCHMARK SUMMARY ===\n")
     for backend, data in results.items():
         if "error" in data:
@@ -113,7 +111,7 @@ def main():
             continue
         avg_lat = data["avg_latency_ms"]
         std_lat = data["std_latency_ms"]
-        recall_entries = data.get("recall_accuracy_by_seed_turn", {})
+        recall_entries = data.get("recall_accuracy_by_probe_turn", {})
         if recall_entries:
             overall_correct = sum(
                 v["correct_rate"] for v in recall_entries.values()

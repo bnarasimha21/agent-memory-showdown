@@ -9,7 +9,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 
 BACKEND_COLORS = {
@@ -26,17 +25,33 @@ def load_results(results_path: str | Path) -> dict:
 
 
 def _get_recall_curve_data(results: dict) -> dict:
-    """Extract recall accuracy by seed turn for each backend."""
+    """Extract recall accuracy at each probe turn for each backend.
+
+    The new results format uses 'recall_accuracy_by_probe_turn' keyed by the
+    turn where probes were asked (15, 25, 35, 50).
+    """
     curves = {}
     for backend, data in results.items():
         if "error" in data:
             continue
-        by_seed = data.get("recall_accuracy_by_seed_turn", {})
-        # Sort by seed turn (keys are strings in JSON)
-        sorted_turns = sorted(by_seed.keys(), key=int)
+
+        by_probe = data.get("recall_accuracy_by_probe_turn", {})
+        if not by_probe:
+            by_seed = data.get("recall_accuracy_by_seed_turn", {})
+            if by_seed:
+                sorted_turns = sorted(by_seed.keys(), key=int)
+                curves[backend] = {
+                    "turns": [int(t) for t in sorted_turns],
+                    "correct_rates": [by_seed[t]["correct_rate"] for t in sorted_turns],
+                }
+            continue
+
+        sorted_probe_turns = sorted(by_probe.keys(), key=int)
         curves[backend] = {
-            "turns": [int(t) for t in sorted_turns],
-            "correct_rates": [by_seed[t]["correct_rate"] for t in sorted_turns],
+            "turns": [int(t) for t in sorted_probe_turns],
+            "correct_rates": [
+                by_probe[t]["correct_rate"] for t in sorted_probe_turns
+            ],
         }
     return curves
 
@@ -59,8 +74,8 @@ def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
         )
 
     fig.update_layout(
-        title="Memory Decay Curve: Recall Accuracy by Seed Turn",
-        xaxis_title="Turn Where Fact Was Seeded",
+        title="Memory Decay Curve: Recall Accuracy by Probe Turn",
+        xaxis_title="Conversation Turn (Probe Point)",
         yaxis_title="Recall Accuracy (%)",
         yaxis=dict(range=[0, 105]),
         legend_title="Backend",
@@ -72,7 +87,7 @@ def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
     try:
         fig.write_image(str(output_path.with_suffix(".png")))
     except Exception:
-        pass  # kaleido may not be installed; HTML is primary
+        pass
 
 
 def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None:
@@ -90,8 +105,8 @@ def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None
             label=backend,
         )
 
-    ax.set_title("Memory Decay Curve: Recall Accuracy by Seed Turn")
-    ax.set_xlabel("Turn Where Fact Was Seeded")
+    ax.set_title("Memory Decay Curve: Recall Accuracy by Probe Turn")
+    ax.set_xlabel("Conversation Turn (Probe Point)")
     ax.set_ylabel("Recall Accuracy (%)")
     ax.set_ylim(0, 105)
     ax.legend(title="Backend")
@@ -152,7 +167,7 @@ def plot_latency_bar_matplotlib(results: dict, output_path: Path) -> None:
 
     colors = [BACKEND_COLORS.get(b, "#888") for b in backends]
     fig, ax = plt.subplots(figsize=(8, 5))
-    bars = ax.bar(backends, avg_lats, color=colors, yerr=std_lats, capsize=5)
+    ax.bar(backends, avg_lats, color=colors, yerr=std_lats, capsize=5)
     ax.set_title("Average Retrieval Latency per Backend")
     ax.set_xlabel("Memory Backend")
     ax.set_ylabel("Latency (ms)")

@@ -1,4 +1,4 @@
-.PHONY: run build up down clean
+.PHONY: run build up down clean run-local run-quick
 
 # Primary entry point: bring up infra and run the benchmark
 run: up
@@ -26,6 +26,6 @@ clean:
 run-local:
 	python run_benchmark.py
 
-# Run with a smaller dataset for quick testing
+# Quick smoke test (2 runs, 10 turns, buffer + summary only)
 run-quick:
 	python run_benchmark.py --runs 2 --turns 10 --backends buffer summary

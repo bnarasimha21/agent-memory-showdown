@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import uuid
 from langchain.memory import VectorStoreRetrieverMemory
 from langchain.chains import ConversationChain
 from langchain_community.vectorstores import Qdrant
+from langchain_community.callbacks import get_openai_callback
 from langchain_core.prompts import PromptTemplate
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
@@ -35,10 +35,11 @@ class QdrantMemoryBackend(BaseMemoryBackend):
         self._client = QdrantClient(url=config.QDRANT_URL)
         self._embeddings = get_embeddings()
 
-        # Create a fresh collection for this session
         self._client.recreate_collection(
             collection_name=self._collection,
-            vectors_config=VectorParams(size=384, distance=Distance.COSINE),
+            vectors_config=VectorParams(
+                size=config.EMBEDDING_DIMENSION, distance=Distance.COSINE
+            ),
         )
 
         vectorstore = Qdrant(
@@ -62,6 +63,6 @@ class QdrantMemoryBackend(BaseMemoryBackend):
             pass
 
     def chat(self, human_message: str) -> tuple[str, int]:
-        response = self._chain.predict(input=human_message)
-        tokens = len(human_message.split()) + len(response.split())
-        return response, tokens
+        with get_openai_callback() as cb:
+            response = self._chain.predict(input=human_message)
+        return response, cb.total_tokens

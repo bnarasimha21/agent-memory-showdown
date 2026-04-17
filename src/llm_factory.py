@@ -1,38 +1,30 @@
-"""Factory for creating LLM instances based on config."""
+"""Factory for LLM and embedding instances via DigitalOcean Serverless Inference."""
 
 from __future__ import annotations
 
 from langchain_core.language_models import BaseChatModel
+from langchain_core.embeddings import Embeddings
 from src.config import config
 
 
 def get_llm() -> BaseChatModel:
-    if config.LLM_PROVIDER == "openai":
-        from langchain_openai import ChatOpenAI
+    """Claude via DigitalOcean Serverless Inference (OpenAI-compatible API)."""
+    from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(
-            model=config.LLM_MODEL,
-            openai_api_key=config.OPENAI_API_KEY,
-            temperature=0.0,
-        )
-    elif config.LLM_PROVIDER == "ollama":
-        from langchain_community.chat_models import ChatOllama
-
-        return ChatOllama(
-            model=config.OLLAMA_MODEL,
-            base_url=config.OLLAMA_BASE_URL,
-            temperature=0.0,
-        )
-    else:
-        raise ValueError(f"Unknown LLM_PROVIDER: {config.LLM_PROVIDER!r}")
+    return ChatOpenAI(
+        model=config.LLM_MODEL,
+        openai_api_key=config.DO_API_KEY,
+        openai_api_base=config.DO_INFERENCE_URL,
+        temperature=0.0,
+    )
 
 
-def get_embeddings():
-    """Return an embedding model. Always uses local sentence-transformers to avoid costs."""
-    from langchain_community.embeddings import HuggingFaceEmbeddings
+def get_embeddings() -> Embeddings:
+    """Embedding model via DigitalOcean Serverless Inference."""
+    from langchain_openai import OpenAIEmbeddings
 
-    return HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2",
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True},
+    return OpenAIEmbeddings(
+        model=config.EMBEDDING_MODEL,
+        openai_api_key=config.DO_API_KEY,
+        openai_api_base=config.DO_INFERENCE_URL,
     )

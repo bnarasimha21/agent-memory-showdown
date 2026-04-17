@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import psycopg2
-import numpy as np
 from langchain.memory import VectorStoreRetrieverMemory
 from langchain.chains import ConversationChain
 from langchain_community.vectorstores import PGVector
+from langchain_community.callbacks import get_openai_callback
 from langchain_core.prompts import PromptTemplate
 from src.backends.base import BaseMemoryBackend
 from src.llm_factory import get_llm, get_embeddings
@@ -53,6 +52,6 @@ class PGVectorMemoryBackend(BaseMemoryBackend):
             pass
 
     def chat(self, human_message: str) -> tuple[str, int]:
-        response = self._chain.predict(input=human_message)
-        tokens = len(human_message.split()) + len(response.split())
-        return response, tokens
+        with get_openai_callback() as cb:
+            response = self._chain.predict(input=human_message)
+        return response, cb.total_tokens
