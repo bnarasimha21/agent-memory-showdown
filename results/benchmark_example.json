@@ -1,158 +1,30 @@
 {
   "buffer": {
-    "num_valid_runs": 10,
-    "avg_latency_ms": 312.4,
-    "std_latency_ms": 45.2,
+    "num_valid_runs": 2,
+    "avg_latency_ms": 8562.32,
+    "std_latency_ms": 2460.78,
     "avg_latency_per_turn": {
-      "1": 285.3, "2": 290.1, "3": 298.4, "5": 305.2, "10": 318.6,
-      "15": 325.7, "20": 338.9, "25": 348.1, "30": 361.4, "40": 382.5,
-      "50": 401.2
+      "1": 3135.82, "2": 7995.51, "3": 6382.41, "4": 9360.92,
+      "5": 11781.0, "6": 9627.02, "7": 7776.49, "8": 9272.94,
+      "9": 9826.09, "10": 10465.01
     },
-    "recall_accuracy_by_seed_turn": {
-      "3": {
-        "correct_rate": 0.9,
-        "partial_rate": 0.1,
-        "failed_rate": 0.0,
-        "score_distribution": {"correct": 9, "partial": 1, "failed": 0}
-      },
-      "10": {
-        "correct_rate": 0.8,
-        "partial_rate": 0.1,
-        "failed_rate": 0.1,
-        "score_distribution": {"correct": 8, "partial": 1, "failed": 1}
-      },
-      "25": {
-        "correct_rate": 0.5,
-        "partial_rate": 0.2,
-        "failed_rate": 0.3,
-        "score_distribution": {"correct": 5, "partial": 2, "failed": 3}
-      },
-      "40": {
-        "correct_rate": 0.3,
-        "partial_rate": 0.2,
-        "failed_rate": 0.5,
-        "score_distribution": {"correct": 3, "partial": 2, "failed": 5}
-      }
-    },
-    "avg_tokens_per_run": 18420,
-    "std_tokens_per_run": 1230,
-    "estimated_cost_per_1k_conversations_usd": 36.84
+    "recall_accuracy_by_probe_turn": {},
+    "avg_tokens_per_run": 16818.5,
+    "std_tokens_per_run": 160.5,
+    "estimated_cost_per_1k_conversations_usd": 100.911
   },
   "summary": {
-    "num_valid_runs": 10,
-    "avg_latency_ms": 890.7,
-    "std_latency_ms": 112.3,
+    "num_valid_runs": 2,
+    "avg_latency_ms": 17443.22,
+    "std_latency_ms": 7707.22,
     "avg_latency_per_turn": {
-      "1": 820.5, "2": 835.2, "3": 855.8, "5": 870.1, "10": 888.4,
-      "15": 895.2, "20": 902.7, "25": 908.1, "30": 912.4, "40": 918.6,
-      "50": 925.3
+      "1": 6131.12, "2": 12433.36, "3": 9535.64, "4": 14272.24,
+      "5": 15581.75, "6": 16890.58, "7": 18216.89, "8": 24806.07,
+      "9": 24940.65, "10": 31623.92
     },
-    "recall_accuracy_by_seed_turn": {
-      "3": {
-        "correct_rate": 0.7,
-        "partial_rate": 0.2,
-        "failed_rate": 0.1,
-        "score_distribution": {"correct": 7, "partial": 2, "failed": 1}
-      },
-      "10": {
-        "correct_rate": 0.6,
-        "partial_rate": 0.2,
-        "failed_rate": 0.2,
-        "score_distribution": {"correct": 6, "partial": 2, "failed": 2}
-      },
-      "25": {
-        "correct_rate": 0.6,
-        "partial_rate": 0.3,
-        "failed_rate": 0.1,
-        "score_distribution": {"correct": 6, "partial": 3, "failed": 1}
-      },
-      "40": {
-        "correct_rate": 0.5,
-        "partial_rate": 0.3,
-        "failed_rate": 0.2,
-        "score_distribution": {"correct": 5, "partial": 3, "failed": 2}
-      }
-    },
-    "avg_tokens_per_run": 4810,
-    "std_tokens_per_run": 320,
-    "estimated_cost_per_1k_conversations_usd": 9.62
-  },
-  "qdrant": {
-    "num_valid_runs": 10,
-    "avg_latency_ms": 145.8,
-    "std_latency_ms": 28.4,
-    "avg_latency_per_turn": {
-      "1": 130.2, "2": 135.4, "3": 140.1, "5": 142.8, "10": 145.3,
-      "15": 147.2, "20": 148.9, "25": 150.1, "30": 151.4, "40": 153.2,
-      "50": 155.8
-    },
-    "recall_accuracy_by_seed_turn": {
-      "3": {
-        "correct_rate": 1.0,
-        "partial_rate": 0.0,
-        "failed_rate": 0.0,
-        "score_distribution": {"correct": 10, "partial": 0, "failed": 0}
-      },
-      "10": {
-        "correct_rate": 1.0,
-        "partial_rate": 0.0,
-        "failed_rate": 0.0,
-        "score_distribution": {"correct": 10, "partial": 0, "failed": 0}
-      },
-      "25": {
-        "correct_rate": 0.9,
-        "partial_rate": 0.1,
-        "failed_rate": 0.0,
-        "score_distribution": {"correct": 9, "partial": 1, "failed": 0}
-      },
-      "40": {
-        "correct_rate": 0.9,
-        "partial_rate": 0.1,
-        "failed_rate": 0.0,
-        "score_distribution": {"correct": 9, "partial": 1, "failed": 0}
-      }
-    },
-    "avg_tokens_per_run": 2650,
-    "std_tokens_per_run": 180,
-    "estimated_cost_per_1k_conversations_usd": 5.30
-  },
-  "pgvector": {
-    "num_valid_runs": 10,
-    "avg_latency_ms": 168.2,
-    "std_latency_ms": 35.1,
-    "avg_latency_per_turn": {
-      "1": 152.4, "2": 158.1, "3": 162.5, "5": 165.3, "10": 168.1,
-      "15": 170.4, "20": 172.8, "25": 174.2, "30": 175.9, "40": 178.3,
-      "50": 181.5
-    },
-    "recall_accuracy_by_seed_turn": {
-      "3": {
-        "correct_rate": 1.0,
-        "partial_rate": 0.0,
-        "failed_rate": 0.0,
-        "score_distribution": {"correct": 10, "partial": 0, "failed": 0}
-      },
-      "10": {
-        "correct_rate": 0.9,
-        "partial_rate": 0.1,
-        "failed_rate": 0.0,
-        "score_distribution": {"correct": 9, "partial": 1, "failed": 0}
-      },
-      "25": {
-        "correct_rate": 0.9,
-        "partial_rate": 0.1,
-        "failed_rate": 0.0,
-        "score_distribution": {"correct": 9, "partial": 1, "failed": 0}
-      },
-      "40": {
-        "correct_rate": 0.8,
-        "partial_rate": 0.1,
-        "failed_rate": 0.1,
-        "score_distribution": {"correct": 8, "partial": 1, "failed": 1}
-      }
-    },
-    "avg_tokens_per_run": 2780,
-    "std_tokens_per_run": 195,
-    "estimated_cost_per_1k_conversations_usd": 5.56
+    "recall_accuracy_by_probe_turn": {},
+    "avg_tokens_per_run": 24020.0,
+    "std_tokens_per_run": 182.0,
+    "estimated_cost_per_1k_conversations_usd": 144.12
   }
 }

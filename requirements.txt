@@ -3,6 +3,7 @@ langchain-community==0.2.17
 langchain-openai==0.1.25
 langchain-core==0.2.40
 openai==1.51.0
+httpx<0.28
 qdrant-client==1.11.3
 psycopg2-binary==2.9.9
 asyncpg==0.29.0
@@ -10,7 +11,8 @@ pgvector==0.3.5
 plotly==5.24.1
 matplotlib==3.9.2
 pandas==2.2.3
-numpy==2.1.1
+numpy>=1.26.0,<2.0.0
 tiktoken==0.7.0
 python-dotenv==1.0.1
 kaleido==0.2.1
+sentence-transformers==3.1.1

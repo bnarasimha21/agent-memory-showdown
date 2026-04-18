@@ -9,14 +9,14 @@ load_dotenv()
 class Config:
     # DigitalOcean Serverless Inference
     DO_API_KEY: str = os.getenv("DO_API_KEY", "")
-    DO_INFERENCE_URL: str = "https://cluster-api.do-ai.run/v1"
+    DO_INFERENCE_URL: str = "https://inference.do-ai.run/v1"
 
     # LLM (Claude via DO Serverless Inference)
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "anthropic/claude-3.5-sonnet")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "anthropic-claude-4.5-sonnet")
 
     # Embeddings (DO Serverless Inference)
-    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "baai/bge-large-en-v1.5")
-    EMBEDDING_DIMENSION: int = int(os.getenv("EMBEDDING_DIMENSION", "1024"))
+    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "gte-large-en-v1.5")
+    EMBEDDING_DIMENSION: int = int(os.getenv("EMBEDDING_DIMENSION", "384"))
 
     # Vector DBs
     QDRANT_URL: str = os.getenv("QDRANT_URL", "http://localhost:6333")

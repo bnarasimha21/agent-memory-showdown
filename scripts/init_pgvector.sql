@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS memory_embeddings (
     id BIGSERIAL PRIMARY KEY,
     session_id TEXT NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(1024),
+    embedding vector(384),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
