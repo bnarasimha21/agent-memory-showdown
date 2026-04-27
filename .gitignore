@@ -10,6 +10,9 @@ venv/
 results/benchmark_*.json
 results/charts/*.html
 results/charts/*.png
+node_modules/
+package-lock.json
+remotion/out/
 *.swp
 *.swo
 .DS_Store

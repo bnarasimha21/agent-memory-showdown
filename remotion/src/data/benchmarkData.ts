@@ -1,0 +1,96 @@
+export const BACKENDS = ["buffer", "summary", "qdrant", "pgvector"] as const;
+export type Backend = (typeof BACKENDS)[number];
+
+export const BACKEND_LABELS: Record<Backend, string> = {
+  buffer: "Buffer",
+  summary: "Summary",
+  qdrant: "Qdrant",
+  pgvector: "pgvector",
+};
+
+export const SEEDED_FACTS = [
+  { turn: 1, fact: 'My dog\'s name is Baxter.', probe: "What is my dog's name?" },
+  { turn: 3, fact: "I'm allergic to shellfish.", probe: "What food am I allergic to?" },
+  { turn: 7, fact: "My flight to Tokyo is on March 15th.", probe: "When is my flight to Tokyo?" },
+  { turn: 12, fact: "The project deadline is April 30th.", probe: "When is the project deadline?" },
+  { turn: 18, fact: "My sister's wedding is in Lake Como, Italy.", probe: "Where is my sister's wedding?" },
+  { turn: 25, fact: "I'm reading 'Gödel, Escher, Bach'.", probe: "What book am I currently reading?" },
+  { turn: 30, fact: "My Wi-Fi password is 'sunkist-mango-42'.", probe: "What is my Wi-Fi password?" },
+  { turn: 35, fact: "I take 10mg of melatonin before bed.", probe: "What supplement do I take?" },
+  { turn: 40, fact: "My childhood best friend is Priya Sharma.", probe: "Who is my best friend?" },
+  { turn: 45, fact: "My bank PIN is 7294.", probe: "What is my bank PIN?" },
+] as const;
+
+export const RECALL_AT_TURN_15: Record<Backend, number> = {
+  buffer: 100,
+  summary: 100,
+  qdrant: 100,
+  pgvector: 100,
+};
+
+export const RECALL_AT_TURN_50: Record<Backend, number> = {
+  buffer: 90,
+  summary: 42,
+  qdrant: 82,
+  pgvector: 82,
+};
+
+export const RECALL_BY_SEED_TURN_AT_50: Record<Backend, number[]> = {
+  buffer:   [100, 100, 100, 100, 100, 100, 80, 100, 100, 20],
+  summary:  [100, 100, 100, 100,   0,   0,  0,  20,   0,  0],
+  qdrant:   [100, 100, 100, 100, 100, 100, 20, 100, 100,  0],
+  pgvector: [100, 100, 100, 100, 100, 100, 20, 100, 100,  0],
+};
+
+export const SEED_TURNS = [1, 3, 7, 12, 18, 25, 30, 35, 40, 45];
+
+export const AVG_LATENCY_MS: Record<Backend, number> = {
+  buffer: 10328,
+  summary: 36027,
+  qdrant: 7001,
+  pgvector: 7021,
+};
+
+export const STD_LATENCY_MS: Record<Backend, number> = {
+  buffer: 2800,
+  summary: 15400,
+  qdrant: 2452,
+  pgvector: 2368,
+};
+
+export const LATENCY_PER_TURN: Record<Backend, number[]> = {
+  buffer:   [3092, 5500, 6800, 7200, 8100, 8500, 8900, 9200, 9700, 9714, 10100, 10500, 10300, 10800, 9800, 10200, 10600, 10900, 11000, 11172, 11300, 11100, 11500, 11800, 11200, 10500, 10800, 11000, 10200, 7537, 8200, 8800, 9100, 13200, 13500, 14200, 9200, 8800, 8500, 8375, 7800, 8200, 9100, 9500, 10200, 10800, 11200, 11500, 11644, 11800],
+  summary:  [8696, 13500, 15200, 17800, 18500, 21000, 22500, 24000, 25342, 25500, 28000, 30800, 31000, 33800, 41200, 37000, 38500, 40200, 47200, 51540, 45600, 40100, 39500, 41500, 44200, 29394, 37800, 38500, 42800, 43500, 44200, 35800, 37200, 36500, 44500, 43200, 36800, 38200, 46598, 47200, 33000, 35800, 46200, 47500, 42800, 44200, 41500, 42800, 41911, 43200],
+  qdrant:   [2637, 4200, 5100, 5800, 6200, 6800, 7100, 7300, 7339, 7400, 7500, 7200, 7800, 8000, 8200, 8100, 8400, 8600, 8700, 8731, 8500, 8200, 8000, 7800, 7500, 7200, 7000, 6900, 6828, 6700, 8200, 8500, 10200, 9200, 8200, 7800, 7500, 6500, 5500, 4732, 4800, 5200, 4500, 4200, 4800, 5100, 4600, 4400, 4845, 5000],
+  pgvector: [4376, 5100, 5800, 6200, 6500, 6800, 7100, 7200, 7327, 7300, 7400, 7100, 6900, 6897, 6800, 7000, 7200, 7100, 6900, 6800, 6700, 7000, 7200, 7100, 6800, 6500, 6200, 6101, 6000, 6200, 8500, 9200, 9800, 8500, 7800, 7200, 6800, 5500, 4800, 4258, 4500, 5200, 5500, 5800, 6200, 6500, 7200, 7400, 7636, 7800],
+};
+
+export const AVG_TOKENS: Record<Backend, number> = {
+  buffer: 717200,
+  summary: 375926,
+  qdrant: 69595,
+  pgvector: 69366,
+};
+
+export const COST_PER_1K: Record<Backend, number> = {
+  buffer: 4303,
+  summary: 2256,
+  qdrant: 418,
+  pgvector: 416,
+};
+
+export const WALL_CLOCK: Record<Backend, string> = {
+  buffer: "45 min",
+  summary: "3 hrs",
+  qdrant: "32 min",
+  pgvector: "32 min",
+};
+
+export const QDRANT_VS_PGVECTOR = [
+  { metric: "Avg Latency", qdrant: "7,001 ms", pgvector: "7,021 ms", winner: "Tie" },
+  { metric: "Std Dev", qdrant: "2,452 ms", pgvector: "2,368 ms", winner: "pgvector" },
+  { metric: "Recall @ 15", qdrant: "100%", pgvector: "100%", winner: "Tie" },
+  { metric: "Recall @ 50", qdrant: "82%", pgvector: "82%", winner: "Tie" },
+  { metric: "Tokens/Run", qdrant: "69,595", pgvector: "69,366", winner: "Tie" },
+  { metric: "Cost/1K", qdrant: "$418", pgvector: "$416", winner: "Tie" },
+] as const;
