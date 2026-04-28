@@ -4,6 +4,17 @@
 
 A benchmark that stress-tests four LangChain memory backends across a 50-turn synthetic conversation and measures recall accuracy, retrieval latency, and token cost.
 
+## Key Results
+
+| Backend | Recall @ Turn 50 | Avg Latency/Turn | Cost / 1K Convos | Tokens/Run |
+|---------|:-----------------:|:----------------:|:-----------------:|:----------:|
+| **buffer** | 90% | 10.3s | $4,303 | 717K |
+| **summary** | 42% | 36.0s | $2,256 | 376K |
+| **qdrant** | 82% | 7.0s | $418 | 70K |
+| **pgvector** | 82% | 7.0s | $416 | 69K |
+
+**Winner:** Vector backends (qdrant/pgvector) — 82% recall at 1/10th the cost of buffer, with flat latency regardless of conversation length. Summary memory is the worst performer: slowest, lossy, and still expensive.
+
 ## Architecture
 
 ```mermaid
@@ -16,69 +27,84 @@ flowchart TD
     HN --> B2[SummaryMemoryBackend\nConversationSummaryMemory]
     HN --> B3[QdrantMemoryBackend\nVectorStore via Qdrant]
     HN --> B4[PGVectorMemoryBackend\nVectorStore via pgvector]
-    B1 & B2 --> LLM[Claude via\nDO Serverless Inference]
+    B1 & B2 --> LLM[Claude 4.5 Sonnet via\nDO Serverless Inference]
     B3 --> LLM
     B3 --> QD[(Qdrant\nDocker)]
     B4 --> LLM
-    B4 --> PG[(PostgreSQL\npgvector)]
-    B3 & B4 --> EMB[DO Serverless\nEmbeddings]
+    B4 --> PG[(PostgreSQL 16\npgvector)]
+    B3 & B4 --> EMB[Local Embeddings\nall-MiniLM-L6-v2]
     HN --> RS[results/benchmark_*.json]
     RS --> VIZ[visualize.py]
-    VIZ --> C1[memory_decay_curve.html/.png]
-    VIZ --> C2[latency_bar.html/.png]
+    VIZ --> C1[memory_decay_curve.png]
+    VIZ --> C2[latency_bar.png]
     VIZ --> C3[cost_table.md]
 ```
 
 ## Infrastructure
 
-- **Compute:** Single DigitalOcean Droplet (8GB RAM / 4 vCPU, Ubuntu 24.04)
-- **LLM:** Claude via DigitalOcean Serverless Inference API
-- **Embeddings:** DigitalOcean Serverless Inference embedding models
-- **Vector DB:** Qdrant (Docker) on the Droplet
-- **Relational + Vector:** PostgreSQL 16 + pg_vector extension on the Droplet
+- **Compute:** Single DigitalOcean Droplet (8GB RAM / 4 vCPU, Ubuntu 24.04, BLR1)
+- **LLM:** Claude 4.5 Sonnet via DigitalOcean Serverless Inference API (`anthropic-claude-4.5-sonnet`)
+- **Embeddings:** Local sentence-transformers (`all-MiniLM-L6-v2`, 384-dim, CPU)
+- **Vector DB:** Qdrant (Docker container) on the Droplet
+- **Relational + Vector:** PostgreSQL 16 + pgvector extension on the Droplet
 
 ## Memory Backends
 
 | Backend | Strategy | Strength | Weakness |
 |---------|----------|----------|---------|
 | `buffer` | Full conversation history | Perfect recall short-term | Context blows up, high cost |
-| `summary` | LLM-compressed summary | Low token cost | Lossy — facts may be summarized away |
+| `summary` | LLM-compressed summary | Low token cost | Lossy — facts get summarized away |
 | `qdrant` | Semantic vector search (Qdrant) | Fast, accurate retrieval, low cost | Requires Qdrant service |
-| `pgvector` | Semantic vector search (PostgreSQL) | SQL-native, easy ops | Slightly slower than Qdrant at scale |
+| `pgvector` | Semantic vector search (PostgreSQL) | SQL-native, easy ops | Slightly slower than Qdrant at massive scale |
 
 ## Benchmark Design
 
 - **50-turn synthetic conversation** — multi-topic (travel planning, tech preferences, personal details, work projects)
 - **10 facts planted** at turns: 1, 3, 7, 12, 18, 25, 30, 35, 40, 45
-- **Example facts:**
+- **Facts include:**
   - "My dog's name is Baxter"
   - "I'm allergic to shellfish"
   - "My flight to Tokyo is on March 15th"
   - "The project deadline is April 30th"
-- **Recall quizzed** at turns 15, 25, 35, and 50 (builds the memory decay curve)
-- **Scoring:** exact match (1.0) / partial match (0.5) / miss (0.0)
+  - "My sister's wedding is in Lake Como, Italy"
+  - "I'm reading 'Gödel, Escher, Bach'"
+  - "My Wi-Fi password is 'sunkist-mango-42'"
+  - "I take 10mg of melatonin before bed"
+  - "My childhood best friend is Priya Sharma"
+  - "My bank PIN is 7294"
+- **Recall probed** at turns 15 and 50 (builds the memory decay curve)
+- **Scoring:** exact match = correct / partial word match = partial / miss = failed
 - **5 runs per backend** for statistical reliability
 
 ## Metrics
 
 | Metric | Description |
 |--------|-------------|
-| Recall Accuracy | Score at turns 15, 25, 35, 50 (the decay curve) |
+| Recall Accuracy | Score at turns 15 and 50 (the decay curve) |
 | Retrieval Latency | Time to fetch memory context per turn (ms) |
 | Total Tokens Used | Input + output tokens across 50 turns |
-| Cost per 1000 Conversations | Extrapolated from token usage at standard pricing |
-| Memory Storage Size | Data volume per backend |
+| Cost per 1,000 Conversations | Extrapolated from token usage at Claude pricing |
 
-## Visualizations
+## Results
+
+Full results are in [`results/full_benchmark_results.md`](results/full_benchmark_results.md).
 
 ### Memory Decay Curve
-Line chart: recall accuracy (y-axis) vs. conversation turn (x-axis). One line per backend. Vector backends should hold a flat line; buffer drops sharply for early-seeded facts once the context window fills.
 
-### Latency Bar Chart
-Average retrieval latency per backend with error bars (std dev).
+All backends achieve 100% recall at turn 15. By turn 50:
 
-### Cost Table
-Estimated USD cost per 1,000 conversations based on average token usage.
+| Backend | Turn 15 | Turn 50 | Drop |
+|---------|:-------:|:-------:|:----:|
+| buffer | 100% | 90% | -10% |
+| summary | 100% | 42% | **-58%** |
+| qdrant | 100% | 82% | -18% |
+| pgvector | 100% | 82% | -18% |
+
+Summary collapses after turn 12 — the summarizer aggressively compresses away specific details. Facts from turns 18–45 are essentially lost.
+
+### Notable Finding
+
+The Wi-Fi password (turn 30) and bank PIN (turn 45) were missed by **all** backends — including buffer, which had the data in the prompt. This is Claude's safety behavior refusing to repeat sensitive data, not a memory failure.
 
 ## Setup
 
@@ -131,10 +157,21 @@ python run_benchmark.py --help
   --no-viz         skip chart generation
 ```
 
+## Remotion Video
+
+An animated explainer video of the benchmark results is built with [Remotion](https://www.remotion.dev/) (React + TypeScript). 10 scenes, 1920x1080 @ 30fps, dark techy theme.
+
+```bash
+cd remotion
+npm install
+npx remotion studio      # preview in browser
+npx remotion render src/index.ts AgentMemoryShowdown out/video.mp4  # render
+```
+
 ## Project Structure
 
 ```
-agent_memory_showdown/
+agent-memory-showdown/
 ├── run_benchmark.py          # entry point
 ├── Makefile                  # make run / make run-quick / make clean
 ├── docker-compose.yml        # Qdrant + PostgreSQL + benchmark app
@@ -145,7 +182,7 @@ agent_memory_showdown/
 │   ├── config.py             # env-driven config (DO API key, DB URIs)
 │   ├── dataset.py            # synthetic conversation generator
 │   ├── harness.py            # benchmark runner + aggregator
-│   ├── llm_factory.py        # Claude + embeddings via DO inference
+│   ├── llm_factory.py        # Claude + local embeddings
 │   ├── visualize.py          # Plotly + Matplotlib charts
 │   └── backends/
 │       ├── base.py           # BaseMemoryBackend, scoring helpers
@@ -156,37 +193,34 @@ agent_memory_showdown/
 ├── scripts/
 │   ├── setup_droplet.sh      # Provision Qdrant + Postgres on DO Droplet
 │   └── init_pgvector.sql     # DB schema for pgvector backend
+├── remotion/                 # Animated explainer video (React + Remotion)
+│   ├── src/
+│   │   ├── Root.tsx          # Main composition (all 10 scenes)
+│   │   ├── scenes/           # Scene1_Hook.tsx ... Scene10_Closing.tsx
+│   │   ├── components/       # AnimatedLineChart, GlassCard, ChatBubble, etc.
+│   │   ├── data/             # benchmarkData.ts (hardcoded results)
+│   │   └── styles/           # theme.ts (colors, fonts)
+│   └── package.json
 └── results/
-    ├── benchmark_example.json
+    ├── full_benchmark_results.md   # Detailed analysis
+    ├── smoke_test_results.md       # Quick test results
+    ├── video_script.md             # Video narration script
+    ├── video_script_simple.md      # Simplified video script
     └── charts/
-        ├── memory_decay_curve.html
-        ├── memory_decay_curve.png
-        ├── latency_bar.html
-        ├── latency_bar.png
         └── cost_table.md
 ```
 
-## Execution Plan
-
-1. Provision DO Droplet + install Qdrant (Docker) and PostgreSQL + pg_vector
-2. Set up repo + dependencies
-3. Build the conversation generator + fact planting
-4. Implement the 4 memory backends (Claude via DO inference)
-5. Run benchmark (5 runs per backend)
-6. Collect metrics + generate charts
-7. Write up findings
-
 ## Tech Stack
 
-- Python 3.11+
-- LangChain 0.2
-- Claude (via DigitalOcean Serverless Inference)
-- DO Serverless Inference embedding models
+- Python 3.11+ / LangChain 0.2
+- Claude 4.5 Sonnet (via DigitalOcean Serverless Inference)
+- sentence-transformers (all-MiniLM-L6-v2, local embeddings)
 - Qdrant client 1.11
 - pgvector 0.3 + psycopg2
 - Plotly 5 + Matplotlib 3.9
+- Remotion 4.0 (React + TypeScript video)
 - Docker Compose
 
 ## Status
 
-**Planning** — Infrastructure and code to be updated for DO + Claude.
+**Complete** — Benchmark run finished April 17, 2026. Full results and animated video available.
