@@ -1,13 +1,54 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { COLORS, FONTS, BACKEND_COLORS } from "../styles/theme";
+import {
+  AbsoluteFill,
+  Audio,
+  interpolate,
+  spring,
+  staticFile,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
+import { COLORS, FONTS } from "../styles/theme";
 import { AnimatedText } from "../components/AnimatedText";
 import { GlassCard } from "../components/GlassCard";
 import { FadeTransition } from "../components/FadeTransition";
 
-const MINI_STATS = [
-  { label: "Recall", buffer: "90%", vector: "82%", summary: "42%" },
-  { label: "Latency", buffer: "10.3s", vector: "7.0s", summary: "36.0s" },
-  { label: "Cost/1K", buffer: "$4,303", vector: "$416", summary: "$2,256" },
+// Cue points synced to public/audio/scene10.wav (whisper word-level, 30fps).
+const CUE = {
+  thats: 10,                // 0.34s "That's"
+  agentMemory: 25,          // 0.85s
+  showdown: 56,             // 1.89s
+  introEnd: 76,             // 2.53s
+  fourBackends: 89,         // 2.96s
+  thousandCalls: 137,       // 4.56s
+  fiveHours: 187,           // 6.22s
+  digitalOceanDroplet: 241, // 8.06s
+  statsEnd: 303,            // 10.11s
+  ifBuilding: 314,          // 10.48s
+  haventBenchmarked: 379,   // 12.56s
+  youreGuessing: 452,       // 15.08s
+  guessingEnd: 473,         // 15.76s
+  theDifference: 480,       // 16.00s
+  tenTimesCost: 579,        // 19.34s
+  fiveTimesLatency: 631,    // 21.04s
+  twoTimesRecall: 678,      // 22.61s
+  recallEnd: 738,           // 24.60s
+  soDoNot: 738,             // 24.60s "So do not"
+  guess: 760,               // 25.31s
+  measure: 780,             // 26.02s
+  end: 822,                 // 27.38s
+};
+
+const HEADLINE_STATS = [
+  { value: "4", label: "memory backends", reveal: CUE.fourBackends, color: COLORS.accent },
+  { value: "1,000+", label: "LLM calls", reveal: CUE.thousandCalls, color: COLORS.neonGreen },
+  { value: "5 hrs", label: "benchmarking", reveal: CUE.fiveHours, color: COLORS.qdrant },
+  { value: "$48/mo", label: "DO Droplet", reveal: CUE.digitalOceanDroplet, color: COLORS.pgvector },
+];
+
+const DIFF_STATS = [
+  { multiplier: "10×", label: "cost", reveal: CUE.tenTimesCost, color: COLORS.danger },
+  { multiplier: "5×", label: "latency", reveal: CUE.fiveTimesLatency, color: COLORS.summary },
+  { multiplier: "2×", label: "recall accuracy", reveal: CUE.twoTimesRecall, color: COLORS.accent },
 ];
 
 export const Scene10_Closing: React.FC = () => {
@@ -15,150 +56,360 @@ export const Scene10_Closing: React.FC = () => {
   const { fps } = useVideoConfig();
 
   return (
-    <FadeTransition durationFrames={900} fadeOutFrames={0}>
+    <FadeTransition durationFrames={CUE.end} fadeOutFrames={0}>
+      <Audio src={staticFile("audio/scene10.wav")} />
+
       <AbsoluteFill
         style={{
           background: `radial-gradient(ellipse at 50% 50%, #0d1525 0%, ${COLORS.bg} 70%)`,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
           padding: 80,
         }}
       >
-        {/* Phase 1: Mini stats grid (0-15s / 0-450f) */}
+        {/* Phase 1: "That's the Agent Memory Showdown" title reveal (10 → 303f) */}
         <div
           style={{
+            position: "absolute",
+            inset: 0,
             display: "flex",
-            gap: 30,
-            marginBottom: 60,
-            opacity: interpolate(frame, [0, 20, 400, 450], [0, 1, 1, 0.6], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
-          }}
-        >
-          {MINI_STATS.map((stat, i) => (
-            <GlassCard key={i} startFrame={i * 15} padding={24} width={320}>
-              <div
-                style={{
-                  fontFamily: FONTS.body,
-                  fontSize: 16,
-                  color: COLORS.textMuted,
-                  textAlign: "center",
-                  marginBottom: 16,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: 2,
-                }}
-              >
-                {stat.label}
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                {[
-                  { label: "buffer", val: stat.buffer, color: COLORS.buffer },
-                  { label: "vector", val: stat.vector, color: COLORS.qdrant },
-                  { label: "summary", val: stat.summary, color: COLORS.summary },
-                ].map((col) => (
-                  <div key={col.label} style={{ textAlign: "center", flex: 1 }}>
-                    <div
-                      style={{
-                        fontFamily: FONTS.mono,
-                        fontSize: 22,
-                        fontWeight: 700,
-                        color: col.color,
-                      }}
-                    >
-                      {col.val}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: FONTS.mono,
-                        fontSize: 11,
-                        color: COLORS.textDim,
-                        marginTop: 4,
-                      }}
-                    >
-                      {col.label}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
-          ))}
-        </div>
-
-        {/* Phase 2: Tagline (15-25s / 450-750f) */}
-        <div
-          style={{
-            opacity: interpolate(frame, [450, 490], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
-            transform: `scale(${spring({
-              frame: Math.max(0, frame - 450),
-              fps,
-              config: { damping: 12, stiffness: 80 },
-            })})`,
-            textAlign: "center",
-          }}
-        >
-          <h1
-            style={{
-              fontFamily: FONTS.body,
-              fontSize: 72,
-              fontWeight: 800,
-              color: COLORS.text,
-              margin: 0,
-              letterSpacing: -2,
-              textShadow: `0 0 60px ${COLORS.accentGlow}`,
-            }}
-          >
-            Don't guess.{" "}
-            <span style={{ color: COLORS.accent }}>Measure.</span>
-          </h1>
-        </div>
-
-        {/* Phase 3: GitHub + CTA (25-30s / 750-900f) */}
-        <div
-          style={{
-            marginTop: 50,
-            textAlign: "center",
-            opacity: interpolate(frame, [750, 790], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: interpolate(
+              frame,
+              [CUE.thats, CUE.thats + 12, CUE.statsEnd - 25, CUE.statsEnd + 10],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
           }}
         >
           <div
             style={{
               fontFamily: FONTS.mono,
-              fontSize: 22,
+              fontSize: 18,
               color: COLORS.accent,
-              background: `${COLORS.accent}11`,
-              border: `1px solid ${COLORS.accent}33`,
-              borderRadius: 10,
-              padding: "12px 32px",
-              display: "inline-block",
-              boxShadow: `0 0 30px ${COLORS.accentGlow}`,
+              letterSpacing: 6,
+              textTransform: "uppercase",
+              marginBottom: 20,
+              opacity: interpolate(frame, [CUE.thats, CUE.thats + 15], [0, 1], {
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              }),
             }}
           >
-            github.com/bnarasimha21/agent-memory-showdown
+            That's the
           </div>
-
-          <div
+          <h1
             style={{
               fontFamily: FONTS.body,
-              fontSize: 18,
-              color: COLORS.textMuted,
-              marginTop: 20,
+              fontSize: 96,
+              fontWeight: 800,
+              color: COLORS.text,
+              margin: 0,
+              textAlign: "center",
+              letterSpacing: -2,
+              textShadow: `0 0 60px ${COLORS.accentGlow}`,
+              opacity: interpolate(
+                frame,
+                [CUE.agentMemory, CUE.agentMemory + 15],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              transform: `scale(${spring({
+                frame: Math.max(0, frame - CUE.agentMemory),
+                fps,
+                config: { damping: 14, stiffness: 90 },
+              })})`,
             }}
           >
-            Full code, raw results, and all charts — open source
+            Agent Memory<br />Showdown
+          </h1>
+
+          {/* Headline stats appear below title */}
+          <div
+            style={{
+              display: "flex",
+              gap: 30,
+              marginTop: 60,
+            }}
+          >
+            {HEADLINE_STATS.map((s, i) => (
+              <div
+                key={i}
+                style={{
+                  textAlign: "center",
+                  opacity: interpolate(frame, [s.reveal, s.reveal + 15], [0, 1], {
+                    extrapolateLeft: "clamp",
+                    extrapolateRight: "clamp",
+                  }),
+                  transform: `translateY(${interpolate(
+                    frame,
+                    [s.reveal, s.reveal + 15],
+                    [12, 0],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                  )}px)`,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: FONTS.mono,
+                    fontSize: 44,
+                    fontWeight: 700,
+                    color: s.color,
+                    textShadow: `0 0 20px ${s.color}55`,
+                  }}
+                >
+                  {s.value}
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONTS.body,
+                    fontSize: 16,
+                    color: COLORS.textMuted,
+                    marginTop: 4,
+                  }}
+                >
+                  {s.label}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Bottom bar */}
+        {/* Phase 2: "You're guessing" warning (314 → 473f) */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 120px",
+            opacity: interpolate(
+              frame,
+              [CUE.ifBuilding, CUE.ifBuilding + 15, CUE.guessingEnd - 8, CUE.theDifference],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
+          }}
+        >
+          <AnimatedText
+            text="If you haven't benchmarked your memory backend,"
+            startFrame={CUE.ifBuilding + 5}
+            fontSize={34}
+            color={COLORS.textMuted}
+            textAlign="center"
+            mode="wordByWord"
+            durationFrames={130}
+          />
+          <div
+            style={{
+              fontFamily: FONTS.body,
+              fontSize: 96,
+              fontWeight: 800,
+              color: COLORS.accent,
+              marginTop: 30,
+              textShadow: `0 0 60px ${COLORS.accentGlow}`,
+              opacity: interpolate(
+                frame,
+                [CUE.youreGuessing, CUE.youreGuessing + 12],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              transform: `scale(${interpolate(
+                frame,
+                [CUE.youreGuessing, CUE.youreGuessing + 18],
+                [0.8, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              )})`,
+            }}
+          >
+            you're guessing.
+          </div>
+        </div>
+
+        {/* Phase 3: The difference (480 → 738f) */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: interpolate(
+              frame,
+              [CUE.theDifference, CUE.theDifference + 15, CUE.recallEnd - 8, CUE.recallEnd + 4],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 18,
+              color: COLORS.textMuted,
+              letterSpacing: 4,
+              textTransform: "uppercase",
+              marginBottom: 30,
+            }}
+          >
+            Best vs. worst choice
+          </div>
+
+          <div style={{ display: "flex", gap: 60 }}>
+            {DIFF_STATS.map((s) => (
+              <GlassCard
+                key={s.label}
+                startFrame={s.reveal}
+                padding={32}
+                glowColor={`${s.color}66`}
+              >
+                <div style={{ textAlign: "center", minWidth: 220 }}>
+                  <div
+                    style={{
+                      fontFamily: FONTS.mono,
+                      fontSize: 88,
+                      fontWeight: 800,
+                      color: s.color,
+                      lineHeight: 1,
+                      textShadow: `0 0 30px ${s.color}55`,
+                      opacity: interpolate(
+                        frame,
+                        [s.reveal + 5, s.reveal + 20],
+                        [0, 1],
+                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                      ),
+                      transform: `scale(${spring({
+                        frame: Math.max(0, frame - s.reveal - 5),
+                        fps,
+                        config: { damping: 12, stiffness: 100 },
+                      })})`,
+                    }}
+                  >
+                    {s.multiplier}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: FONTS.body,
+                      fontSize: 22,
+                      color: COLORS.text,
+                      marginTop: 12,
+                    }}
+                  >
+                    {s.label}
+                  </div>
+                </div>
+              </GlassCard>
+            ))}
+          </div>
+        </div>
+
+        {/* Phase 4: "Don't guess. Measure." + GitHub (738 → 822f) */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: interpolate(
+              frame,
+              [CUE.soDoNot, CUE.soDoNot + 12],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
+          }}
+        >
+          <h1
+            style={{
+              fontFamily: FONTS.body,
+              fontSize: 110,
+              fontWeight: 800,
+              color: COLORS.text,
+              margin: 0,
+              letterSpacing: -2,
+              textShadow: `0 0 60px ${COLORS.accentGlow}`,
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                opacity: interpolate(
+                  frame,
+                  [CUE.guess, CUE.guess + 10],
+                  [0, 1],
+                  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                ),
+              }}
+            >
+              Don't guess.{" "}
+            </span>
+            <span
+              style={{
+                color: COLORS.accent,
+                opacity: interpolate(
+                  frame,
+                  [CUE.measure, CUE.measure + 10],
+                  [0, 1],
+                  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                ),
+                transform: `scale(${interpolate(
+                  frame,
+                  [CUE.measure, CUE.measure + 18],
+                  [0.85, 1],
+                  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                )})`,
+                display: "inline-block",
+              }}
+            >
+              Measure.
+            </span>
+          </h1>
+
+          <div
+            style={{
+              marginTop: 50,
+              textAlign: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.measure + 15, CUE.measure + 40],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <div
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 22,
+                color: COLORS.accent,
+                background: `${COLORS.accent}11`,
+                border: `1px solid ${COLORS.accent}44`,
+                borderRadius: 10,
+                padding: "12px 32px",
+                display: "inline-block",
+                boxShadow: `0 0 30px ${COLORS.accentGlow}`,
+              }}
+            >
+              github.com/bnarasimha21/agent-memory-showdown
+            </div>
+            <div
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: 18,
+                color: COLORS.textMuted,
+                marginTop: 16,
+              }}
+            >
+              Full code, raw results, and all charts. Open source.
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom progress bar (full gradient at the very end) */}
         <div
           style={{
             position: "absolute",
@@ -167,10 +418,12 @@ export const Scene10_Closing: React.FC = () => {
             right: 0,
             height: 4,
             background: `linear-gradient(90deg, ${COLORS.buffer}, ${COLORS.summary}, ${COLORS.qdrant}, ${COLORS.pgvector})`,
-            opacity: interpolate(frame, [750, 800], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            opacity: interpolate(
+              frame,
+              [CUE.measure, CUE.measure + 30],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
           }}
         />
       </AbsoluteFill>

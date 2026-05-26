@@ -1,10 +1,17 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Audio,
+  interpolate,
+  spring,
+  staticFile,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 import { COLORS, FONTS, BACKEND_COLORS } from "../styles/theme";
 import { AnimatedText } from "../components/AnimatedText";
 import { AnimatedCounter } from "../components/AnimatedCounter";
 import { AnimatedLineChart } from "../components/AnimatedLineChart";
 import { BackendBadge } from "../components/BackendBadge";
-import { GlassCard } from "../components/GlassCard";
 import { FadeTransition } from "../components/FadeTransition";
 import {
   BACKENDS,
@@ -12,37 +19,87 @@ import {
   RECALL_AT_TURN_50,
   RECALL_BY_SEED_TURN_AT_50,
   SEED_TURNS,
-  BACKEND_LABELS,
 } from "../data/benchmarkData";
+
+// Cue points synced to public/audio/scene04.wav (whisper word-level, 30fps).
+const CUE = {
+  intro: 0,                      // 0.00 "Let's start"
+  canItRemember: 87,             // 2.79s
+  introEnd: 128,                 // 4.25s
+  atTurn15: 131,                 // 4.36s
+  fourBackends: 182,             // 6.14s
+  hundredPctRecall: 222,         // 7.42s "100%"
+  recallWord: 258,               // 8.62s
+  onlyFourFacts: 270,            // 9.00s
+  noChallenge: 429,              // 14.31s
+  turn15End: 464,                // 15.48s
+  butAtTurn50: 464,              // 15.48s "But at turn 50"
+  storyChanges: 626,             // 20.79s
+  dramatically: 653,             // 21.78s
+  turn50SetupEnd: 684,           // 22.80s
+  bufferReveal: 703,             // 23.44s "Buffer"
+  buffer90: 727,                 // 24.24s "90%"
+  bufferReason: 787,             // 26.23s "it has"
+  ofCourseRemembers: 901,        // 30.03s
+  onlyFailures: 940,             // 31.32s
+  wifiPasswordBankPIN: 982,      // 32.71s
+  claudeSafety: 1051,            // 35.04s
+  notMemoryFailure: 1186,        // 39.56s
+  qdrantPgvectorReveal: 1244,    // 41.48s
+  qdrantPgvector82: 1299,        // 43.33s
+  solidPerformance: 1328,        // 44.27s
+  sameSafetyDrops: 1496,         // 49.87s
+  summaryReveal: 1602,           // 53.40s "And then"
+  summary42: 1663,               // 55.43s "42%"
+  lessThanHalf: 1683,            // 56.19s
+  scoreboardEnd: 1735,           // 57.84s
+  letsLookAt: 1735,              // 57.84s
+  summaryRemembersT1to12: 1791,  // 59.73s
+  perfectly: 1894,               // 63.13s
+  everythingAfter18: 1922,       // 64.08s
+  turn18Zero: 1982,              // 66.06s
+  summarizerCompressed: 2024,    // 67.48s
+  sistersWedding: 2078,          // 69.22s
+  bookReading: 2142,             // 71.41s
+  supplementDosage: 2190,        // 73.02s
+  allGone: 2230,                 // 74.34s
+  notJustForget: 2294,           // 76.40s
+  activelyDestroys: 2356,        // 78.55s
+  end: 2469,                     // 82.27s
+};
 
 export const Scene4_Recall: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   return (
-    <FadeTransition durationFrames={3150}>
+    <FadeTransition durationFrames={CUE.end}>
+      <Audio src={staticFile("audio/scene04.wav")} />
+
       <AbsoluteFill
         style={{
           background: `radial-gradient(ellipse at 50% 50%, #0d1525 0%, ${COLORS.bg} 70%)`,
           padding: 60,
         }}
       >
-        {/* Phase 1: Memory Decay Curve (0-30s / 0-900f) */}
+        {/* Phase 1: "Can it remember?" + Turn 15 line chart (0 → 684f) */}
         <div
           style={{
-            opacity: interpolate(frame, [0, 15, 850, 900], [0, 1, 1, 0], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            opacity: interpolate(
+              frame,
+              [0, 12, CUE.turn50SetupEnd - 25, CUE.turn50SetupEnd + 10],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
             position: "absolute",
             inset: 0,
             padding: 60,
           }}
         >
           <AnimatedText
-            text="Can It Remember?"
-            startFrame={0}
-            fontSize={48}
+            text="Can it remember?"
+            startFrame={CUE.canItRemember}
+            fontSize={56}
             fontWeight={700}
             textAlign="center"
           />
@@ -53,13 +110,15 @@ export const Scene4_Recall: React.FC = () => {
               color: COLORS.textMuted,
               textAlign: "center",
               marginTop: 8,
-              opacity: interpolate(frame, [20, 40], [0, 1], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }),
+              opacity: interpolate(
+                frame,
+                [CUE.atTurn15, CUE.atTurn15 + 20],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
             }}
           >
-            Recall accuracy at turn 15 vs turn 50
+            Recall accuracy: turn 15 vs turn 50
           </div>
 
           <div style={{ display: "flex", justifyContent: "center", marginTop: 30 }}>
@@ -69,32 +128,90 @@ export const Scene4_Recall: React.FC = () => {
                 data: [RECALL_AT_TURN_15[b], RECALL_AT_TURN_50[b]],
                 color: BACKEND_COLORS[b],
               }))}
-              startFrame={60}
+              startFrame={CUE.atTurn15 + 20}
               drawDuration={120}
               chartWidth={1000}
-              chartHeight={500}
+              chartHeight={460}
               xLabels={["Turn 15", "Turn 50"]}
               yMax={105}
               yLabel="Recall %"
             />
           </div>
+
+          {/* Annotation: 100% recall at turn 15 */}
+          <div
+            style={{
+              position: "absolute",
+              top: 320,
+              right: 200,
+              opacity: interpolate(
+                frame,
+                [CUE.hundredPctRecall, CUE.hundredPctRecall + 15, CUE.butAtTurn50, CUE.butAtTurn50 + 30],
+                [0, 1, 1, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              fontFamily: FONTS.mono,
+              fontSize: 28,
+              fontWeight: 700,
+              color: COLORS.neonGreen,
+              textShadow: `0 0 20px rgba(0,255,136,0.4)`,
+              background: "rgba(0,255,136,0.06)",
+              border: `1px solid rgba(0,255,136,0.3)`,
+              borderRadius: 10,
+              padding: "8px 16px",
+            }}
+          >
+            100% · no challenge
+          </div>
+
+          {/* "But at turn 50..." subtitle */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 100,
+              left: 0,
+              right: 0,
+              textAlign: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.butAtTurn50, CUE.butAtTurn50 + 15],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <AnimatedText
+              text="But at turn 50, the story changes dramatically."
+              startFrame={CUE.butAtTurn50 + 5}
+              fontSize={32}
+              fontWeight={600}
+              color={COLORS.danger}
+              glow
+              glowColor={COLORS.dangerGlow}
+              textAlign="center"
+              mode="wordByWord"
+              durationFrames={140}
+            />
+          </div>
         </div>
 
-        {/* Phase 2: Scoreboard (30-65s / 900-1950f) */}
+        {/* Phase 2: Scoreboard at Turn 50 (684 → 1735f) */}
         <div
           style={{
-            opacity: interpolate(frame, [900, 930, 1900, 1950], [0, 1, 1, 0], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            opacity: interpolate(
+              frame,
+              [CUE.turn50SetupEnd, CUE.turn50SetupEnd + 15, CUE.scoreboardEnd - 15, CUE.scoreboardEnd + 5],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
             position: "absolute",
             inset: 0,
-            padding: "60px 120px",
+            padding: "50px 120px",
           }}
         >
           <AnimatedText
             text="Recall at Turn 50"
-            startFrame={910}
+            startFrame={CUE.turn50SetupEnd + 5}
             fontSize={48}
             fontWeight={700}
             textAlign="center"
@@ -105,19 +222,31 @@ export const Scene4_Recall: React.FC = () => {
               display: "flex",
               flexDirection: "column",
               gap: 24,
-              marginTop: 60,
-              maxWidth: 1000,
-              margin: "60px auto 0",
+              marginTop: 50,
+              maxWidth: 1100,
+              margin: "50px auto 0",
             }}
           >
-            {BACKENDS.map((b, i) => {
-              const rowStart = 960 + i * 60;
+            {BACKENDS.map((b) => {
               const pct = RECALL_AT_TURN_50[b];
               const color = BACKEND_COLORS[b];
               const isSummary = b === "summary";
+              const isBuffer = b === "buffer";
+              const isVector = b === "qdrant" || b === "pgvector";
+
+              const rowStart = isBuffer
+                ? CUE.bufferReveal
+                : isVector
+                ? CUE.qdrantPgvectorReveal
+                : CUE.summaryReveal;
+              const counterStart = isBuffer
+                ? CUE.buffer90
+                : isVector
+                ? CUE.qdrantPgvector82
+                : CUE.summary42;
 
               const barWidth = spring({
-                frame: Math.max(0, frame - rowStart),
+                frame: Math.max(0, frame - counterStart),
                 fps,
                 config: { damping: 18, stiffness: 60 },
               });
@@ -168,8 +297,8 @@ export const Scene4_Recall: React.FC = () => {
                   <div style={{ width: 100, textAlign: "right" }}>
                     <AnimatedCounter
                       value={pct}
-                      startFrame={rowStart}
-                      durationFrames={50}
+                      startFrame={counterStart}
+                      durationFrames={40}
                       suffix="%"
                       fontSize={36}
                       color={isSummary ? COLORS.danger : color}
@@ -181,162 +310,415 @@ export const Scene4_Recall: React.FC = () => {
             })}
           </div>
 
-          {/* Commentary */}
-          <AnimatedText
-            text='Summary: 42% — it forgot more than it remembers'
-            startFrame={1250}
-            fontSize={24}
-            color={COLORS.danger}
-            glow
-            glowColor={COLORS.dangerGlow}
-            textAlign="center"
-            style={{ marginTop: 50 }}
-          />
+          {/* Sensitive-data callout during buffer narration */}
+          <div
+            style={{
+              position: "absolute",
+              left: 120,
+              right: 120,
+              bottom: 180,
+              textAlign: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.wifiPasswordBankPIN, CUE.wifiPasswordBankPIN + 20, CUE.qdrantPgvectorReveal - 10, CUE.qdrantPgvectorReveal + 10],
+                [0, 1, 1, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <div
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 18,
+                color: COLORS.textMuted,
+                marginBottom: 8,
+              }}
+            >
+              Buffer's only misses
+            </div>
+            <div
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: 22,
+                color: COLORS.text,
+              }}
+            >
+              🔒 Wi-Fi password · 🔒 Bank PIN <span style={{ color: COLORS.textMuted, fontSize: 18 }}>(Claude's safety layer, not memory)</span>
+            </div>
+          </div>
+
+          {/* Summary shock callout */}
+          <div
+            style={{
+              position: "absolute",
+              left: 120,
+              right: 120,
+              bottom: 100,
+              textAlign: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.summary42, CUE.summary42 + 15, CUE.scoreboardEnd - 10, CUE.scoreboardEnd],
+                [0, 1, 1, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <AnimatedText
+              text="Summary: 42%. Less than half."
+              startFrame={CUE.summary42 + 5}
+              fontSize={32}
+              fontWeight={700}
+              color={COLORS.danger}
+              glow
+              glowColor={COLORS.dangerGlow}
+              textAlign="center"
+              mode="wordByWord"
+              durationFrames={60}
+            />
+          </div>
         </div>
 
-        {/* Phase 3: Grouped bar chart — recall by seed turn (65-105s / 1950-3150f) */}
+        {/* Phase 3: Summary cliff heatmap + lost facts (1735 → 2469f) */}
         <div
           style={{
-            opacity: interpolate(frame, [1950, 1990], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            opacity: interpolate(
+              frame,
+              [CUE.scoreboardEnd, CUE.scoreboardEnd + 15],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
             position: "absolute",
             inset: 0,
-            padding: "50px 40px",
+            padding: "40px 80px",
           }}
         >
           <AnimatedText
-            text="Recall at Turn 50 — By Fact Seed Turn"
-            startFrame={1960}
-            fontSize={40}
+            text="The Summary Cliff"
+            startFrame={CUE.letsLookAt + 5}
+            fontSize={44}
             fontWeight={700}
             textAlign="center"
           />
+          <div
+            style={{
+              fontFamily: FONTS.body,
+              fontSize: 20,
+              color: COLORS.textMuted,
+              textAlign: "center",
+              marginTop: 6,
+              opacity: interpolate(
+                frame,
+                [CUE.letsLookAt + 20, CUE.letsLookAt + 40],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            Each cell = one planted fact. Green kept, red lost.
+          </div>
 
-          <div style={{ position: "relative", marginTop: 40, height: 600, width: "100%" }}>
-            {/* Grid and bars */}
-            {SEED_TURNS.map((seedTurn, si) => {
-              const groupX = 80 + si * 170;
-              const groupDelay = 2020 + si * 20;
+          {(() => {
+            const cliffIndex = 4;
+            const cellW = 100;
+            const cellH = 60;
+            const cellGap = 6;
+            const cliffGap = 30;
+            const rowLabelW = 150;
+            const gridTop = 90;
 
-              return (
-                <div key={seedTurn}>
-                  {/* Seed turn label */}
+            const getCellLeft = (si: number) =>
+              rowLabelW + si * (cellW + cellGap) + (si >= cliffIndex ? cliffGap : 0);
+
+            const gridWidth =
+              rowLabelW + SEED_TURNS.length * (cellW + cellGap) + cliffGap;
+
+            return (
+              <div
+                style={{
+                  position: "relative",
+                  marginTop: 24,
+                  width: gridWidth,
+                  marginLeft: "auto",
+                  marginRight: "auto",
+                }}
+              >
+                {SEED_TURNS.map((turn, si) => (
                   <div
+                    key={turn}
                     style={{
                       position: "absolute",
-                      left: groupX,
-                      bottom: 10,
-                      width: 160,
+                      left: getCellLeft(si),
+                      top: gridTop - 30,
+                      width: cellW,
                       textAlign: "center",
                       fontFamily: FONTS.mono,
                       fontSize: 14,
                       color: COLORS.textMuted,
-                      opacity: interpolate(frame, [groupDelay, groupDelay + 10], [0, 1], {
-                        extrapolateLeft: "clamp",
-                        extrapolateRight: "clamp",
-                      }),
+                      opacity: interpolate(
+                        frame,
+                        [CUE.letsLookAt + 30, CUE.letsLookAt + 50],
+                        [0, 1],
+                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                      ),
                     }}
                   >
-                    Turn {seedTurn}
+                    T{turn}
                   </div>
+                ))}
 
-                  {/* 4 bars per group */}
-                  {BACKENDS.map((b, bi) => {
-                    const val = RECALL_BY_SEED_TURN_AT_50[b][si];
-                    const barDelay = groupDelay + bi * 5;
-                    const barH = spring({
-                      frame: Math.max(0, frame - barDelay),
-                      fps,
-                      config: { damping: 16, stiffness: 80 },
-                    });
-                    const color = BACKEND_COLORS[b];
-                    const barWidth = 32;
-                    const barLeft = groupX + 16 + bi * (barWidth + 4);
-                    const maxBarHeight = 400;
-                    const height = (val / 100) * maxBarHeight * barH;
+                {/* Cliff line */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left:
+                      rowLabelW +
+                      cliffIndex * (cellW + cellGap) -
+                      cellGap / 2 +
+                      cliffGap / 2 -
+                      1,
+                    top: gridTop - 44,
+                    width: 2,
+                    height: BACKENDS.length * (cellH + cellGap) + 56,
+                    background: COLORS.danger,
+                    boxShadow: `0 0 12px ${COLORS.dangerGlow}`,
+                    opacity: interpolate(
+                      frame,
+                      [CUE.everythingAfter18, CUE.everythingAfter18 + 40],
+                      [0, 0.85],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    ),
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    left:
+                      rowLabelW +
+                      cliffIndex * (cellW + cellGap) -
+                      cellGap / 2 +
+                      cliffGap / 2 -
+                      80,
+                    top: gridTop - 62,
+                    width: 160,
+                    textAlign: "center",
+                    fontFamily: FONTS.mono,
+                    fontSize: 13,
+                    color: COLORS.danger,
+                    fontWeight: 700,
+                    letterSpacing: 1,
+                    opacity: interpolate(
+                      frame,
+                      [CUE.everythingAfter18 + 30, CUE.everythingAfter18 + 60],
+                      [0, 1],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    ),
+                  }}
+                >
+                  ↓ THE CLIFF
+                </div>
 
-                    return (
+                {BACKENDS.map((b, bi) => {
+                  const rowDelay = CUE.letsLookAt + 60 + bi * 35;
+                  const rowOpacity = interpolate(
+                    frame,
+                    [rowDelay, rowDelay + 20],
+                    [0, 1],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                  );
+                  const isSummary = b === "summary";
+                  return (
+                    <div key={b} style={{ opacity: rowOpacity }}>
                       <div
-                        key={b}
                         style={{
                           position: "absolute",
-                          left: barLeft,
-                          bottom: 40,
-                          width: barWidth,
-                          height,
-                          background: val === 0
-                            ? `${COLORS.danger}44`
-                            : `linear-gradient(180deg, ${color}, ${color}88)`,
-                          borderRadius: "4px 4px 0 0",
-                          boxShadow: val === 0 ? undefined : `0 0 8px ${color}33`,
+                          left: 0,
+                          top: gridTop + bi * (cellH + cellGap),
+                          width: rowLabelW - 12,
+                          height: cellH,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-end",
+                          paddingRight: 16,
+                          fontFamily: FONTS.mono,
+                          fontSize: 18,
+                          fontWeight: 700,
+                          color: BACKEND_COLORS[b],
+                          textShadow: isSummary
+                            ? `0 0 12px ${COLORS.dangerGlow}`
+                            : undefined,
                         }}
                       >
-                        {val === 0 && barH > 0.9 && (
+                        {b}
+                      </div>
+
+                      {SEED_TURNS.map((turn, si) => {
+                        const val = RECALL_BY_SEED_TURN_AT_50[b][si];
+                        const kept = val >= 50;
+                        const partial = val > 0 && val < 50;
+                        const cellDelay = rowDelay + si * 10;
+                        const cellFill = spring({
+                          frame: Math.max(0, frame - cellDelay),
+                          fps,
+                          config: { damping: 18, stiffness: 90 },
+                        });
+                        const scale = 0.7 + 0.3 * cellFill;
+
+                        const bg = kept
+                          ? `linear-gradient(135deg, ${COLORS.neonGreen}cc, ${COLORS.neonGreen}66)`
+                          : partial
+                          ? `linear-gradient(135deg, #ffaa44cc, #ffaa4466)`
+                          : `linear-gradient(135deg, ${COLORS.danger}cc, ${COLORS.danger}66)`;
+
+                        const glow = kept
+                          ? `0 0 14px rgba(0,255,136,0.25)`
+                          : partial
+                          ? `0 0 14px rgba(255,170,68,0.3)`
+                          : `0 0 18px ${COLORS.dangerGlow}`;
+
+                        return (
                           <div
+                            key={turn}
                             style={{
                               position: "absolute",
-                              top: -20,
-                              left: "50%",
-                              transform: "translateX(-50%)",
-                              fontFamily: FONTS.mono,
-                              fontSize: 10,
-                              color: COLORS.danger,
+                              left: getCellLeft(si),
+                              top: gridTop + bi * (cellH + cellGap),
+                              width: cellW,
+                              height: cellH,
+                              borderRadius: 8,
+                              background: bg,
+                              border: `1px solid ${
+                                kept
+                                  ? "rgba(0,255,136,0.4)"
+                                  : partial
+                                  ? "rgba(255,170,68,0.4)"
+                                  : "rgba(255,68,68,0.5)"
+                              }`,
+                              boxShadow: glow,
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              opacity: cellFill,
+                              transform: `scale(${scale})`,
                             }}
                           >
-                            0%
+                            <div
+                              style={{
+                                fontFamily: FONTS.mono,
+                                fontSize: 20,
+                                fontWeight: 700,
+                                color: "#fff",
+                                lineHeight: 1,
+                              }}
+                            >
+                              {val}%
+                            </div>
+                            <div
+                              style={{
+                                fontFamily: FONTS.mono,
+                                fontSize: 12,
+                                color: "rgba(255,255,255,0.85)",
+                                marginTop: 3,
+                              }}
+                            >
+                              {kept ? "✓" : "✗"}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
-            {/* Legend */}
+          {/* Lost facts strip during "compressed away" narration */}
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 100,
+              textAlign: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.summarizerCompressed, CUE.summarizerCompressed + 15, CUE.allGone + 20, CUE.allGone + 40],
+                [0, 1, 1, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
             <div
               style={{
-                position: "absolute",
-                top: 0,
-                right: 40,
-                display: "flex",
-                gap: 20,
-                opacity: interpolate(frame, [2000, 2020], [0, 1], {
-                  extrapolateLeft: "clamp",
-                  extrapolateRight: "clamp",
-                }),
+                fontFamily: FONTS.mono,
+                fontSize: 14,
+                color: COLORS.textMuted,
+                marginBottom: 10,
               }}
             >
-              {BACKENDS.map((b) => (
-                <div key={b} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: 3,
-                      background: BACKEND_COLORS[b],
-                    }}
-                  />
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 14, color: COLORS.textMuted }}>
-                    {b}
-                  </span>
+              Compressed away by summary
+            </div>
+            <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+              {[
+                { label: "💒 Sister's wedding", reveal: CUE.sistersWedding },
+                { label: "📖 Book reading", reveal: CUE.bookReading },
+                { label: "💊 Supplement dosage", reveal: CUE.supplementDosage },
+              ].map((f) => (
+                <div
+                  key={f.label}
+                  style={{
+                    fontFamily: FONTS.body,
+                    fontSize: 18,
+                    color: COLORS.text,
+                    background: "rgba(255,68,68,0.10)",
+                    border: `1px solid ${COLORS.danger}44`,
+                    borderRadius: 10,
+                    padding: "8px 16px",
+                    textDecoration: frame >= f.reveal + 20 ? "line-through" : "none",
+                    opacity: interpolate(
+                      frame,
+                      [f.reveal, f.reveal + 15],
+                      [0, 1],
+                      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                    ),
+                  }}
+                >
+                  {f.label}
                 </div>
               ))}
             </div>
           </div>
 
-          <AnimatedText
-            text="Summary destroys new information as it compresses"
-            startFrame={2500}
-            fontSize={26}
-            color={COLORS.summary}
-            glow
-            glowColor={COLORS.summaryGlow}
-            textAlign="center"
-            style={{ marginTop: -20 }}
-          />
+          {/* Closing tagline */}
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 50,
+              textAlign: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.activelyDestroys, CUE.activelyDestroys + 20],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <AnimatedText
+              text="Summary actively destroys new information as it compresses."
+              startFrame={CUE.activelyDestroys + 5}
+              fontSize={26}
+              fontWeight={600}
+              color={COLORS.summary}
+              glow
+              glowColor={COLORS.summaryGlow}
+              textAlign="center"
+              mode="wordByWord"
+              durationFrames={100}
+            />
+          </div>
         </div>
       </AbsoluteFill>
     </FadeTransition>

@@ -1,58 +1,152 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Audio,
+  interpolate,
+  staticFile,
+  useCurrentFrame,
+} from "remotion";
 import { COLORS, FONTS } from "../styles/theme";
 import { AnimatedText } from "../components/AnimatedText";
 import { GlassCard } from "../components/GlassCard";
 import { FadeTransition } from "../components/FadeTransition";
-import { QDRANT_VS_PGVECTOR } from "../data/benchmarkData";
+
+// Cue points synced to public/audio/scene07.wav (whisper word-level, 30fps).
+const CUE = {
+  elephant: 2,                  // 0.08s
+  doesItMatter: 76,             // 2.56s
+  questionEnd: 166,             // 5.54s
+  atThisScale: 168,             // 5.60s
+  noWord: 209,                  // 6.96s
+  noEnd: 240,                   // ~8.0s buffer before stats
+  qdrantLatency: 242,           // 8.07s Qdrant 7001ms
+  pgvectorLatency: 339,         // 11.30s pgvector 7021ms
+  recallRow: 458,               // 15.25s "82%"
+  costRow: 505,                 // 16.82s "$418"
+  cost416: 586,                 // 19.51s
+  tokensRow: 606,               // 20.19s
+  identical: 677,               // 22.57s
+  statsEnd: 720,                // ~24s
+  ifAlreadyPostgres: 725,       // 24.16s
+  justAddPgv: 851,              // 28.34s
+  zeroExtra: 914,               // 30.47s
+  pgvecRecEnd: 1050,            // 35.00s
+  ifScale: 1050,                // 35.00s "If you're building"
+  millionsVectors: 1137,        // 37.91s
+  qdrantPurpose: 1188,          // 39.61s
+  edge: 1300,                   // 43.33s
+  qdrantRecEnd: 1308,           // 43.63s
+  butForPerSession: 1318,       // 43.92s
+  pgvectorPragmatic: 1404,      // 46.79s
+  end: 1472,                    // 49.03s
+};
+
+// Comparison rows aligned with narration cues
+const COMPARISON = [
+  { metric: "Avg Latency", qdrant: "7,001 ms", pgvector: "7,021 ms", reveal: 242 },
+  { metric: "Recall @ 50", qdrant: "82%", pgvector: "82%", reveal: 458 },
+  { metric: "Cost / 1K", qdrant: "$418", pgvector: "$416", reveal: 505 },
+  { metric: "Tokens / Run", qdrant: "69,595", pgvector: "69,366", reveal: 606 },
+];
 
 export const Scene7_QdrantVsPgvector: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
   return (
-    <FadeTransition durationFrames={1350}>
+    <FadeTransition durationFrames={CUE.end}>
+      <Audio src={staticFile("audio/scene07.wav")} />
+
       <AbsoluteFill
         style={{
           background: `radial-gradient(ellipse at 50% 50%, #0d1825 0%, ${COLORS.bg} 70%)`,
           padding: 60,
         }}
       >
-        {/* Phase 1: Comparison table (0-35s / 0-1050f) */}
+        {/* Phase 1: "Elephant in the room" question + dramatic "NO" (0 → 240f) */}
         <div
           style={{
-            opacity: interpolate(frame, [0, 15, 1000, 1050], [0, 1, 1, 0], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
             position: "absolute",
             inset: 0,
-            padding: "50px 100px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: interpolate(
+              frame,
+              [0, 10, CUE.noEnd - 10, CUE.noEnd + 8],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
           }}
         >
+          <div style={{ fontSize: 100, marginBottom: 20 }}>🐘</div>
           <AnimatedText
-            text="Qdrant vs pgvector"
-            startFrame={0}
-            fontSize={48}
-            fontWeight={700}
+            text="The elephant in the room:"
+            startFrame={CUE.elephant + 5}
+            fontSize={36}
+            color={COLORS.textMuted}
             textAlign="center"
+            mode="wordByWord"
+            durationFrames={60}
+          />
+          <AnimatedText
+            text="Does it matter which vector database you choose?"
+            startFrame={CUE.doesItMatter}
+            fontSize={42}
+            fontWeight={700}
+            color={COLORS.text}
+            textAlign="center"
+            mode="wordByWord"
+            durationFrames={80}
+            style={{ marginTop: 18 }}
           />
           <div
             style={{
               fontFamily: FONTS.body,
-              fontSize: 22,
-              color: COLORS.textMuted,
-              textAlign: "center",
-              marginTop: 8,
-              opacity: interpolate(frame, [20, 40], [0, 1], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }),
+              fontSize: 120,
+              fontWeight: 800,
+              color: COLORS.danger,
+              marginTop: 40,
+              textShadow: `0 0 80px ${COLORS.dangerGlow}`,
+              opacity: interpolate(
+                frame,
+                [CUE.noWord, CUE.noWord + 10],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              transform: `scale(${interpolate(
+                frame,
+                [CUE.noWord, CUE.noWord + 15],
+                [0.7, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              )})`,
             }}
           >
-            Does the vector database choice matter?
+            No.
           </div>
+        </div>
 
-          {/* VS divider + comparison */}
+        {/* Phase 2: Side-by-side comparison (240 → 720f) */}
+        <div
+          style={{
+            opacity: interpolate(
+              frame,
+              [CUE.noEnd, CUE.noEnd + 15, CUE.statsEnd - 10, CUE.statsEnd + 8],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
+            position: "absolute",
+            inset: 0,
+            padding: "50px 80px",
+          }}
+        >
+          <AnimatedText
+            text="At this scale, identical."
+            startFrame={CUE.noEnd + 5}
+            fontSize={42}
+            fontWeight={700}
+            textAlign="center"
+          />
+
           <div
             style={{
               display: "flex",
@@ -63,11 +157,16 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
             }}
           >
             {/* Qdrant side */}
-            <GlassCard startFrame={60} width={380} padding={28} glowColor={COLORS.qdrantGlow}>
+            <GlassCard
+              startFrame={CUE.noEnd + 10}
+              width={420}
+              padding={32}
+              glowColor={COLORS.qdrantGlow}
+            >
               <div
                 style={{
                   fontFamily: FONTS.mono,
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: 700,
                   color: COLORS.qdrant,
                   textAlign: "center",
@@ -76,17 +175,17 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
               >
                 🔍 Qdrant
               </div>
-              {QDRANT_VS_PGVECTOR.map((row, i) => (
+              {COMPARISON.map((row, i) => (
                 <div
                   key={i}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    padding: "10px 0",
+                    padding: "12px 0",
                     borderBottom: `1px solid ${COLORS.border}`,
                     opacity: interpolate(
                       frame,
-                      [120 + i * 30, 135 + i * 30],
+                      [row.reveal, row.reveal + 15],
                       [0, 1],
                       { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                     ),
@@ -95,7 +194,14 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
                   <span style={{ fontFamily: FONTS.body, fontSize: 16, color: COLORS.textMuted }}>
                     {row.metric}
                   </span>
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 16, color: COLORS.text, fontWeight: 600 }}>
+                  <span
+                    style={{
+                      fontFamily: FONTS.mono,
+                      fontSize: 18,
+                      color: COLORS.text,
+                      fontWeight: 600,
+                    }}
+                  >
                     {row.qdrant}
                   </span>
                 </div>
@@ -109,7 +215,7 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
                 alignItems: "center",
                 justifyContent: "center",
                 height: 400,
-                opacity: interpolate(frame, [80, 100], [0, 1], {
+                opacity: interpolate(frame, [CUE.noEnd + 20, CUE.noEnd + 40], [0, 1], {
                   extrapolateLeft: "clamp",
                   extrapolateRight: "clamp",
                 }),
@@ -124,16 +230,21 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
                   textShadow: `0 0 30px ${COLORS.accentGlow}`,
                 }}
               >
-                VS
+                ≈
               </div>
             </div>
 
             {/* pgvector side */}
-            <GlassCard startFrame={80} width={380} padding={28} glowColor={COLORS.pgvectorGlow}>
+            <GlassCard
+              startFrame={CUE.noEnd + 25}
+              width={420}
+              padding={32}
+              glowColor={COLORS.pgvectorGlow}
+            >
               <div
                 style={{
                   fontFamily: FONTS.mono,
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: 700,
                   color: COLORS.pgvector,
                   textAlign: "center",
@@ -142,17 +253,17 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
               >
                 🐘 pgvector
               </div>
-              {QDRANT_VS_PGVECTOR.map((row, i) => (
+              {COMPARISON.map((row, i) => (
                 <div
                   key={i}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    padding: "10px 0",
+                    padding: "12px 0",
                     borderBottom: `1px solid ${COLORS.border}`,
                     opacity: interpolate(
                       frame,
-                      [120 + i * 30, 135 + i * 30],
+                      [row.reveal, row.reveal + 15],
                       [0, 1],
                       { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                     ),
@@ -161,7 +272,14 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
                   <span style={{ fontFamily: FONTS.body, fontSize: 16, color: COLORS.textMuted }}>
                     {row.metric}
                   </span>
-                  <span style={{ fontFamily: FONTS.mono, fontSize: 16, color: COLORS.text, fontWeight: 600 }}>
+                  <span
+                    style={{
+                      fontFamily: FONTS.mono,
+                      fontSize: 18,
+                      color: COLORS.text,
+                      fontWeight: 600,
+                    }}
+                  >
                     {row.pgvector}
                   </span>
                 </div>
@@ -169,74 +287,214 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
             </GlassCard>
           </div>
 
-          {/* Winner badges */}
           <div
             style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 20,
-              marginTop: 30,
-            }}
-          >
-            {QDRANT_VS_PGVECTOR.map((row, i) => {
-              const badgeOpacity = interpolate(
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 80,
+              textAlign: "center",
+              opacity: interpolate(
                 frame,
-                [350 + i * 30, 370 + i * 30],
+                [CUE.identical, CUE.identical + 20],
                 [0, 1],
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-              );
-              return (
-                <div
-                  key={i}
-                  style={{
-                    fontFamily: FONTS.mono,
-                    fontSize: 13,
-                    color: COLORS.neonGreen,
-                    background: "rgba(0,255,136,0.08)",
-                    border: "1px solid rgba(0,255,136,0.2)",
-                    borderRadius: 6,
-                    padding: "4px 10px",
-                    opacity: badgeOpacity,
-                  }}
-                >
-                  ={row.winner}
-                </div>
-              );
-            })}
+              ),
+            }}
+          >
+            <div
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 22,
+                color: COLORS.neonGreen,
+                letterSpacing: 2,
+                textTransform: "uppercase",
+                textShadow: `0 0 16px rgba(0,255,136,0.4)`,
+              }}
+            >
+              ✓ Nearly identical
+            </div>
           </div>
         </div>
 
-        {/* Phase 2: Verdict (35-45s / 1050-1350f) */}
+        {/* Phase 3: pgvector recommendation (725 → 1050f) */}
         <div
           style={{
+            opacity: interpolate(
+              frame,
+              [CUE.ifAlreadyPostgres, CUE.ifAlreadyPostgres + 15, CUE.pgvecRecEnd - 10, CUE.pgvecRecEnd + 5],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
             position: "absolute",
-            bottom: 80,
-            left: 0,
-            right: 0,
-            textAlign: "center",
-            opacity: interpolate(frame, [1050, 1080], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 120px",
           }}
         >
+          <div style={{ fontSize: 80, marginBottom: 16 }}>🐘</div>
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 18,
+              color: COLORS.pgvector,
+              letterSpacing: 4,
+              textTransform: "uppercase",
+              marginBottom: 18,
+            }}
+          >
+            Pick pgvector if...
+          </div>
           <AnimatedText
-            text="No meaningful difference at this scale"
-            startFrame={1060}
-            fontSize={36}
+            text="You already run PostgreSQL."
+            startFrame={CUE.ifAlreadyPostgres + 8}
+            fontSize={48}
             fontWeight={700}
-            color={COLORS.accent}
-            glow
+            color={COLORS.text}
             textAlign="center"
             mode="wordByWord"
-            durationFrames={30}
+            durationFrames={70}
           />
+          <div style={{ display: "flex", gap: 24, marginTop: 40 }}>
+            {[
+              { label: "Zero extra infrastructure", reveal: CUE.zeroExtra },
+              { label: "Zero operational burden", reveal: CUE.zeroExtra + 80 },
+            ].map((p) => (
+              <div
+                key={p.label}
+                style={{
+                  fontFamily: FONTS.mono,
+                  fontSize: 18,
+                  color: COLORS.neonGreen,
+                  background: "rgba(0,255,136,0.08)",
+                  border: `1px solid rgba(0,255,136,0.3)`,
+                  borderRadius: 10,
+                  padding: "10px 20px",
+                  opacity: interpolate(
+                    frame,
+                    [p.reveal, p.reveal + 15],
+                    [0, 1],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                  ),
+                  transform: `translateY(${interpolate(
+                    frame,
+                    [p.reveal, p.reveal + 15],
+                    [10, 0],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                  )}px)`,
+                }}
+              >
+                ✓ {p.label}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Phase 4: Qdrant recommendation (1050 → 1308f) */}
+        <div
+          style={{
+            opacity: interpolate(
+              frame,
+              [CUE.ifScale, CUE.ifScale + 15, CUE.qdrantRecEnd - 10, CUE.qdrantRecEnd + 5],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 120px",
+          }}
+        >
+          <div style={{ fontSize: 80, marginBottom: 16 }}>🔍</div>
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 18,
+              color: COLORS.qdrant,
+              letterSpacing: 4,
+              textTransform: "uppercase",
+              marginBottom: 18,
+            }}
+          >
+            Pick Qdrant if...
+          </div>
           <AnimatedText
-            text="Already run PostgreSQL? Just add pgvector."
-            startFrame={1130}
-            fontSize={24}
-            color={COLORS.textMuted}
+            text="You scale to millions of vectors."
+            startFrame={CUE.ifScale + 8}
+            fontSize={48}
+            fontWeight={700}
+            color={COLORS.text}
             textAlign="center"
+            mode="wordByWord"
+            durationFrames={80}
+          />
+          <div
+            style={{
+              fontFamily: FONTS.body,
+              fontSize: 22,
+              color: COLORS.textMuted,
+              textAlign: "center",
+              marginTop: 30,
+              maxWidth: 900,
+              opacity: interpolate(
+                frame,
+                [CUE.qdrantPurpose, CUE.qdrantPurpose + 20],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            Purpose-built architecture pays off across many users.
+          </div>
+        </div>
+
+        {/* Phase 5: Final verdict (1318 → 1472f) */}
+        <div
+          style={{
+            opacity: interpolate(
+              frame,
+              [CUE.butForPerSession, CUE.butForPerSession + 15],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            background: `radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.6), rgba(0,0,0,0.85))`,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 18,
+              color: COLORS.textMuted,
+              letterSpacing: 4,
+              textTransform: "uppercase",
+              marginBottom: 16,
+            }}
+          >
+            For per-session memory
+          </div>
+          <AnimatedText
+            text="pgvector is the pragmatic choice."
+            startFrame={CUE.pgvectorPragmatic}
+            fontSize={56}
+            fontWeight={800}
+            color={COLORS.pgvector}
+            glow
+            glowColor={COLORS.pgvectorGlow}
+            textAlign="center"
+            mode="wordByWord"
+            durationFrames={60}
           />
         </div>
       </AbsoluteFill>

@@ -16,3 +16,9 @@ remotion/out/
 *.swp
 *.swo
 .DS_Store
+
+# Raw QuickTime audio recordings (redundant with .wav). Preserve locally.
+remotion/public/audio/*.aifc
+
+# Personal scratch notes
+ToDo.txt

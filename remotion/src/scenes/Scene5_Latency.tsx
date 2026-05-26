@@ -1,4 +1,10 @@
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import {
+  AbsoluteFill,
+  Audio,
+  interpolate,
+  staticFile,
+  useCurrentFrame,
+} from "remotion";
 import { COLORS, FONTS, BACKEND_COLORS } from "../styles/theme";
 import { AnimatedText } from "../components/AnimatedText";
 import { AnimatedLineChart } from "../components/AnimatedLineChart";
@@ -12,6 +18,43 @@ import {
   WALL_CLOCK,
 } from "../data/benchmarkData";
 
+// Cue points synced to public/audio/scene05.wav (whisper word-level, 30fps).
+const CUE = {
+  intro: 2,                    // 0.06s "Now"
+  speedWord: 56,               // 1.88s "speed"
+  chartTitle: 81,              // 2.70s "This chart"
+  chartDrawStart: 215,         // 7.12s (Qdrant/pgvector start being discussed)
+  qdrantPgvFlat: 273,          // 9.10s "stay flat"
+  sevenSeconds: 304,           // 10.13s
+  topK: 503,                   // 16.81s "top-K snippets"
+  qdrantPgvEnd: 582,           // 19.41s
+  bufferStart: 588,            // 19.60s "Buffer"
+  bufferClimb12: 669,          // 22.32s "climbs to 12+"
+  byTurn30: 715,               // 23.95s "by turn 30"
+  bufferEnd: 866,              // 28.87s
+  summaryStart: 870,           // 29.00s "But look at summary"
+  summaryRockets: 996,         // 33.05s "rockets to 50"
+  byTurn20: 1054,              // 35.14s
+  summaryEnd: 1074,            // 35.80s
+  whyWord: 1084,               // 36.14s "Why?"
+  twoLLMCalls: 1183,           // 39.42s "two LLM calls"
+  oneToRespond: 1209,          // 40.28s
+  oneToUpdate: 1247,           // 41.25s "update the running summary"
+  doublesLatency: 1303,        // 43.42s
+  whyEnd: 1433,                // 47.77s
+  onAverage: 1441,             // 48.02s "On average"
+  vector7: 1490,               // 49.91s
+  buffer10: 1542,              // 51.43s
+  summaryWhopping: 1604,       // 53.47s
+  thirtySixSec: 1625,          // 54.18s
+  fiveTimesSlower: 1707,       // 56.77s
+  totalWallclock: 1758,        // 58.60s
+  qdrantPgv32min: 1920,        // 63.99s
+  buffer45min: 1973,           // 65.75s
+  summary3hrs: 2060,           // 68.66s
+  end: 2112,                   // 70.40s
+};
+
 export const Scene5_Latency: React.FC = () => {
   const frame = useCurrentFrame();
 
@@ -20,20 +63,24 @@ export const Scene5_Latency: React.FC = () => {
   ) as Record<string, number[]>;
 
   return (
-    <FadeTransition durationFrames={2250}>
+    <FadeTransition durationFrames={CUE.end}>
+      <Audio src={staticFile("audio/scene05.wav")} />
+
       <AbsoluteFill
         style={{
           background: `radial-gradient(ellipse at 40% 40%, #0d1825 0%, ${COLORS.bg} 70%)`,
           padding: 60,
         }}
       >
-        {/* Phase 1: Line chart (0-45s / 0-1350f) */}
+        {/* Phase 1: Latency line chart (0 → 1441f) */}
         <div
           style={{
-            opacity: interpolate(frame, [0, 15, 1300, 1350], [0, 1, 1, 0], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            opacity: interpolate(
+              frame,
+              [0, 12, CUE.onAverage - 25, CUE.onAverage + 5],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
             position: "absolute",
             inset: 0,
             padding: "50px 60px",
@@ -41,7 +88,7 @@ export const Scene5_Latency: React.FC = () => {
         >
           <AnimatedText
             text="Latency Per Turn"
-            startFrame={0}
+            startFrame={CUE.chartTitle}
             fontSize={48}
             fontWeight={700}
             textAlign="center"
@@ -53,10 +100,12 @@ export const Scene5_Latency: React.FC = () => {
               color: COLORS.textMuted,
               textAlign: "center",
               marginTop: 4,
-              opacity: interpolate(frame, [15, 30], [0, 1], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }),
+              opacity: interpolate(
+                frame,
+                [CUE.chartTitle + 30, CUE.chartTitle + 60],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
             }}
           >
             How response time changes across 50 conversation turns
@@ -69,10 +118,10 @@ export const Scene5_Latency: React.FC = () => {
                 data: latencySeconds[b],
                 color: BACKEND_COLORS[b],
               }))}
-              startFrame={50}
-              drawDuration={150}
+              startFrame={CUE.chartDrawStart}
+              drawDuration={200}
               chartWidth={1400}
-              chartHeight={550}
+              chartHeight={500}
               xLabels={["1", "5", "10", "15", "20", "25", "30", "35", "40", "45", "50"]}
               yMax={55}
               yLabel="Latency (seconds)"
@@ -80,51 +129,143 @@ export const Scene5_Latency: React.FC = () => {
             />
           </div>
 
-          {/* 5x annotation */}
+          {/* Annotation: Qdrant + pgvector stay flat */}
           <div
             style={{
               position: "absolute",
-              top: 200,
-              right: 200,
-              opacity: interpolate(frame, [250, 280], [0, 1], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }),
+              top: 520,
+              right: 240,
               fontFamily: FONTS.mono,
-              fontSize: 22,
-              color: COLORS.summary,
-              background: `${COLORS.summary}15`,
-              border: `1px solid ${COLORS.summary}44`,
+              fontSize: 18,
+              color: COLORS.qdrant,
+              background: `${COLORS.qdrant}15`,
+              border: `1px solid ${COLORS.qdrant}44`,
               borderRadius: 8,
-              padding: "8px 16px",
-              textShadow: `0 0 10px ${COLORS.summaryGlow}`,
+              padding: "8px 14px",
+              opacity: interpolate(
+                frame,
+                [CUE.qdrantPgvFlat, CUE.qdrantPgvFlat + 20, CUE.bufferStart, CUE.bufferStart + 20],
+                [0, 1, 1, 0.2],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              textShadow: `0 0 10px ${COLORS.qdrantGlow}`,
             }}
           >
-            5x slower →
+            ↘ qdrant & pgvector: flat ~7s
+          </div>
+
+          {/* Annotation: Buffer climbs */}
+          <div
+            style={{
+              position: "absolute",
+              top: 470,
+              right: 200,
+              fontFamily: FONTS.mono,
+              fontSize: 18,
+              color: COLORS.buffer,
+              background: `${COLORS.buffer}20`,
+              border: `1px solid ${COLORS.buffer}66`,
+              borderRadius: 8,
+              padding: "8px 14px",
+              opacity: interpolate(
+                frame,
+                [CUE.bufferClimb12, CUE.bufferClimb12 + 20, CUE.summaryStart, CUE.summaryStart + 20],
+                [0, 1, 1, 0.2],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              textShadow: `0 0 10px ${COLORS.bufferGlow}`,
+            }}
+          >
+            ↗ buffer: 3s → 12+s by turn 30
+          </div>
+
+          {/* Annotation: Summary rockets */}
+          <div
+            style={{
+              position: "absolute",
+              top: 210,
+              right: 200,
+              fontFamily: FONTS.mono,
+              fontSize: 22,
+              fontWeight: 700,
+              color: COLORS.summary,
+              background: `${COLORS.summary}20`,
+              border: `1px solid ${COLORS.summary}66`,
+              borderRadius: 10,
+              padding: "10px 18px",
+              opacity: interpolate(
+                frame,
+                [CUE.summaryRockets, CUE.summaryRockets + 20],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              textShadow: `0 0 12px ${COLORS.summaryGlow}`,
+              boxShadow: `0 0 24px ${COLORS.summaryGlow}`,
+            }}
+          >
+            🚀 summary: 9s → 50s
+          </div>
+
+          {/* "Why?" overlay during 2-LLM-call explanation */}
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 60,
+              display: "flex",
+              justifyContent: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.whyWord, CUE.whyWord + 20, CUE.whyEnd - 10, CUE.whyEnd + 5],
+                [0, 1, 1, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <div
+              style={{
+                background: COLORS.bgCard,
+                border: `1px solid ${COLORS.summary}66`,
+                borderRadius: 12,
+                padding: "18px 28px",
+                fontFamily: FONTS.body,
+                fontSize: 22,
+                color: COLORS.text,
+                backdropFilter: "blur(20px)",
+                maxWidth: 1100,
+                textAlign: "center",
+                boxShadow: `0 0 30px ${COLORS.summaryGlow}`,
+              }}
+            >
+              Summary needs <span style={{ color: COLORS.summary, fontWeight: 700 }}>2 LLM calls per turn</span>: one to respond, one to update the summary. Latency doubles, and the summary keeps growing.
+            </div>
           </div>
         </div>
 
-        {/* Phase 2: Bar chart (45-75s / 1350-2250f) */}
+        {/* Phase 2: Average bar chart + wall clock (1441 → 2112f) */}
         <div
           style={{
-            opacity: interpolate(frame, [1350, 1390], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            opacity: interpolate(
+              frame,
+              [CUE.onAverage, CUE.onAverage + 15],
+              [0, 1],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
             position: "absolute",
             inset: 0,
             padding: "50px 60px",
           }}
         >
           <AnimatedText
-            text="Average Latency Per Backend"
-            startFrame={1360}
-            fontSize={48}
+            text="Average Latency Per Turn"
+            startFrame={CUE.onAverage + 5}
+            fontSize={44}
             fontWeight={700}
             textAlign="center"
           />
 
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 50 }}>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 40 }}>
             <AnimatedBarChart
               data={BACKENDS.map((b) => ({
                 label: b,
@@ -132,60 +273,127 @@ export const Scene5_Latency: React.FC = () => {
                 displayValue: `${(AVG_LATENCY_MS[b] / 1000).toFixed(1)}s`,
                 color: BACKEND_COLORS[b],
               }))}
-              startFrame={1400}
+              startFrame={CUE.onAverage + 30}
               barWidth={160}
-              chartHeight={480}
+              chartHeight={400}
               chartWidth={1000}
               errorBars={BACKENDS.map((b) => STD_LATENCY_MS[b] / 1000)}
             />
           </div>
 
-          {/* Wall clock times */}
+          {/* 5x slower badge */}
           <div
             style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 60,
-              marginTop: 40,
-              opacity: interpolate(frame, [1600, 1630], [0, 1], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }),
+              position: "absolute",
+              top: 420,
+              right: 360,
+              fontFamily: FONTS.mono,
+              fontSize: 24,
+              fontWeight: 700,
+              color: COLORS.danger,
+              background: `${COLORS.danger}15`,
+              border: `1px solid ${COLORS.danger}66`,
+              borderRadius: 10,
+              padding: "10px 18px",
+              opacity: interpolate(
+                frame,
+                [CUE.fiveTimesSlower, CUE.fiveTimesSlower + 15],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              textShadow: `0 0 12px ${COLORS.dangerGlow}`,
+              boxShadow: `0 0 24px ${COLORS.dangerGlow}`,
             }}
           >
-            {BACKENDS.map((b) => (
-              <div key={b} style={{ textAlign: "center" }}>
-                <div
-                  style={{
-                    fontFamily: FONTS.mono,
-                    fontSize: 14,
-                    color: COLORS.textMuted,
-                    marginBottom: 4,
-                  }}
-                >
-                  {b}
-                </div>
-                <div
-                  style={{
-                    fontFamily: FONTS.mono,
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: BACKEND_COLORS[b],
-                  }}
-                >
-                  {WALL_CLOCK[b]}
-                </div>
-                <div
-                  style={{
-                    fontFamily: FONTS.body,
-                    fontSize: 12,
-                    color: COLORS.textDim,
-                  }}
-                >
-                  wall clock (5 runs)
-                </div>
-              </div>
-            ))}
+            5× slower
+          </div>
+
+          {/* Wall clock totals */}
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 60,
+              opacity: interpolate(
+                frame,
+                [CUE.totalWallclock, CUE.totalWallclock + 20],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <div
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 16,
+                color: COLORS.textMuted,
+                textAlign: "center",
+                letterSpacing: 3,
+                textTransform: "uppercase",
+                marginBottom: 16,
+              }}
+            >
+              Total wall-clock (5 runs)
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: 80,
+              }}
+            >
+              {BACKENDS.map((b) => {
+                const revealFrame =
+                  b === "buffer"
+                    ? CUE.buffer45min
+                    : b === "summary"
+                    ? CUE.summary3hrs
+                    : CUE.qdrantPgv32min;
+                return (
+                  <div
+                    key={b}
+                    style={{
+                      textAlign: "center",
+                      opacity: interpolate(
+                        frame,
+                        [revealFrame, revealFrame + 15],
+                        [0, 1],
+                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                      ),
+                      transform: `scale(${interpolate(
+                        frame,
+                        [revealFrame, revealFrame + 15],
+                        [0.9, 1],
+                        { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                      )})`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontFamily: FONTS.mono,
+                        fontSize: 14,
+                        color: COLORS.textMuted,
+                        marginBottom: 6,
+                      }}
+                    >
+                      {b}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: FONTS.mono,
+                        fontSize: 32,
+                        fontWeight: 700,
+                        color: BACKEND_COLORS[b],
+                        textShadow: b === "summary" ? `0 0 16px ${COLORS.summaryGlow}` : undefined,
+                      }}
+                    >
+                      {WALL_CLOCK[b]}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </AbsoluteFill>
