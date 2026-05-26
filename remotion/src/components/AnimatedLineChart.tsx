@@ -37,7 +37,7 @@ export const AnimatedLineChart: React.FC<Props> = ({
 
   if (relFrame < 0) return null;
 
-  const pad = { top: 20, right: 40, bottom: 60, left: 80 };
+  const pad = { top: 30, right: 50, bottom: 90, left: 110 };
   const w = chartWidth - pad.left - pad.right;
   const h = chartHeight - pad.top - pad.bottom;
 
@@ -89,12 +89,13 @@ export const AnimatedLineChart: React.FC<Props> = ({
         {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
           <text
             key={pct}
-            x={pad.left - 10}
-            y={toY(yMax * pct) + 4}
+            x={pad.left - 14}
+            y={toY(yMax * pct) + 8}
             textAnchor="end"
-            fill={COLORS.textMuted}
+            fill={COLORS.text}
             fontFamily={FONTS.mono}
-            fontSize={14}
+            fontSize={22}
+            fontWeight={600}
           >
             {(yMax * pct).toFixed(0)}
           </text>
@@ -106,11 +107,12 @@ export const AnimatedLineChart: React.FC<Props> = ({
             <text
               key={i}
               x={toX(i, xLabels.length)}
-              y={pad.top + h + 30}
+              y={pad.top + h + 40}
               textAnchor="middle"
-              fill={COLORS.textMuted}
+              fill={COLORS.text}
               fontFamily={FONTS.mono}
-              fontSize={14}
+              fontSize={22}
+              fontWeight={600}
             >
               {label}
             </text>
@@ -175,17 +177,18 @@ export const AnimatedLineChart: React.FC<Props> = ({
         {/* Legend */}
         {series.map((s, i) => {
           const color = s.color ?? BACKEND_COLORS[s.label] ?? COLORS.accent;
-          const lx = chartWidth - pad.right - 160;
-          const ly = pad.top + 20 + i * 28;
+          const lx = chartWidth - pad.right - 220;
+          const ly = pad.top + 30 + i * 40;
           return (
             <g key={i}>
-              <rect x={lx} y={ly - 6} width={20} height={4} rx={2} fill={color} />
+              <rect x={lx} y={ly - 12} width={30} height={6} rx={3} fill={color} />
               <text
-                x={lx + 28}
+                x={lx + 44}
                 y={ly}
                 fill={COLORS.text}
                 fontFamily={FONTS.mono}
-                fontSize={15}
+                fontSize={22}
+                fontWeight={600}
               >
                 {s.label}
               </text>
@@ -196,13 +199,14 @@ export const AnimatedLineChart: React.FC<Props> = ({
         {/* Axis labels */}
         {yLabel && (
           <text
-            x={20}
+            x={26}
             y={chartHeight / 2}
             fill={COLORS.textMuted}
             fontFamily={FONTS.body}
-            fontSize={16}
+            fontSize={24}
+            fontWeight={600}
             textAnchor="middle"
-            transform={`rotate(-90, 20, ${chartHeight / 2})`}
+            transform={`rotate(-90, 26, ${chartHeight / 2})`}
           >
             {yLabel}
           </text>
@@ -210,10 +214,11 @@ export const AnimatedLineChart: React.FC<Props> = ({
         {xLabel && (
           <text
             x={chartWidth / 2}
-            y={chartHeight - 8}
+            y={chartHeight - 10}
             fill={COLORS.textMuted}
             fontFamily={FONTS.body}
-            fontSize={16}
+            fontSize={24}
+            fontWeight={600}
             textAnchor="middle"
           >
             {xLabel}

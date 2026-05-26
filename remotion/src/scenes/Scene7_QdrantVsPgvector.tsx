@@ -78,35 +78,81 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
             ),
           }}
         >
-          <div style={{ fontSize: 100, marginBottom: 20 }}>🐘</div>
-          <AnimatedText
-            text="The elephant in the room:"
-            startFrame={CUE.elephant + 5}
-            fontSize={36}
-            color={COLORS.textMuted}
-            textAlign="center"
-            mode="wordByWord"
-            durationFrames={60}
-          />
+          {/* Big elephant with subtle glow */}
+          <div
+            style={{
+              fontSize: 160,
+              marginBottom: 4,
+              filter: `drop-shadow(0 0 36px rgba(196,78,82,0.35))`,
+            }}
+          >
+            🐘
+          </div>
+
+          {/* Eyebrow tag */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              marginBottom: 30,
+              opacity: interpolate(
+                frame,
+                [CUE.elephant + 5, CUE.elephant + 25],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 2,
+                background: COLORS.textMuted,
+                opacity: 0.5,
+              }}
+            />
+            <div
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 22,
+                fontWeight: 700,
+                color: COLORS.textMuted,
+                letterSpacing: 8,
+                textTransform: "uppercase",
+              }}
+            >
+              The elephant in the room
+            </div>
+            <div
+              style={{
+                width: 40,
+                height: 2,
+                background: COLORS.textMuted,
+                opacity: 0.5,
+              }}
+            />
+          </div>
+
+          {/* The question */}
           <AnimatedText
             text="Does it matter which vector database you choose?"
             startFrame={CUE.doesItMatter}
-            fontSize={42}
-            fontWeight={700}
+            fontSize={52}
+            fontWeight={800}
             color={COLORS.text}
             textAlign="center"
             mode="wordByWord"
             durationFrames={80}
-            style={{ marginTop: 18 }}
+            style={{ letterSpacing: -1, marginBottom: 40 }}
           />
+
+          {/* The verdict: "No." with stamped emphasis */}
           <div
             style={{
-              fontFamily: FONTS.body,
-              fontSize: 120,
-              fontWeight: 800,
-              color: COLORS.danger,
-              marginTop: 40,
-              textShadow: `0 0 80px ${COLORS.dangerGlow}`,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
               opacity: interpolate(
                 frame,
                 [CUE.noWord, CUE.noWord + 10],
@@ -121,7 +167,63 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
               )})`,
             }}
           >
-            No.
+            <div
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: 160,
+                fontWeight: 900,
+                color: COLORS.danger,
+                textShadow: `0 0 80px ${COLORS.dangerGlow}, 0 0 30px ${COLORS.danger}55`,
+                lineHeight: 1,
+                letterSpacing: -4,
+              }}
+            >
+              No.
+            </div>
+            {/* Stamped horizontal rule */}
+            <div
+              style={{
+                width: 220,
+                height: 4,
+                background: COLORS.danger,
+                marginTop: 10,
+                borderRadius: 2,
+                boxShadow: `0 0 18px ${COLORS.dangerGlow}`,
+                opacity: interpolate(
+                  frame,
+                  [CUE.noWord + 12, CUE.noWord + 30],
+                  [0, 1],
+                  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                ),
+                transform: `scaleX(${interpolate(
+                  frame,
+                  [CUE.noWord + 12, CUE.noWord + 30],
+                  [0, 1],
+                  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                )})`,
+              }}
+            />
+          </div>
+
+          {/* Subline filling the dead space */}
+          <div
+            style={{
+              fontFamily: FONTS.body,
+              fontSize: 26,
+              fontWeight: 500,
+              color: COLORS.textMuted,
+              textAlign: "center",
+              marginTop: 36,
+              maxWidth: 1200,
+              opacity: interpolate(
+                frame,
+                [CUE.noWord + 30, CUE.noWord + 55],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            At this benchmark scale, qdrant <span style={{ color: COLORS.text, fontWeight: 700 }}>≈</span> pgvector on every metric.
           </div>
         </div>
 
@@ -151,9 +253,9 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
             style={{
               display: "flex",
               gap: 40,
-              marginTop: 50,
+              marginTop: 160,
               justifyContent: "center",
-              alignItems: "flex-start",
+              alignItems: "center",
             }}
           >
             {/* Qdrant side */}
@@ -191,15 +293,15 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
                     ),
                   }}
                 >
-                  <span style={{ fontFamily: FONTS.body, fontSize: 16, color: COLORS.textMuted }}>
+                  <span style={{ fontFamily: FONTS.body, fontSize: 26, color: COLORS.textMuted }}>
                     {row.metric}
                   </span>
                   <span
                     style={{
                       fontFamily: FONTS.mono,
-                      fontSize: 18,
+                      fontSize: 30,
                       color: COLORS.text,
-                      fontWeight: 600,
+                      fontWeight: 700,
                     }}
                   >
                     {row.qdrant}
@@ -214,7 +316,6 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                height: 400,
                 opacity: interpolate(frame, [CUE.noEnd + 20, CUE.noEnd + 40], [0, 1], {
                   extrapolateLeft: "clamp",
                   extrapolateRight: "clamp",
@@ -269,15 +370,15 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
                     ),
                   }}
                 >
-                  <span style={{ fontFamily: FONTS.body, fontSize: 16, color: COLORS.textMuted }}>
+                  <span style={{ fontFamily: FONTS.body, fontSize: 26, color: COLORS.textMuted }}>
                     {row.metric}
                   </span>
                   <span
                     style={{
                       fontFamily: FONTS.mono,
-                      fontSize: 18,
+                      fontSize: 30,
                       color: COLORS.text,
-                      fontWeight: 600,
+                      fontWeight: 700,
                     }}
                   >
                     {row.pgvector}
@@ -335,30 +436,42 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
             padding: "0 120px",
           }}
         >
-          <div style={{ fontSize: 80, marginBottom: 16 }}>🐘</div>
+          <div
+            style={{
+              fontSize: 140,
+              marginBottom: 8,
+              filter: `drop-shadow(0 0 40px ${COLORS.pgvectorGlow})`,
+            }}
+          >
+            🐘
+          </div>
           <div
             style={{
               fontFamily: FONTS.mono,
-              fontSize: 18,
+              fontSize: 22,
+              fontWeight: 700,
               color: COLORS.pgvector,
-              letterSpacing: 4,
+              letterSpacing: 8,
               textTransform: "uppercase",
-              marginBottom: 18,
+              marginBottom: 28,
             }}
           >
-            Pick pgvector if...
+            Pick pgvector if
           </div>
           <AnimatedText
             text="You already run PostgreSQL."
             startFrame={CUE.ifAlreadyPostgres + 8}
-            fontSize={48}
-            fontWeight={700}
+            fontSize={68}
+            fontWeight={800}
             color={COLORS.text}
             textAlign="center"
             mode="wordByWord"
             durationFrames={70}
+            style={{ letterSpacing: -1 }}
           />
-          <div style={{ display: "flex", gap: 24, marginTop: 40 }}>
+
+          {/* Polished feature cards */}
+          <div style={{ display: "flex", gap: 32, marginTop: 64 }}>
             {[
               { label: "Zero extra infrastructure", reveal: CUE.zeroExtra },
               { label: "Zero operational burden", reveal: CUE.zeroExtra + 80 },
@@ -366,13 +479,15 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
               <div
                 key={p.label}
                 style={{
-                  fontFamily: FONTS.mono,
-                  fontSize: 18,
-                  color: COLORS.neonGreen,
-                  background: "rgba(0,255,136,0.08)",
-                  border: `1px solid rgba(0,255,136,0.3)`,
-                  borderRadius: 10,
-                  padding: "10px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 18,
+                  background:
+                    "linear-gradient(135deg, rgba(0,255,136,0.10), rgba(0,255,136,0.04))",
+                  border: `1px solid rgba(0,255,136,0.35)`,
+                  borderRadius: 16,
+                  padding: "20px 32px",
+                  boxShadow: `0 0 28px rgba(0,255,136,0.12)`,
                   opacity: interpolate(
                     frame,
                     [p.reveal, p.reveal + 15],
@@ -382,12 +497,40 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
                   transform: `translateY(${interpolate(
                     frame,
                     [p.reveal, p.reveal + 15],
-                    [10, 0],
+                    [16, 0],
                     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                   )}px)`,
                 }}
               >
-                ✓ {p.label}
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: "50%",
+                    background: COLORS.neonGreen,
+                    color: "#0a0a0f",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: FONTS.body,
+                    fontSize: 22,
+                    fontWeight: 800,
+                    boxShadow: `0 0 18px ${COLORS.neonGreen}66`,
+                    flexShrink: 0,
+                  }}
+                >
+                  ✓
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONTS.body,
+                    fontSize: 24,
+                    fontWeight: 600,
+                    color: COLORS.text,
+                  }}
+                >
+                  {p.label}
+                </div>
               </div>
             ))}
           </div>
@@ -411,46 +554,95 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
             padding: "0 120px",
           }}
         >
-          <div style={{ fontSize: 80, marginBottom: 16 }}>🔍</div>
+          <div
+            style={{
+              fontSize: 140,
+              marginBottom: 8,
+              filter: `drop-shadow(0 0 40px ${COLORS.qdrantGlow})`,
+            }}
+          >
+            🔍
+          </div>
           <div
             style={{
               fontFamily: FONTS.mono,
-              fontSize: 18,
+              fontSize: 22,
+              fontWeight: 700,
               color: COLORS.qdrant,
-              letterSpacing: 4,
+              letterSpacing: 8,
               textTransform: "uppercase",
-              marginBottom: 18,
+              marginBottom: 28,
             }}
           >
-            Pick Qdrant if...
+            Pick Qdrant if
           </div>
           <AnimatedText
             text="You scale to millions of vectors."
             startFrame={CUE.ifScale + 8}
-            fontSize={48}
-            fontWeight={700}
+            fontSize={68}
+            fontWeight={800}
             color={COLORS.text}
             textAlign="center"
             mode="wordByWord"
             durationFrames={80}
+            style={{ letterSpacing: -1 }}
           />
+
+          {/* Polished feature card */}
           <div
             style={{
-              fontFamily: FONTS.body,
-              fontSize: 22,
-              color: COLORS.textMuted,
-              textAlign: "center",
-              marginTop: 30,
-              maxWidth: 900,
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
+              background: `linear-gradient(135deg, ${COLORS.qdrant}22, ${COLORS.qdrant}0c)`,
+              border: `1px solid ${COLORS.qdrant}55`,
+              borderRadius: 16,
+              padding: "20px 32px",
+              marginTop: 56,
+              boxShadow: `0 0 28px ${COLORS.qdrantGlow}`,
               opacity: interpolate(
                 frame,
                 [CUE.qdrantPurpose, CUE.qdrantPurpose + 20],
                 [0, 1],
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               ),
+              transform: `translateY(${interpolate(
+                frame,
+                [CUE.qdrantPurpose, CUE.qdrantPurpose + 20],
+                [16, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              )}px)`,
             }}
           >
-            Purpose-built architecture pays off across many users.
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: "50%",
+                background: COLORS.qdrant,
+                color: "#0a0a0f",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: FONTS.body,
+                fontSize: 22,
+                fontWeight: 800,
+                boxShadow: `0 0 18px ${COLORS.qdrant}88`,
+                flexShrink: 0,
+              }}
+            >
+              ⚡
+            </div>
+            <div
+              style={{
+                fontFamily: FONTS.body,
+                fontSize: 24,
+                fontWeight: 600,
+                color: COLORS.text,
+              }}
+            >
+              Purpose-built for vector search at scale
+            </div>
           </div>
         </div>
 
@@ -472,22 +664,52 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
             background: `radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.6), rgba(0,0,0,0.85))`,
           }}
         >
+          {/* Verdict stamp emblem */}
           <div
             style={{
-              fontFamily: FONTS.mono,
-              fontSize: 18,
-              color: COLORS.textMuted,
-              letterSpacing: 4,
-              textTransform: "uppercase",
-              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              marginBottom: 32,
             }}
           >
-            For per-session memory
+            <div
+              style={{
+                width: 4,
+                height: 28,
+                background: COLORS.pgvector,
+                borderRadius: 2,
+                boxShadow: `0 0 14px ${COLORS.pgvectorGlow}`,
+              }}
+            />
+            <div
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 22,
+                fontWeight: 700,
+                color: COLORS.pgvector,
+                letterSpacing: 8,
+                textTransform: "uppercase",
+              }}
+            >
+              For per-session memory
+            </div>
+            <div
+              style={{
+                width: 4,
+                height: 28,
+                background: COLORS.pgvector,
+                borderRadius: 2,
+                boxShadow: `0 0 14px ${COLORS.pgvectorGlow}`,
+              }}
+            />
           </div>
+
+          {/* Verdict headline */}
           <AnimatedText
             text="pgvector is the pragmatic choice."
             startFrame={CUE.pgvectorPragmatic}
-            fontSize={56}
+            fontSize={76}
             fontWeight={800}
             color={COLORS.pgvector}
             glow
@@ -495,7 +717,9 @@ export const Scene7_QdrantVsPgvector: React.FC = () => {
             textAlign="center"
             mode="wordByWord"
             durationFrames={60}
+            style={{ letterSpacing: -1.5 }}
           />
+
         </div>
       </AbsoluteFill>
     </FadeTransition>

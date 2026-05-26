@@ -96,10 +96,11 @@ export const Scene5_Latency: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.body,
-              fontSize: 20,
+              fontSize: 30,
+              fontWeight: 500,
               color: COLORS.textMuted,
               textAlign: "center",
-              marginTop: 4,
+              marginTop: 10,
               opacity: interpolate(
                 frame,
                 [CUE.chartTitle + 30, CUE.chartTitle + 60],
@@ -111,7 +112,7 @@ export const Scene5_Latency: React.FC = () => {
             How response time changes across 50 conversation turns
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 40 }}>
             <AnimatedLineChart
               series={BACKENDS.map((b) => ({
                 label: b,
@@ -120,8 +121,8 @@ export const Scene5_Latency: React.FC = () => {
               }))}
               startFrame={CUE.chartDrawStart}
               drawDuration={200}
-              chartWidth={1400}
-              chartHeight={500}
+              chartWidth={1700}
+              chartHeight={620}
               xLabels={["1", "5", "10", "15", "20", "25", "30", "35", "40", "45", "50"]}
               yMax={55}
               yLabel="Latency (seconds)"
@@ -133,22 +134,23 @@ export const Scene5_Latency: React.FC = () => {
           <div
             style={{
               position: "absolute",
-              top: 520,
-              right: 240,
+              top: 660,
+              right: 520,
               fontFamily: FONTS.mono,
-              fontSize: 18,
+              fontSize: 24,
+              fontWeight: 700,
               color: COLORS.qdrant,
               background: `${COLORS.qdrant}15`,
-              border: `1px solid ${COLORS.qdrant}44`,
-              borderRadius: 8,
-              padding: "8px 14px",
+              border: `1px solid ${COLORS.qdrant}55`,
+              borderRadius: 10,
+              padding: "10px 18px",
               opacity: interpolate(
                 frame,
                 [CUE.qdrantPgvFlat, CUE.qdrantPgvFlat + 20, CUE.bufferStart, CUE.bufferStart + 20],
                 [0, 1, 1, 0.2],
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               ),
-              textShadow: `0 0 10px ${COLORS.qdrantGlow}`,
+              textShadow: `0 0 12px ${COLORS.qdrantGlow}`,
             }}
           >
             ↘ qdrant & pgvector: flat ~7s
@@ -158,22 +160,23 @@ export const Scene5_Latency: React.FC = () => {
           <div
             style={{
               position: "absolute",
-              top: 470,
+              top: 540,
               right: 200,
               fontFamily: FONTS.mono,
-              fontSize: 18,
+              fontSize: 24,
+              fontWeight: 700,
               color: COLORS.buffer,
               background: `${COLORS.buffer}20`,
               border: `1px solid ${COLORS.buffer}66`,
-              borderRadius: 8,
-              padding: "8px 14px",
+              borderRadius: 10,
+              padding: "10px 18px",
               opacity: interpolate(
                 frame,
                 [CUE.bufferClimb12, CUE.bufferClimb12 + 20, CUE.summaryStart, CUE.summaryStart + 20],
                 [0, 1, 1, 0.2],
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               ),
-              textShadow: `0 0 10px ${COLORS.bufferGlow}`,
+              textShadow: `0 0 12px ${COLORS.bufferGlow}`,
             }}
           >
             ↗ buffer: 3s → 12+s by turn 30
@@ -183,14 +186,14 @@ export const Scene5_Latency: React.FC = () => {
           <div
             style={{
               position: "absolute",
-              top: 210,
-              right: 200,
+              top: 220,
+              left: 850,
               fontFamily: FONTS.mono,
-              fontSize: 22,
-              fontWeight: 700,
+              fontSize: 28,
+              fontWeight: 800,
               color: COLORS.summary,
               background: `${COLORS.summary}20`,
-              border: `1px solid ${COLORS.summary}66`,
+              border: `2px solid ${COLORS.summary}88`,
               borderRadius: 10,
               padding: "10px 18px",
               opacity: interpolate(
@@ -212,7 +215,7 @@ export const Scene5_Latency: React.FC = () => {
               position: "absolute",
               left: 0,
               right: 0,
-              bottom: 60,
+              bottom: 20,
               display: "flex",
               justifyContent: "center",
               opacity: interpolate(
@@ -227,13 +230,14 @@ export const Scene5_Latency: React.FC = () => {
               style={{
                 background: COLORS.bgCard,
                 border: `1px solid ${COLORS.summary}66`,
-                borderRadius: 12,
-                padding: "18px 28px",
+                borderRadius: 14,
+                padding: "24px 36px",
                 fontFamily: FONTS.body,
-                fontSize: 22,
+                fontSize: 30,
+                fontWeight: 500,
                 color: COLORS.text,
                 backdropFilter: "blur(20px)",
-                maxWidth: 1100,
+                maxWidth: 1400,
                 textAlign: "center",
                 boxShadow: `0 0 30px ${COLORS.summaryGlow}`,
               }}
@@ -265,7 +269,7 @@ export const Scene5_Latency: React.FC = () => {
             textAlign="center"
           />
 
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 40 }}>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 100 }}>
             <AnimatedBarChart
               data={BACKENDS.map((b) => ({
                 label: b,
@@ -314,7 +318,7 @@ export const Scene5_Latency: React.FC = () => {
               position: "absolute",
               left: 0,
               right: 0,
-              bottom: 60,
+              bottom: 180,
               opacity: interpolate(
                 frame,
                 [CUE.totalWallclock, CUE.totalWallclock + 20],
@@ -326,12 +330,13 @@ export const Scene5_Latency: React.FC = () => {
             <div
               style={{
                 fontFamily: FONTS.mono,
-                fontSize: 16,
+                fontSize: 28,
+                fontWeight: 700,
                 color: COLORS.textMuted,
                 textAlign: "center",
-                letterSpacing: 3,
+                letterSpacing: 5,
                 textTransform: "uppercase",
-                marginBottom: 16,
+                marginBottom: 24,
               }}
             >
               Total wall-clock (5 runs)
@@ -372,9 +377,10 @@ export const Scene5_Latency: React.FC = () => {
                     <div
                       style={{
                         fontFamily: FONTS.mono,
-                        fontSize: 14,
+                        fontSize: 20,
+                        fontWeight: 600,
                         color: COLORS.textMuted,
-                        marginBottom: 6,
+                        marginBottom: 8,
                       }}
                     >
                       {b}
@@ -382,8 +388,8 @@ export const Scene5_Latency: React.FC = () => {
                     <div
                       style={{
                         fontFamily: FONTS.mono,
-                        fontSize: 32,
-                        fontWeight: 700,
+                        fontSize: 40,
+                        fontWeight: 800,
                         color: BACKEND_COLORS[b],
                         textShadow: b === "summary" ? `0 0 16px ${COLORS.summaryGlow}` : undefined,
                       }}

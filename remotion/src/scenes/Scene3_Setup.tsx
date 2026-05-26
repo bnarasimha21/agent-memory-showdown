@@ -1,3 +1,4 @@
+import React from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -7,12 +8,12 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { COLORS, FONTS } from "../styles/theme";
+import { COLORS, FONTS, BACKEND_COLORS } from "../styles/theme";
 import { AnimatedText } from "../components/AnimatedText";
 import { GlassCard } from "../components/GlassCard";
 import { AnimatedCounter } from "../components/AnimatedCounter";
 import { FadeTransition } from "../components/FadeTransition";
-import { SEEDED_FACTS } from "../data/benchmarkData";
+import { SEEDED_FACTS, BACKENDS } from "../data/benchmarkData";
 
 // Cue points synced to public/audio/scene03.wav (whisper word-level, 30fps).
 const CUE = {
@@ -58,60 +59,77 @@ const CUE = {
   end: 2176,                 // 72.52s
 };
 
-// Infrastructure boxes with reveal cues
+// Box width used throughout the diagram
+const BOX_W = 280;
+
+// Infrastructure boxes with reveal cues.
+// Topology: droplet hosts qdrant/postgres/embeddings (below).
+// Claude is REMOTE, reached via DO Serverless Inference (right of droplet).
 const INFRA_BOXES = [
   {
     key: "droplet",
     label: "DO Droplet",
-    sub: "Bangalore · Ubuntu 24.04",
+    sub: "",
     icon: "☁️",
-    x: 580,
-    y: 150,
+    x: 480,
+    y: 180,
     reveal: CUE.dropletReveal,
+  },
+  {
+    key: "dosi",
+    label: "DO Serverless",
+    sub: "Inference API",
+    icon: "🌐",
+    x: 1380,
+    y: 180,
+    reveal: CUE.doInferenceLink,
+  },
+  {
+    key: "claude",
+    label: "Claude 4.5 Sonnet",
+    sub: "",
+    icon: "🧠",
+    x: 1380,
+    y: 600,
+    reveal: CUE.llmReveal,
   },
   {
     key: "qdrant",
     label: "Qdrant",
     sub: "Docker container",
     icon: "📦",
-    x: 280,
-    y: 420,
+    x: 460,
+    y: 600,
     reveal: CUE.qdrantReveal,
   },
   {
     key: "postgres",
     label: "PostgreSQL 16",
-    sub: "+ pgvector extension",
+    sub: "+ pgvector ext",
     icon: "🐘",
-    x: 580,
-    y: 420,
+    x: 820,
+    y: 600,
     reveal: CUE.postgresReveal,
-  },
-  {
-    key: "claude",
-    label: "Claude 4.5 Sonnet",
-    sub: "DO Serverless Inference",
-    icon: "🧠",
-    x: 1180,
-    y: 150,
-    reveal: CUE.llmReveal,
   },
   {
     key: "embeddings",
     label: "Embeddings",
-    sub: "all-MiniLM-L6-v2 · 384-dim",
+    sub: "MiniLM-L6 · 384d",
     icon: "🔢",
     x: 1180,
-    y: 420,
+    y: 600,
     reveal: CUE.embeddingsReveal,
   },
 ];
 
-const CONNECTIONS = [
-  { from: 0, to: 1, reveal: CUE.qdrantReveal + 10 },
-  { from: 0, to: 2, reveal: CUE.postgresReveal + 10 },
-  { from: 0, to: 3, reveal: CUE.doInferenceLink },
-  { from: 0, to: 4, reveal: CUE.embeddingsReveal + 10 },
+// Connections by box key, with explicit direction type so we can anchor
+// lines on the right edge (horizontal) vs bottom edge (vertical).
+const CONNECTIONS: { from: string; to: string; type: "down" | "right"; reveal: number }[] = [
+  { from: "droplet", to: "dosi",       type: "right", reveal: CUE.llmReveal },
+  { from: "dosi",    to: "claude",     type: "down",  reveal: CUE.claudeName },
+  { from: "droplet", to: "qdrant",     type: "down",  reveal: CUE.qdrantReveal + 10 },
+  { from: "droplet", to: "postgres",   type: "down",  reveal: CUE.postgresReveal + 10 },
+  { from: "droplet", to: "embeddings", type: "down",  reveal: CUE.embeddingsReveal + 10 },
 ];
 
 const TOPICS = [
@@ -150,33 +168,15 @@ export const Scene3_Setup: React.FC = () => {
           }}
         >
           <AnimatedText
-            text="Here's how the benchmark works."
-            startFrame={CUE.intro + 2}
-            fontSize={36}
-            color={COLORS.textMuted}
-            textAlign="center"
-            mode="wordByWord"
-            durationFrames={50}
-            style={{
-              opacity: interpolate(
-                frame,
-                [0, 10, 75, 100],
-                [0, 1, 1, 0],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-              ),
-            }}
-          />
-
-          <AnimatedText
-            text="Infrastructure"
-            startFrame={90}
-            fontSize={42}
+            text="The Setup"
+            startFrame={5}
+            fontSize={48}
             fontWeight={700}
             textAlign="center"
             style={{
               opacity: interpolate(
                 frame,
-                [90, 120, CUE.infraEnd - 25, CUE.infraEnd],
+                [5, 35, CUE.infraEnd - 25, CUE.infraEnd],
                 [0, 1, 1, 0],
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               ),
@@ -184,33 +184,70 @@ export const Scene3_Setup: React.FC = () => {
             }}
           />
 
-          {/* Connection lines */}
+          {/* Connection lines.
+              SVG positioned at top:0/left:0 with viewport coords.
+              Each box renders at viewport (box.x, box.y + 60). Box height ~180-220
+              depending on sub-label wrapping; we use a fixed 180 estimate for anchors. */}
           <svg
             width={1920}
-            height={700}
-            style={{ position: "absolute", top: 100, left: 0, pointerEvents: "none" }}
+            height={1080}
+            style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
           >
             {CONNECTIONS.map((conn, i) => {
-              const from = INFRA_BOXES[conn.from];
-              const to = INFRA_BOXES[conn.to];
+              const from = INFRA_BOXES.find((b) => b.key === conn.from)!;
+              const to = INFRA_BOXES.find((b) => b.key === conn.to)!;
               const opacity = interpolate(
                 frame,
                 [conn.reveal, conn.reveal + 20],
-                [0, 0.5],
+                [0, 0.55],
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               );
+
+              const BOX_H = 180;
+              const fromTop = from.y + 60;
+              const fromBottom = fromTop + BOX_H;
+              const fromMidY = fromTop + BOX_H / 2;
+              const fromRight = from.x + BOX_W;
+              const fromCenterX = from.x + BOX_W / 2;
+
+              const toTop = to.y + 60;
+              const toMidY = toTop + BOX_H / 2;
+              const toCenterX = to.x + BOX_W / 2;
+              const toLeft = to.x;
+
+              let x1: number, y1: number, x2: number, y2: number;
+              if (conn.type === "right") {
+                x1 = fromRight;
+                y1 = fromMidY;
+                x2 = toLeft;
+                y2 = toMidY;
+              } else {
+                // "down"
+                x1 = fromCenterX;
+                y1 = fromBottom;
+                x2 = toCenterX;
+                y2 = toTop;
+              }
+
               return (
-                <line
-                  key={i}
-                  x1={from.x + 100}
-                  y1={from.y + 80}
-                  x2={to.x + 100}
-                  y2={to.y + 30}
-                  stroke={COLORS.accent}
-                  strokeWidth={2}
-                  opacity={opacity}
-                  strokeDasharray="8,4"
-                />
+                <g key={i} opacity={opacity}>
+                  <line
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke={COLORS.accent}
+                    strokeWidth={2.5}
+                    strokeDasharray="10,6"
+                  />
+                  {/* Arrow head */}
+                  <circle
+                    cx={x2}
+                    cy={y2}
+                    r={5}
+                    fill={COLORS.accent}
+                  />
+                </g>
               );
             })}
           </svg>
@@ -238,45 +275,48 @@ export const Scene3_Setup: React.FC = () => {
                   opacity: boxOpacity,
                   background: COLORS.bgCard,
                   border: `1px solid ${COLORS.border}`,
-                  borderRadius: 14,
-                  padding: "18px 24px",
+                  borderRadius: 16,
+                  padding: "28px 30px",
                   textAlign: "center",
                   backdropFilter: "blur(10px)",
-                  width: 220,
+                  width: 280,
                   boxShadow: `0 0 30px ${COLORS.accentGlow}11`,
                 }}
               >
-                <div style={{ fontSize: 32, marginBottom: 6 }}>{box.icon}</div>
+                <div style={{ fontSize: 64, marginBottom: 12 }}>{box.icon}</div>
                 <div
                   style={{
                     fontFamily: FONTS.body,
-                    fontSize: 18,
-                    fontWeight: 600,
+                    fontSize: 30,
+                    fontWeight: 800,
                     color: COLORS.text,
+                    letterSpacing: -0.5,
                   }}
                 >
                   {box.label}
                 </div>
-                <div
-                  style={{
-                    fontFamily: FONTS.mono,
-                    fontSize: 12,
-                    color: COLORS.textMuted,
-                    marginTop: 6,
-                  }}
-                >
-                  {box.sub}
-                </div>
+                {box.sub && (
+                  <div
+                    style={{
+                      fontFamily: FONTS.mono,
+                      fontSize: 20,
+                      color: COLORS.textMuted,
+                      marginTop: 10,
+                    }}
+                  >
+                    {box.sub}
+                  </div>
+                )}
               </div>
             );
           })}
 
-          {/* Droplet spec callouts that pop in next to the Droplet box */}
+          {/* Droplet spec callouts hugging the Droplet box left/right */}
           {[
-            { label: "8 GB RAM", reveal: CUE.ramSpec, x: 470, y: 110 },
-            { label: "4 vCPUs", reveal: CUE.vcpuSpec, x: 470, y: 160 },
-            { label: "Ubuntu 24.04", reveal: CUE.ubuntuSpec, x: 820, y: 110 },
-            { label: "Bangalore 🇮🇳", reveal: CUE.bangaloreSpec, x: 820, y: 160 },
+            { label: "8 GB RAM",      reveal: CUE.ramSpec,       x: 300, y: 270 },
+            { label: "4 vCPUs",       reveal: CUE.vcpuSpec,      x: 300, y: 350 },
+            { label: "Ubuntu 24.04",  reveal: CUE.ubuntuSpec,    x: 790, y: 270 },
+            { label: "Bangalore 🇮🇳", reveal: CUE.bangaloreSpec, x: 790, y: 350 },
           ].map((s) => (
             <div
               key={s.label}
@@ -285,12 +325,14 @@ export const Scene3_Setup: React.FC = () => {
                 left: s.x,
                 top: s.y,
                 fontFamily: FONTS.mono,
-                fontSize: 14,
+                fontSize: 22,
+                fontWeight: 600,
                 color: COLORS.accent,
-                background: "rgba(0,212,255,0.08)",
-                border: `1px solid ${COLORS.accent}44`,
-                borderRadius: 6,
-                padding: "4px 10px",
+                background: "rgba(0,212,255,0.10)",
+                border: `1px solid ${COLORS.accent}55`,
+                borderRadius: 10,
+                padding: "10px 20px",
+                boxShadow: `0 0 16px ${COLORS.accentGlow}33`,
                 opacity: interpolate(
                   frame,
                   [s.reveal, s.reveal + 14],
@@ -309,31 +351,6 @@ export const Scene3_Setup: React.FC = () => {
             </div>
           ))}
 
-          {/* pgvector tag highlight on postgres box */}
-          {frame >= CUE.pgvectorTag && (
-            <div
-              style={{
-                position: "absolute",
-                left: INFRA_BOXES[2].x + 230,
-                top: INFRA_BOXES[2].y + 130,
-                fontFamily: FONTS.mono,
-                fontSize: 13,
-                color: COLORS.neonGreen,
-                background: "rgba(0,255,136,0.10)",
-                border: `1px solid ${COLORS.neonGreen}44`,
-                borderRadius: 6,
-                padding: "4px 10px",
-                opacity: interpolate(
-                  frame,
-                  [CUE.pgvectorTag, CUE.pgvectorTag + 15],
-                  [0, 1],
-                  { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-                ),
-              }}
-            >
-              + pgvector ext
-            </div>
-          )}
         </div>
 
         {/* Phase 2: 50-turn conversation + topics + facts (910 → 1390f) */}
@@ -350,21 +367,34 @@ export const Scene3_Setup: React.FC = () => {
             padding: "50px 80px",
           }}
         >
-          <AnimatedText
-            text="Synthetic 50-Turn Conversation"
-            startFrame={CUE.conversationStart + 10}
-            fontSize={42}
-            fontWeight={700}
-            textAlign="center"
-          />
+          {/* Small section label */}
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 30,
+              fontWeight: 700,
+              color: COLORS.textMuted,
+              letterSpacing: 6,
+              textTransform: "uppercase",
+              textAlign: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.conversationStart + 10, CUE.conversationStart + 35],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            50-turn conversation
+          </div>
 
-          {/* Topic chips */}
+          {/* Topic chips with embedded facts that surface at "but hidden" */}
           <div
             style={{
               display: "flex",
-              gap: 16,
+              gap: 18,
               justifyContent: "center",
-              marginTop: 50,
+              marginTop: 60,
               flexWrap: "wrap",
             }}
           >
@@ -373,16 +403,16 @@ export const Scene3_Setup: React.FC = () => {
                 key={t.label}
                 style={{
                   fontFamily: FONTS.body,
-                  fontSize: 22,
+                  fontSize: 26,
                   color: COLORS.text,
                   background: COLORS.bgCard,
                   border: `1px solid ${COLORS.border}`,
-                  borderRadius: 28,
-                  padding: "10px 22px",
+                  borderRadius: 32,
+                  padding: "14px 28px",
                   opacity: interpolate(
                     frame,
                     [t.reveal, t.reveal + 15, CUE.butHidden, CUE.butHidden + 30],
-                    [0, 1, 1, 0.25],
+                    [0, 1, 1, 0.15],
                     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                   ),
                   transform: `translateY(${interpolate(
@@ -390,7 +420,12 @@ export const Scene3_Setup: React.FC = () => {
                     [t.reveal, t.reveal + 15],
                     [12, 0],
                     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-                  )}px)`,
+                  )}px) scale(${interpolate(
+                    frame,
+                    [CUE.butHidden, CUE.butHidden + 25],
+                    [1, 0.85],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                  )})`,
                 }}
               >
                 {t.label}
@@ -398,36 +433,48 @@ export const Scene3_Setup: React.FC = () => {
             ))}
           </div>
 
-          {/* "But hidden..." tagline */}
-          <div
-            style={{
-              fontFamily: FONTS.body,
-              fontSize: 28,
-              color: COLORS.accent,
-              textAlign: "center",
-              marginTop: 30,
-              opacity: interpolate(
-                frame,
-                [CUE.butHidden, CUE.butHidden + 20],
-                [0, 1],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-              ),
-              textShadow: `0 0 20px ${COLORS.accentGlow}`,
-            }}
-          >
-            But hidden inside: 10 specific facts.
-          </div>
-
-          {/* Timeline */}
+          {/* Magnifying-glass "x-ray" beat at "but hidden" */}
           <div
             style={{
               position: "absolute",
-              top: 460,
+              top: 240,
+              left: 0,
+              right: 0,
+              textAlign: "center",
+              opacity: interpolate(
+                frame,
+                [CUE.butHidden, CUE.butHidden + 20, CUE.factsRevealStart + 10, CUE.factsRevealStart + 30],
+                [0, 1, 1, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            <div style={{ fontSize: 72 }}>🔍</div>
+            <div
+              style={{
+                fontFamily: FONTS.mono,
+                fontSize: 22,
+                color: COLORS.accent,
+                marginTop: 12,
+                letterSpacing: 4,
+                textTransform: "uppercase",
+                textShadow: `0 0 20px ${COLORS.accentGlow}`,
+              }}
+            >
+              10 facts hidden inside
+            </div>
+          </div>
+
+          {/* Prominent timeline bar */}
+          <div
+            style={{
+              position: "absolute",
+              top: 420,
               left: 100,
               right: 100,
-              height: 4,
+              height: 6,
               background: COLORS.border,
-              borderRadius: 2,
+              borderRadius: 3,
               opacity: interpolate(
                 frame,
                 [CUE.factsRevealStart - 20, CUE.factsRevealStart],
@@ -446,23 +493,24 @@ export const Scene3_Setup: React.FC = () => {
                   { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                 )}%`,
                 background: `linear-gradient(90deg, ${COLORS.accent}, ${COLORS.neonGreen})`,
-                borderRadius: 2,
+                borderRadius: 3,
               }}
             />
           </div>
 
-          {/* Turn markers */}
+          {/* Turn-axis markers (1, 10, 20, 30, 40, 50) */}
           {[1, 10, 20, 30, 40, 50].map((turn) => (
             <div
               key={turn}
               style={{
                 position: "absolute",
-                top: 472,
+                top: 438,
                 left: `${100 + ((turn - 1) / 49) * (1920 - 200)}px`,
                 transform: "translateX(-50%)",
                 fontFamily: FONTS.mono,
-                fontSize: 12,
-                color: COLORS.textDim,
+                fontSize: 20,
+                fontWeight: 600,
+                color: COLORS.textMuted,
                 opacity: interpolate(
                   frame,
                   [CUE.factsRevealStart, CUE.factsRevealStart + 30],
@@ -475,9 +523,9 @@ export const Scene3_Setup: React.FC = () => {
             </div>
           ))}
 
-          {/* Fact pins (10 facts) */}
+          {/* Fact pins on timeline (big & glowing, no text labels here) */}
           {SEEDED_FACTS.map((f, i) => {
-            const pinFrame = CUE.factsRevealStart + i * 12;
+            const pinFrame = CUE.factsRevealStart + i * 10;
             const pinOpacity = interpolate(frame, [pinFrame, pinFrame + 15], [0, 1], {
               extrapolateLeft: "clamp",
               extrapolateRight: "clamp",
@@ -487,41 +535,81 @@ export const Scene3_Setup: React.FC = () => {
               extrapolateRight: "clamp",
             });
             const xPos = 100 + ((f.turn - 1) / 49) * (1920 - 200);
-            const isEven = i % 2 === 0;
 
             return (
-              <div key={i}>
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  top: 411,
+                  left: xPos - 12,
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background: COLORS.accent,
+                  opacity: pinOpacity,
+                  transform: `translateY(${pinY}px)`,
+                  boxShadow: `0 0 22px ${COLORS.accentGlow}, 0 0 4px ${COLORS.accent}`,
+                  border: `2px solid #0a0a0f`,
+                }}
+              />
+            );
+          })}
+
+          {/* Fact cards in 2×5 grid BELOW the timeline */}
+          <div
+            style={{
+              position: "absolute",
+              top: 500,
+              left: 60,
+              right: 60,
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gridTemplateRows: "repeat(2, 1fr)",
+              gap: 20,
+            }}
+          >
+            {SEEDED_FACTS.map((f, i) => {
+              const cardFrame = CUE.factsRevealStart + i * 10;
+              const cardOpacity = interpolate(
+                frame,
+                [cardFrame, cardFrame + 18],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              );
+              const cardY = interpolate(
+                frame,
+                [cardFrame, cardFrame + 18],
+                [16, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              );
+              return (
                 <div
+                  key={i}
                   style={{
-                    position: "absolute",
-                    top: 454,
-                    left: xPos - 6,
-                    width: 12,
-                    height: 12,
-                    borderRadius: "50%",
-                    background: COLORS.accent,
-                    opacity: pinOpacity,
-                    transform: `translateY(${pinY}px)`,
-                    boxShadow: `0 0 12px ${COLORS.accentGlow}`,
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    top: isEven ? 500 : 380,
-                    left: xPos - 100,
-                    width: 200,
-                    textAlign: "center",
-                    opacity: pinOpacity,
-                    transform: `translateY(${pinY}px)`,
+                    opacity: cardOpacity,
+                    transform: `translateY(${cardY}px)`,
+                    background: COLORS.bgCard,
+                    border: `1px solid ${COLORS.accent}33`,
+                    borderRadius: 12,
+                    padding: "18px 20px",
+                    backdropFilter: "blur(8px)",
+                    boxShadow: `0 0 18px ${COLORS.accentGlow}11`,
+                    minHeight: 110,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-start",
                   }}
                 >
                   <div
                     style={{
                       fontFamily: FONTS.mono,
-                      fontSize: 11,
+                      fontSize: 18,
+                      fontWeight: 700,
                       color: COLORS.accent,
-                      marginBottom: 3,
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                      marginBottom: 10,
                     }}
                   >
                     Turn {f.turn}
@@ -529,21 +617,18 @@ export const Scene3_Setup: React.FC = () => {
                   <div
                     style={{
                       fontFamily: FONTS.body,
-                      fontSize: 12,
+                      fontSize: 20,
+                      fontWeight: 500,
                       color: COLORS.text,
-                      background: COLORS.bgCard,
-                      border: `1px solid ${COLORS.border}`,
-                      borderRadius: 8,
-                      padding: "6px 8px",
-                      lineHeight: 1.3,
+                      lineHeight: 1.35,
                     }}
                   >
                     {f.fact}
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
         {/* Phase 3: Quiz markers + memory decay curve (1390 → 1814f) */}
@@ -560,24 +645,18 @@ export const Scene3_Setup: React.FC = () => {
             padding: "50px 80px",
           }}
         >
-          <AnimatedText
-            text="Quiz the AI. Build the decay curve."
-            startFrame={CUE.atTurns15_50 + 10}
-            fontSize={42}
-            fontWeight={700}
-            textAlign="center"
-          />
+          {/* === TIMELINE WITH BIG QUIZ MARKERS (top of phase 3) === */}
 
-          {/* Mini timeline with QUIZ markers */}
+          {/* Timeline bar */}
           <div
             style={{
               position: "absolute",
-              top: 300,
+              top: 340,
               left: 100,
               right: 100,
-              height: 4,
+              height: 8,
               background: COLORS.border,
-              borderRadius: 2,
+              borderRadius: 4,
             }}
           >
             <div
@@ -585,29 +664,32 @@ export const Scene3_Setup: React.FC = () => {
                 height: "100%",
                 width: "100%",
                 background: `linear-gradient(90deg, ${COLORS.accent}, ${COLORS.neonGreen})`,
-                borderRadius: 2,
-                opacity: 0.5,
+                borderRadius: 4,
+                opacity: 0.55,
               }}
             />
           </div>
 
+          {/* Turn axis markers (1, 15, 50) below the bar */}
           {[1, 15, 50].map((turn) => (
             <div
               key={turn}
               style={{
                 position: "absolute",
-                top: 312,
+                top: 360,
                 left: `${100 + ((turn - 1) / 49) * (1920 - 200)}px`,
                 transform: "translateX(-50%)",
                 fontFamily: FONTS.mono,
-                fontSize: 12,
-                color: COLORS.textDim,
+                fontSize: 26,
+                fontWeight: 700,
+                color: COLORS.textMuted,
               }}
             >
               {turn}
             </div>
           ))}
 
+          {/* BIG QUIZ markers above the bar */}
           {[15, 50].map((turn, i) => {
             const quizFrame = CUE.pauseAndQuiz + i * 80;
             const quizOpacity = interpolate(
@@ -616,53 +698,49 @@ export const Scene3_Setup: React.FC = () => {
               [0, 1],
               { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
             );
+            const pulse =
+              frame >= quizFrame
+                ? 0.6 + 0.4 * Math.sin((frame - quizFrame) * 0.15)
+                : 0;
             const xPos = 100 + ((turn - 1) / 49) * (1920 - 200);
             return (
               <div
                 key={turn}
                 style={{
                   position: "absolute",
-                  top: 240,
-                  left: xPos - 45,
-                  width: 90,
+                  top: 140,
+                  left: xPos - 130,
+                  width: 260,
                   textAlign: "center",
                   opacity: quizOpacity,
                 }}
               >
+                <div style={{ fontSize: 72, marginBottom: 8 }}>❓</div>
                 <div
                   style={{
                     fontFamily: FONTS.mono,
-                    fontSize: 14,
-                    fontWeight: 700,
+                    fontSize: 36,
+                    fontWeight: 800,
                     color: COLORS.neonGreen,
-                    background: "rgba(0,255,136,0.12)",
-                    border: `1px solid rgba(0,255,136,0.4)`,
-                    borderRadius: 8,
-                    padding: "4px 10px",
-                    boxShadow: `0 0 16px rgba(0,255,136,0.3)`,
+                    background: "rgba(0,255,136,0.14)",
+                    border: `2px solid rgba(0,255,136,0.55)`,
+                    borderRadius: 14,
+                    padding: "14px 28px",
+                    letterSpacing: 3,
+                    boxShadow: `0 0 ${28 + pulse * 24}px rgba(0,255,136,${0.35 + pulse * 0.35})`,
                   }}
                 >
                   QUIZ
-                </div>
-                <div
-                  style={{
-                    fontFamily: FONTS.mono,
-                    fontSize: 12,
-                    color: COLORS.textMuted,
-                    marginTop: 4,
-                  }}
-                >
-                  Turn {turn}
                 </div>
               </div>
             );
           })}
 
-          {/* Sketch memory decay curve */}
+          {/* === BIG MEMORY DECAY CURVE === */}
           <div
             style={{
               position: "absolute",
-              top: 420,
+              top: 460,
               left: 0,
               right: 0,
               opacity: interpolate(
@@ -676,35 +754,115 @@ export const Scene3_Setup: React.FC = () => {
             <div
               style={{
                 fontFamily: FONTS.body,
-                fontSize: 26,
+                fontSize: 40,
+                fontWeight: 700,
                 color: COLORS.accent,
                 textAlign: "center",
-                marginBottom: 16,
-                textShadow: `0 0 20px ${COLORS.accentGlow}`,
+                marginBottom: 24,
+                textShadow: `0 0 24px ${COLORS.accentGlow}`,
               }}
             >
               ↘ Memory Decay Curve
             </div>
-            <svg width={900} height={200} style={{ display: "block", margin: "0 auto" }}>
-              <line x1={50} y1={180} x2={850} y2={180} stroke={COLORS.border} strokeWidth={1} />
-              <line x1={50} y1={20} x2={50} y2={180} stroke={COLORS.border} strokeWidth={1} />
+            <svg
+              width={1500}
+              height={500}
+              style={{ display: "block", margin: "0 auto" }}
+              viewBox="0 0 1500 500"
+            >
+              {/* Axes */}
+              <line x1={120} y1={60} x2={120} y2={430} stroke={COLORS.border} strokeWidth={2} />
+              <line x1={120} y1={430} x2={1430} y2={430} stroke={COLORS.border} strokeWidth={2} />
+
+              {/* Faint gridlines for readability */}
+              {[0.25, 0.5, 0.75].map((g) => (
+                <line
+                  key={g}
+                  x1={120}
+                  y1={60 + g * 370}
+                  x2={1430}
+                  y2={60 + g * 370}
+                  stroke={COLORS.border}
+                  strokeWidth={1}
+                  strokeDasharray="4,8"
+                  opacity={0.4}
+                />
+              ))}
+
+              {/* Decay curve */}
               <path
-                d={`M 100 30 Q 350 40 450 90 T 800 170`}
+                d="M 150 75 Q 600 100 850 240 T 1400 400"
                 stroke={COLORS.danger}
-                strokeWidth={3}
+                strokeWidth={6}
                 fill="none"
-                strokeDasharray={1500}
+                strokeDasharray={2000}
                 strokeDashoffset={interpolate(
                   frame,
                   [CUE.howMuchForget, CUE.howMuchForget + 70],
-                  [1500, 0],
+                  [2000, 0],
                   { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
                 )}
+                style={{ filter: `drop-shadow(0 0 12px ${COLORS.dangerGlow})` }}
               />
-              <text x={70} y={30} fontFamily={FONTS.mono} fontSize={12} fill={COLORS.textMuted}>100%</text>
-              <text x={70} y={180} fontFamily={FONTS.mono} fontSize={12} fill={COLORS.textMuted}>0%</text>
-              <text x={70} y={195} fontFamily={FONTS.mono} fontSize={12} fill={COLORS.textMuted}>turn 1</text>
-              <text x={780} y={195} fontFamily={FONTS.mono} fontSize={12} fill={COLORS.textMuted}>turn 50</text>
+
+              {/* Y axis labels */}
+              <text
+                x={100}
+                y={75}
+                fontFamily={FONTS.mono}
+                fontSize={26}
+                fontWeight={700}
+                fill={COLORS.text}
+                textAnchor="end"
+              >
+                100%
+              </text>
+              <text
+                x={100}
+                y={430}
+                fontFamily={FONTS.mono}
+                fontSize={26}
+                fontWeight={700}
+                fill={COLORS.text}
+                textAnchor="end"
+              >
+                0%
+              </text>
+
+              {/* X axis labels */}
+              <text
+                x={150}
+                y={475}
+                fontFamily={FONTS.mono}
+                fontSize={24}
+                fill={COLORS.textMuted}
+              >
+                turn 1
+              </text>
+              <text
+                x={1400}
+                y={475}
+                fontFamily={FONTS.mono}
+                fontSize={24}
+                fill={COLORS.textMuted}
+                textAnchor="end"
+              >
+                turn 50
+              </text>
+
+              {/* "recall %" Y-axis title */}
+              <text
+                x={50}
+                y={245}
+                fontFamily={FONTS.mono}
+                fontSize={22}
+                fontWeight={600}
+                fill={COLORS.textMuted}
+                transform="rotate(-90, 50, 245)"
+                textAnchor="middle"
+              >
+                recall
+              </text>
             </svg>
           </div>
         </div>
@@ -726,16 +884,82 @@ export const Scene3_Setup: React.FC = () => {
             justifyContent: "center",
           }}
         >
-          <AnimatedText
-            text="Each backend runs 5 times."
-            startFrame={CUE.eachBackend5x + 5}
-            fontSize={36}
-            color={COLORS.textMuted}
-            textAlign="center"
-            mode="wordByWord"
-            durationFrames={50}
-            style={{ marginBottom: 60 }}
-          />
+          {/* 4×5 grid of run-dots — concrete visualization of scale */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "220px repeat(5, 120px)",
+              gridTemplateRows: "repeat(4, 120px)",
+              gap: 20,
+              marginBottom: 60,
+              opacity: interpolate(
+                frame,
+                [CUE.eachBackend5x, CUE.eachBackend5x + 15, CUE.thatsMath - 5, CUE.thatsMath + 25],
+                [0, 1, 1, 0.4],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+            }}
+          >
+            {BACKENDS.map((b, bi) => (
+              <React.Fragment key={b}>
+                {/* Backend label */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-end",
+                    paddingRight: 24,
+                    fontFamily: FONTS.mono,
+                    fontSize: 34,
+                    fontWeight: 800,
+                    color: BACKEND_COLORS[b],
+                    textShadow: `0 0 14px ${BACKEND_COLORS[b]}55`,
+                  }}
+                >
+                  {b}
+                </div>
+                {/* 5 run dots */}
+                {Array.from({ length: 5 }).map((_, ri) => {
+                  const dotFrame = CUE.eachBackend5x + 30 + (bi * 5 + ri) * 6;
+                  const dotOpacity = interpolate(
+                    frame,
+                    [dotFrame, dotFrame + 12],
+                    [0, 1],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                  );
+                  const dotScale = interpolate(
+                    frame,
+                    [dotFrame, dotFrame + 12],
+                    [0, 1],
+                    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+                  );
+                  return (
+                    <div
+                      key={ri}
+                      style={{
+                        width: 120,
+                        height: 120,
+                        borderRadius: 22,
+                        background: `linear-gradient(135deg, ${BACKEND_COLORS[b]}, ${BACKEND_COLORS[b]}88)`,
+                        opacity: dotOpacity,
+                        transform: `scale(${dotScale})`,
+                        boxShadow: `0 0 24px ${BACKEND_COLORS[b]}77`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontFamily: FONTS.mono,
+                        fontSize: 48,
+                        fontWeight: 800,
+                        color: "#fff",
+                      }}
+                    >
+                      ▶
+                    </div>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </div>
 
           <div
             style={{
@@ -745,6 +969,12 @@ export const Scene3_Setup: React.FC = () => {
               fontFamily: FONTS.mono,
               fontSize: 56,
               color: COLORS.text,
+              opacity: interpolate(
+                frame,
+                [CUE.thatsMath, CUE.thatsMath + 15],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
             }}
           >
             {[
@@ -778,9 +1008,10 @@ export const Scene3_Setup: React.FC = () => {
                     <div
                       style={{
                         fontFamily: FONTS.body,
-                        fontSize: 16,
+                        fontSize: 22,
+                        fontWeight: 600,
                         color: COLORS.textMuted,
-                        marginTop: 4,
+                        marginTop: 6,
                       }}
                     >
                       {stat.label}

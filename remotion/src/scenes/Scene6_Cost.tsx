@@ -157,15 +157,15 @@ export const Scene6_Cost: React.FC = () => {
             style={{
               position: "relative",
               width: 1100,
-              height: chartHeight + 100,
-              margin: "60px auto 0",
+              height: chartHeight + 160,
+              margin: "120px auto 0",
             }}
           >
             {/* Y-axis baseline */}
             <div
               style={{
                 position: "absolute",
-                bottom: 60,
+                bottom: 120,
                 left: 0,
                 right: 0,
                 height: 1,
@@ -215,7 +215,7 @@ export const Scene6_Cost: React.FC = () => {
                     style={{
                       position: "absolute",
                       left: x,
-                      bottom: 60,
+                      bottom: 120,
                       width: barW,
                       height: barHeight,
                       background: `linear-gradient(180deg, ${color}, ${color}99)`,
@@ -236,7 +236,7 @@ export const Scene6_Cost: React.FC = () => {
                     style={{
                       position: "absolute",
                       left: x,
-                      bottom: 60 + barHeight + 12,
+                      bottom: 120 + barHeight + 12,
                       width: barW,
                       textAlign: "center",
                       fontFamily: FONTS.mono,
@@ -261,11 +261,12 @@ export const Scene6_Cost: React.FC = () => {
                     style={{
                       position: "absolute",
                       left: x,
-                      bottom: 30,
+                      bottom: 60,
                       width: barW,
                       textAlign: "center",
                       fontFamily: FONTS.mono,
-                      fontSize: 18,
+                      fontSize: 24,
+                      fontWeight: 600,
                       color: COLORS.text,
                       opacity: interpolate(
                         frame,
@@ -282,12 +283,12 @@ export const Scene6_Cost: React.FC = () => {
                     style={{
                       position: "absolute",
                       left: x,
-                      bottom: 5,
+                      bottom: 16,
                       width: barW,
                       textAlign: "center",
                       fontFamily: FONTS.mono,
-                      fontSize: 12,
-                      color: COLORS.textDim,
+                      fontSize: 18,
+                      color: COLORS.textMuted,
                       opacity: interpolate(
                         frame,
                         [revealFrame + 20, revealFrame + 40],
@@ -345,11 +346,12 @@ export const Scene6_Cost: React.FC = () => {
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               ),
               fontFamily: FONTS.body,
-              fontSize: 20,
+              fontSize: 28,
+              fontWeight: 500,
               color: COLORS.textMuted,
             }}
           >
-            Buffer sends the <span style={{ color: COLORS.buffer, fontWeight: 600 }}>entire conversation history</span> every turn. By turn 50, every message carries 50 turns of context.
+            Buffer sends the <span style={{ color: COLORS.buffer, fontWeight: 700 }}>entire conversation history</span> every turn. By turn 50, every message carries 50 turns of context.
           </div>
 
           {/* Summary reasoning callout */}
@@ -367,11 +369,12 @@ export const Scene6_Cost: React.FC = () => {
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               ),
               fontFamily: FONTS.body,
-              fontSize: 20,
+              fontSize: 28,
+              fontWeight: 500,
               color: COLORS.textMuted,
             }}
           >
-            Summary pays <span style={{ color: COLORS.summary, fontWeight: 600 }}>twice per turn</span>: one call to respond, one to update the running summary.
+            Summary pays <span style={{ color: COLORS.summary, fontWeight: 700 }}>twice per turn</span>: one call to respond, one to update the running summary.
           </div>
 
           {/* Vector reasoning callout */}
@@ -389,11 +392,12 @@ export const Scene6_Cost: React.FC = () => {
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               ),
               fontFamily: FONTS.body,
-              fontSize: 20,
+              fontSize: 28,
+              fontWeight: 500,
               color: COLORS.textMuted,
             }}
           >
-            Vector backends send only <span style={{ color: COLORS.neonGreen, fontWeight: 600 }}>4 relevant snippets</span> per turn. Token usage stays flat regardless of conversation length.
+            Vector backends send only <span style={{ color: COLORS.neonGreen, fontWeight: 700 }}>4 relevant snippets</span> per turn. Token usage stays flat regardless of conversation length.
           </div>
         </div>
 
@@ -425,9 +429,9 @@ export const Scene6_Cost: React.FC = () => {
             durationFrames={90}
           />
 
-          <div style={{ display: "flex", alignItems: "center", gap: 80, marginTop: 60 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 80, marginTop: 60 }}>
             {/* Vector side: 1 coin */}
-            <div style={{ textAlign: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
               <div
                 style={{
                   width: 100,
@@ -460,7 +464,8 @@ export const Scene6_Cost: React.FC = () => {
               <div
                 style={{
                   fontFamily: FONTS.body,
-                  fontSize: 20,
+                  fontSize: 26,
+                  fontWeight: 600,
                   color: COLORS.qdrant,
                   marginTop: 16,
                 }}
@@ -471,9 +476,11 @@ export const Scene6_Cost: React.FC = () => {
 
             <div
               style={{
+                alignSelf: "center",
                 fontFamily: FONTS.body,
                 fontSize: 32,
                 color: COLORS.textMuted,
+                marginBottom: 30,
                 opacity: interpolate(
                   frame,
                   [CUE.tenDollars - 30, CUE.tenDollars],
@@ -486,7 +493,7 @@ export const Scene6_Cost: React.FC = () => {
             </div>
 
             {/* Buffer side: 10 coins in a 5×2 grid */}
-            <div style={{ textAlign: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
               <div
                 style={{
                   display: "grid",
@@ -535,7 +542,8 @@ export const Scene6_Cost: React.FC = () => {
               <div
                 style={{
                   fontFamily: FONTS.body,
-                  fontSize: 20,
+                  fontSize: 26,
+                  fontWeight: 600,
                   color: COLORS.buffer,
                   marginTop: 16,
                 }}

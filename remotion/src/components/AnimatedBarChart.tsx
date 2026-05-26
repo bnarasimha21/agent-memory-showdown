@@ -144,14 +144,15 @@ export const AnimatedBarChart: React.FC<Props> = ({
                 style={{
                   position: "absolute",
                   left: x,
-                  bottom: 61 + barHeight + 8,
+                  bottom: 61 + barHeight + 10,
                   width: barWidth,
                   textAlign: "center",
                   fontFamily: FONTS.mono,
-                  fontSize: 20,
-                  fontWeight: 700,
+                  fontSize: 30,
+                  fontWeight: 800,
                   color,
                   opacity: valueOpacity,
+                  textShadow: `0 0 14px ${color}55`,
                 }}
               >
                 {d.displayValue ?? `${valuePrefix}${d.value.toLocaleString()}${valueSuffix}`}
@@ -163,12 +164,13 @@ export const AnimatedBarChart: React.FC<Props> = ({
               style={{
                 position: "absolute",
                 left: x,
-                bottom: 20,
+                bottom: 16,
                 width: barWidth,
                 textAlign: "center",
                 fontFamily: FONTS.mono,
-                fontSize: 18,
-                color: COLORS.textMuted,
+                fontSize: 24,
+                fontWeight: 600,
+                color: COLORS.text,
                 opacity: interpolate(relFrame, [0, 15], [0, 1], {
                   extrapolateRight: "clamp",
                 }),

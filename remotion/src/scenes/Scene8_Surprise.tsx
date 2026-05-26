@@ -116,10 +116,11 @@ export const Scene8_Surprise: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.body,
-              fontSize: 22,
+              fontSize: 32,
+              fontWeight: 500,
               color: COLORS.textMuted,
               textAlign: "center",
-              marginTop: 16,
+              marginTop: 20,
               opacity: interpolate(
                 frame,
                 [CUE.includingBuffer, CUE.includingBuffer + 20, FLASH_FRAME - 10, FLASH_FRAME + 10],
@@ -134,16 +135,17 @@ export const Scene8_Surprise: React.FC = () => {
           {/* 4 backends × 2 facts indicator grid */}
           {(() => {
             const tileW = 220;
-            const tileH = 130;
+            const tileH = 120;
             const gapX = 28;
-            const gapY = 20;
-            const rowHeaderW = 150;
-            const gridLeft =
-              (1920 -
-                80 * 2 -
-                (rowHeaderW + SENSITIVE_FACTS.length * (tileW + gapX) - gapX)) /
-              2;
-            const gridTop = 240;
+            const gapY = 18;
+            const rowHeaderW = 170;
+            // Center based on the VISIBLE tiles (since labels are short text
+            // right-aligned, the tile cluster dominates the visual weight).
+            const tilesWidth = SENSITIVE_FACTS.length * (tileW + gapX) - gapX;
+            const tilesViewportX = (1920 - tilesWidth) / 2;
+            // gridLeft (relative to container that starts at viewport padding-left = 80)
+            const gridLeft = tilesViewportX - 80 - rowHeaderW;
+            const gridTop = 40;
 
             return (
               <div style={{ position: "relative", marginTop: 20 }}>
@@ -165,11 +167,11 @@ export const Scene8_Surprise: React.FC = () => {
                       ),
                     }}
                   >
-                    <div style={{ fontSize: 28, marginBottom: 4 }}>🔒</div>
+                    <div style={{ fontSize: 36, marginBottom: 4 }}>🔒</div>
                     <div
                       style={{
                         fontFamily: FONTS.mono,
-                        fontSize: 13,
+                        fontSize: 18,
                         color: COLORS.textMuted,
                       }}
                     >
@@ -178,10 +180,10 @@ export const Scene8_Surprise: React.FC = () => {
                     <div
                       style={{
                         fontFamily: FONTS.body,
-                        fontSize: 20,
-                        fontWeight: 600,
+                        fontSize: 24,
+                        fontWeight: 700,
                         color: COLORS.text,
-                        marginTop: 2,
+                        marginTop: 4,
                       }}
                     >
                       {sf.fact}
@@ -336,45 +338,6 @@ export const Scene8_Surprise: React.FC = () => {
             );
           })()}
 
-          {/* Tagline after flash */}
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 60,
-              textAlign: "center",
-              opacity: interpolate(
-                frame,
-                [CUE.thisIsntMemory, CUE.thisIsntMemory + 15],
-                [0, 1],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-              ),
-            }}
-          >
-            <AnimatedText
-              text="This isn't a memory problem."
-              startFrame={CUE.thisIsntMemory + 5}
-              fontSize={32}
-              fontWeight={600}
-              color={COLORS.text}
-              textAlign="center"
-              mode="wordByWord"
-              durationFrames={50}
-            />
-            <AnimatedText
-              text="It's a safety behavior."
-              startFrame={CUE.safetyBehavior - 12}
-              fontSize={40}
-              fontWeight={800}
-              color={COLORS.accent}
-              glow
-              textAlign="center"
-              mode="wordByWord"
-              durationFrames={40}
-              style={{ marginTop: 8 }}
-            />
-          </div>
         </div>
 
         {/* Phase 2: Safety explanation (470 → 757f) */}
@@ -420,18 +383,19 @@ export const Scene8_Surprise: React.FC = () => {
               ),
             }}
           >
-            <GlassCard startFrame={CUE.declinesRepeat} padding={32}>
+            <GlassCard startFrame={CUE.declinesRepeat} padding={36}>
               <div
                 style={{
                   fontFamily: FONTS.body,
-                  fontSize: 22,
+                  fontSize: 28,
+                  fontWeight: 500,
                   color: COLORS.textMuted,
-                  lineHeight: 1.6,
+                  lineHeight: 1.55,
                   textAlign: "center",
                 }}
               >
                 Passwords and PINs trip a safety layer.{" "}
-                <span style={{ color: COLORS.text, fontWeight: 600 }}>
+                <span style={{ color: COLORS.text, fontWeight: 700 }}>
                   Claude declines to repeat them
                 </span>{" "}
                 even when they were explicitly provided in the conversation.
@@ -483,11 +447,12 @@ export const Scene8_Surprise: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.body,
-              fontSize: 22,
+              fontSize: 30,
+              fontWeight: 500,
               color: COLORS.textMuted,
               textAlign: "center",
-              marginTop: 30,
-              maxWidth: 1100,
+              marginTop: 36,
+              maxWidth: 1300,
               opacity: interpolate(
                 frame,
                 [CUE.testFacts, CUE.testFacts + 20],
@@ -496,7 +461,7 @@ export const Scene8_Surprise: React.FC = () => {
               ),
             }}
           >
-            Recall scores get <span style={{ color: COLORS.danger, fontWeight: 600 }}>misleading</span> when the LLM's safety layer is doing the refusing.
+            Recall scores get <span style={{ color: COLORS.danger, fontWeight: 700 }}>misleading</span> when the LLM's safety layer is doing the refusing.
           </div>
         </div>
 

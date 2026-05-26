@@ -96,7 +96,6 @@ export const Scene9_Recommendations: React.FC = () => {
             display: "flex",
             flexDirection: "column",
             gap: 20,
-            marginTop: 60,
             maxWidth: 1300,
             margin: "60px auto 0",
           }}
@@ -156,10 +155,10 @@ export const Scene9_Recommendations: React.FC = () => {
                     <div
                       style={{
                         fontFamily: FONTS.body,
-                        fontSize: 22,
+                        fontSize: 28,
                         color: COLORS.text,
-                        fontWeight: 600,
-                        marginBottom: 4,
+                        fontWeight: 700,
+                        marginBottom: 8,
                       }}
                     >
                       {rec.useCase}
@@ -167,7 +166,7 @@ export const Scene9_Recommendations: React.FC = () => {
                     <div
                       style={{
                         fontFamily: FONTS.body,
-                        fontSize: 16,
+                        fontSize: 24,
                         color: COLORS.textMuted,
                       }}
                     >
@@ -216,9 +215,10 @@ export const Scene9_Recommendations: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.mono,
-              fontSize: 22,
+              fontSize: 30,
+              fontWeight: 700,
               color: COLORS.danger,
-              textShadow: `0 0 16px ${COLORS.dangerGlow}`,
+              textShadow: `0 0 18px ${COLORS.dangerGlow}`,
             }}
           >
             Summary forgets more than it remembers.

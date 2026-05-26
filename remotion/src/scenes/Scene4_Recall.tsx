@@ -19,6 +19,7 @@ import {
   RECALL_AT_TURN_50,
   RECALL_BY_SEED_TURN_AT_50,
   SEED_TURNS,
+  SEEDED_FACTS,
 } from "../data/benchmarkData";
 
 // Cue points synced to public/audio/scene04.wav (whisper word-level, 30fps).
@@ -106,10 +107,11 @@ export const Scene4_Recall: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.body,
-              fontSize: 22,
+              fontSize: 36,
+              fontWeight: 600,
               color: COLORS.textMuted,
               textAlign: "center",
-              marginTop: 8,
+              marginTop: 28,
               opacity: interpolate(
                 frame,
                 [CUE.atTurn15, CUE.atTurn15 + 20],
@@ -121,7 +123,37 @@ export const Scene4_Recall: React.FC = () => {
             Recall accuracy: turn 15 vs turn 50
           </div>
 
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 30 }}>
+          {/* Annotation: 100% recall at turn 15 — sits above the chart */}
+          <div
+            style={{
+              position: "absolute",
+              top: 250,
+              left: "50%",
+              transform: "translateX(-50%)",
+              opacity: interpolate(
+                frame,
+                [CUE.hundredPctRecall, CUE.hundredPctRecall + 15, CUE.butAtTurn50, CUE.butAtTurn50 + 30],
+                [0, 1, 1, 0],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              ),
+              fontFamily: FONTS.mono,
+              fontSize: 22,
+              fontWeight: 700,
+              color: COLORS.neonGreen,
+              textShadow: `0 0 16px rgba(0,255,136,0.4)`,
+              background: "rgba(0,255,136,0.07)",
+              border: `1px solid rgba(0,255,136,0.35)`,
+              borderRadius: 10,
+              padding: "8px 18px",
+              letterSpacing: 1,
+              boxShadow: `0 0 18px rgba(0,255,136,0.12)`,
+              whiteSpace: "nowrap",
+            }}
+          >
+            ✓ 100% at Turn 15 · no challenge
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 90 }}>
             <AnimatedLineChart
               series={BACKENDS.map((b) => ({
                 label: b,
@@ -130,38 +162,12 @@ export const Scene4_Recall: React.FC = () => {
               }))}
               startFrame={CUE.atTurn15 + 20}
               drawDuration={120}
-              chartWidth={1000}
-              chartHeight={460}
+              chartWidth={1300}
+              chartHeight={620}
               xLabels={["Turn 15", "Turn 50"]}
               yMax={105}
               yLabel="Recall %"
             />
-          </div>
-
-          {/* Annotation: 100% recall at turn 15 */}
-          <div
-            style={{
-              position: "absolute",
-              top: 320,
-              right: 200,
-              opacity: interpolate(
-                frame,
-                [CUE.hundredPctRecall, CUE.hundredPctRecall + 15, CUE.butAtTurn50, CUE.butAtTurn50 + 30],
-                [0, 1, 1, 0],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-              ),
-              fontFamily: FONTS.mono,
-              fontSize: 28,
-              fontWeight: 700,
-              color: COLORS.neonGreen,
-              textShadow: `0 0 20px rgba(0,255,136,0.4)`,
-              background: "rgba(0,255,136,0.06)",
-              border: `1px solid rgba(0,255,136,0.3)`,
-              borderRadius: 10,
-              padding: "8px 16px",
-            }}
-          >
-            100% · no challenge
           </div>
 
           {/* "But at turn 50..." subtitle */}
@@ -221,10 +227,9 @@ export const Scene4_Recall: React.FC = () => {
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: 24,
-              marginTop: 50,
-              maxWidth: 1100,
-              margin: "50px auto 0",
+              gap: 44,
+              maxWidth: 1500,
+              margin: "60px auto 0",
             }}
           >
             {BACKENDS.map((b) => {
@@ -261,19 +266,19 @@ export const Scene4_Recall: React.FC = () => {
                     }),
                     display: "flex",
                     alignItems: "center",
-                    gap: 24,
+                    gap: 32,
                   }}
                 >
-                  <div style={{ width: 140 }}>
-                    <BackendBadge name={b} fontSize={18} />
+                  <div style={{ width: 240, flexShrink: 0 }}>
+                    <BackendBadge name={b} fontSize={32} />
                   </div>
 
                   <div
                     style={{
                       flex: 1,
-                      height: 48,
+                      height: 90,
                       background: COLORS.bgCard,
-                      borderRadius: 8,
+                      borderRadius: 12,
                       overflow: "hidden",
                       position: "relative",
                       border: `1px solid ${COLORS.border}`,
@@ -286,65 +291,28 @@ export const Scene4_Recall: React.FC = () => {
                         background: isSummary
                           ? `linear-gradient(90deg, ${color}, ${COLORS.danger})`
                           : `linear-gradient(90deg, ${color}88, ${color})`,
-                        borderRadius: 7,
+                        borderRadius: 10,
                         boxShadow: isSummary
-                          ? `0 0 20px ${COLORS.dangerGlow}`
-                          : `0 0 20px ${color}33`,
+                          ? `0 0 30px ${COLORS.dangerGlow}`
+                          : `0 0 24px ${color}44`,
                       }}
                     />
                   </div>
 
-                  <div style={{ width: 100, textAlign: "right" }}>
+                  <div style={{ width: 160, textAlign: "right", flexShrink: 0 }}>
                     <AnimatedCounter
                       value={pct}
                       startFrame={counterStart}
                       durationFrames={40}
                       suffix="%"
-                      fontSize={36}
+                      fontSize={56}
                       color={isSummary ? COLORS.danger : color}
-                      fontWeight={700}
+                      fontWeight={800}
                     />
                   </div>
                 </div>
               );
             })}
-          </div>
-
-          {/* Sensitive-data callout during buffer narration */}
-          <div
-            style={{
-              position: "absolute",
-              left: 120,
-              right: 120,
-              bottom: 180,
-              textAlign: "center",
-              opacity: interpolate(
-                frame,
-                [CUE.wifiPasswordBankPIN, CUE.wifiPasswordBankPIN + 20, CUE.qdrantPgvectorReveal - 10, CUE.qdrantPgvectorReveal + 10],
-                [0, 1, 1, 0],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-              ),
-            }}
-          >
-            <div
-              style={{
-                fontFamily: FONTS.mono,
-                fontSize: 18,
-                color: COLORS.textMuted,
-                marginBottom: 8,
-              }}
-            >
-              Buffer's only misses
-            </div>
-            <div
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: 22,
-                color: COLORS.text,
-              }}
-            >
-              🔒 Wi-Fi password · 🔒 Bank PIN <span style={{ color: COLORS.textMuted, fontSize: 18 }}>(Claude's safety layer, not memory)</span>
-            </div>
           </div>
 
           {/* Summary shock callout */}
@@ -366,8 +334,8 @@ export const Scene4_Recall: React.FC = () => {
             <AnimatedText
               text="Summary: 42%. Less than half."
               startFrame={CUE.summary42 + 5}
-              fontSize={32}
-              fontWeight={700}
+              fontSize={56}
+              fontWeight={800}
               color={COLORS.danger}
               glow
               glowColor={COLORS.dangerGlow}
@@ -402,10 +370,11 @@ export const Scene4_Recall: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.body,
-              fontSize: 20,
+              fontSize: 30,
+              fontWeight: 500,
               color: COLORS.textMuted,
               textAlign: "center",
-              marginTop: 6,
+              marginTop: 12,
               opacity: interpolate(
                 frame,
                 [CUE.letsLookAt + 20, CUE.letsLookAt + 40],
@@ -419,12 +388,12 @@ export const Scene4_Recall: React.FC = () => {
 
           {(() => {
             const cliffIndex = 4;
-            const cellW = 100;
-            const cellH = 60;
-            const cellGap = 6;
-            const cliffGap = 30;
-            const rowLabelW = 150;
-            const gridTop = 90;
+            const cellW = 115;
+            const cellH = 92;
+            const cellGap = 8;
+            const cliffGap = 36;
+            const rowLabelW = 180;
+            const gridTop = 110;
 
             const getCellLeft = (si: number) =>
               rowLabelW + si * (cellW + cellGap) + (si >= cliffIndex ? cliffGap : 0);
@@ -448,11 +417,12 @@ export const Scene4_Recall: React.FC = () => {
                     style={{
                       position: "absolute",
                       left: getCellLeft(si),
-                      top: gridTop - 30,
+                      top: gridTop - 42,
                       width: cellW,
                       textAlign: "center",
                       fontFamily: FONTS.mono,
-                      fontSize: 14,
+                      fontSize: 26,
+                      fontWeight: 700,
                       color: COLORS.textMuted,
                       opacity: interpolate(
                         frame,
@@ -497,15 +467,16 @@ export const Scene4_Recall: React.FC = () => {
                       cliffIndex * (cellW + cellGap) -
                       cellGap / 2 +
                       cliffGap / 2 -
-                      80,
-                    top: gridTop - 62,
-                    width: 160,
+                      130,
+                    top: gridTop - 84,
+                    width: 260,
                     textAlign: "center",
                     fontFamily: FONTS.mono,
-                    fontSize: 13,
+                    fontSize: 26,
                     color: COLORS.danger,
-                    fontWeight: 700,
-                    letterSpacing: 1,
+                    fontWeight: 800,
+                    letterSpacing: 3,
+                    textShadow: `0 0 16px ${COLORS.dangerGlow}`,
                     opacity: interpolate(
                       frame,
                       [CUE.everythingAfter18 + 30, CUE.everythingAfter18 + 60],
@@ -538,13 +509,13 @@ export const Scene4_Recall: React.FC = () => {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "flex-end",
-                          paddingRight: 16,
+                          paddingRight: 20,
                           fontFamily: FONTS.mono,
-                          fontSize: 18,
-                          fontWeight: 700,
+                          fontSize: 30,
+                          fontWeight: 800,
                           color: BACKEND_COLORS[b],
                           textShadow: isSummary
-                            ? `0 0 12px ${COLORS.dangerGlow}`
+                            ? `0 0 14px ${COLORS.dangerGlow}`
                             : undefined,
                         }}
                       >
@@ -605,8 +576,8 @@ export const Scene4_Recall: React.FC = () => {
                             <div
                               style={{
                                 fontFamily: FONTS.mono,
-                                fontSize: 20,
-                                fontWeight: 700,
+                                fontSize: 32,
+                                fontWeight: 800,
                                 color: "#fff",
                                 lineHeight: 1,
                               }}
@@ -616,9 +587,9 @@ export const Scene4_Recall: React.FC = () => {
                             <div
                               style={{
                                 fontFamily: FONTS.mono,
-                                fontSize: 12,
-                                color: "rgba(255,255,255,0.85)",
-                                marginTop: 3,
+                                fontSize: 28,
+                                color: "rgba(255,255,255,0.95)",
+                                marginTop: 4,
                               }}
                             >
                               {kept ? "✓" : "✗"}
@@ -639,7 +610,7 @@ export const Scene4_Recall: React.FC = () => {
               position: "absolute",
               left: 0,
               right: 0,
-              bottom: 100,
+              top: 820,
               textAlign: "center",
               opacity: interpolate(
                 frame,
@@ -652,14 +623,17 @@ export const Scene4_Recall: React.FC = () => {
             <div
               style={{
                 fontFamily: FONTS.mono,
-                fontSize: 14,
+                fontSize: 32,
+                fontWeight: 700,
                 color: COLORS.textMuted,
-                marginBottom: 10,
+                letterSpacing: 5,
+                textTransform: "uppercase",
+                marginBottom: 24,
               }}
             >
               Compressed away by summary
             </div>
-            <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap" }}>
               {[
                 { label: "💒 Sister's wedding", reveal: CUE.sistersWedding },
                 { label: "📖 Book reading", reveal: CUE.bookReading },
@@ -669,12 +643,13 @@ export const Scene4_Recall: React.FC = () => {
                   key={f.label}
                   style={{
                     fontFamily: FONTS.body,
-                    fontSize: 18,
+                    fontSize: 26,
+                    fontWeight: 600,
                     color: COLORS.text,
                     background: "rgba(255,68,68,0.10)",
-                    border: `1px solid ${COLORS.danger}44`,
-                    borderRadius: 10,
-                    padding: "8px 16px",
+                    border: `1px solid ${COLORS.danger}66`,
+                    borderRadius: 12,
+                    padding: "12px 22px",
                     textDecoration: frame >= f.reveal + 20 ? "line-through" : "none",
                     opacity: interpolate(
                       frame,
@@ -696,7 +671,7 @@ export const Scene4_Recall: React.FC = () => {
               position: "absolute",
               left: 0,
               right: 0,
-              bottom: 50,
+              top: 740,
               textAlign: "center",
               opacity: interpolate(
                 frame,
@@ -709,8 +684,8 @@ export const Scene4_Recall: React.FC = () => {
             <AnimatedText
               text="Summary actively destroys new information as it compresses."
               startFrame={CUE.activelyDestroys + 5}
-              fontSize={26}
-              fontWeight={600}
+              fontSize={40}
+              fontWeight={800}
               color={COLORS.summary}
               glow
               glowColor={COLORS.summaryGlow}

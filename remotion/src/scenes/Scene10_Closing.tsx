@@ -163,9 +163,9 @@ export const Scene10_Closing: React.FC = () => {
                 <div
                   style={{
                     fontFamily: FONTS.body,
-                    fontSize: 16,
+                    fontSize: 22,
                     color: COLORS.textMuted,
-                    marginTop: 4,
+                    marginTop: 8,
                   }}
                 >
                   {s.label}
@@ -248,11 +248,11 @@ export const Scene10_Closing: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.mono,
-              fontSize: 18,
+              fontSize: 22,
               color: COLORS.textMuted,
               letterSpacing: 4,
               textTransform: "uppercase",
-              marginBottom: 30,
+              marginBottom: 36,
             }}
           >
             Best vs. worst choice
@@ -399,9 +399,9 @@ export const Scene10_Closing: React.FC = () => {
             <div
               style={{
                 fontFamily: FONTS.body,
-                fontSize: 18,
+                fontSize: 22,
                 color: COLORS.textMuted,
-                marginTop: 16,
+                marginTop: 20,
               }}
             >
               Full code, raw results, and all charts. Open source.

@@ -5,10 +5,20 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { COLORS, FONTS } from "../styles/theme";
+import { COLORS, FONTS, BACKEND_COLORS } from "../styles/theme";
 import { ChatBubble } from "../components/ChatBubble";
 import { AnimatedText } from "../components/AnimatedText";
 import { FadeTransition } from "../components/FadeTransition";
+
+// Results-table teaser data (shown blurred behind "So I built a benchmark")
+const TEASER_BACKENDS = ["buffer", "summary", "qdrant", "pgvector"] as const;
+const TEASER_ROWS = [
+  { metric: "Recall @ Turn 50",   values: ["90%",     "42%",    "82%",    "82%"] },
+  { metric: "Avg Latency / Turn", values: ["10.3s",   "36.0s",  "7.0s",   "7.0s"] },
+  { metric: "Cost / 1K Convos",   values: ["$4,303",  "$2,256", "$418",   "$416"] },
+  { metric: "Total Tokens / Run", values: ["717K",    "376K",   "70K",    "69K"] },
+  { metric: "Wall Clock (5 runs)",values: ["45 min",  "3 hrs",  "32 min", "32 min"] },
+];
 
 // Cue points synced to public/audio/scene01.wav (whisper word-level timestamps, 30fps).
 // Times in seconds → frames at 30fps.
@@ -134,18 +144,18 @@ export const Scene1_Hook: React.FC = () => {
             <div
               style={{
                 fontFamily: FONTS.mono,
-                fontSize: 13,
+                fontSize: 18,
                 color: COLORS.textMuted,
-                marginBottom: 18,
+                marginBottom: 20,
                 display: "flex",
-                gap: 8,
+                gap: 10,
                 alignItems: "center",
               }}
             >
-              <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
-              <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e" }} />
-              <span style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
-              <span style={{ marginLeft: 12 }}>AI Chat</span>
+              <span style={{ width: 14, height: 14, borderRadius: "50%", background: "#ff5f57" }} />
+              <span style={{ width: 14, height: 14, borderRadius: "50%", background: "#febc2e" }} />
+              <span style={{ width: 14, height: 14, borderRadius: "50%", background: "#28c840" }} />
+              <span style={{ marginLeft: 14 }}>AI Chat</span>
             </div>
 
             <ChatBubble
@@ -181,10 +191,10 @@ export const Scene1_Hook: React.FC = () => {
                 ),
                 textAlign: "center",
                 fontFamily: FONTS.mono,
-                fontSize: 15,
+                fontSize: 20,
                 color: COLORS.textMuted,
-                padding: "14px 0",
-                letterSpacing: 3,
+                padding: "16px 0",
+                letterSpacing: 4,
               }}
             >
               · · · 20 turns later · · ·
@@ -225,19 +235,157 @@ export const Scene1_Hook: React.FC = () => {
           </div>
         </div>
 
+        {/* Phase 2.5: Blurred results-table teaser behind narration (446 → 670f) */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            paddingBottom: 70,
+            opacity: interpolate(
+              frame,
+              [CUE.chatEnd - 4, CUE.theQuestion + 20, CUE.titleStart - 30, CUE.titleStart - 8],
+              [0, 1, 1, 0],
+              { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+            ),
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        >
+          {/* "Coming up" tag */}
+          <div
+            style={{
+              fontFamily: FONTS.mono,
+              fontSize: 18,
+              color: COLORS.accent,
+              letterSpacing: 6,
+              textTransform: "uppercase",
+              marginBottom: 18,
+              opacity: 0.85,
+              textShadow: `0 0 16px ${COLORS.accentGlow}`,
+            }}
+          >
+            ↓ Coming up
+          </div>
+
+          {/* Blurred table */}
+          <div
+            style={{
+              filter: "blur(3.5px)",
+              opacity: 0.7,
+              transform: `scale(${interpolate(
+                frame,
+                [CUE.chatEnd, CUE.benchmark],
+                [0.94, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              )})`,
+            }}
+          >
+            <div
+              style={{
+                background: COLORS.bgCard,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 16,
+                overflow: "hidden",
+              }}
+            >
+              {/* Header row */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "340px repeat(4, 220px)",
+                  background: "rgba(255,255,255,0.05)",
+                  borderBottom: `1px solid ${COLORS.border}`,
+                }}
+              >
+                <div
+                  style={{
+                    padding: "22px 28px",
+                    fontFamily: FONTS.mono,
+                    fontSize: 22,
+                    color: COLORS.textMuted,
+                    fontWeight: 700,
+                    letterSpacing: 1,
+                  }}
+                >
+                  Metric
+                </div>
+                {TEASER_BACKENDS.map((b) => (
+                  <div
+                    key={b}
+                    style={{
+                      padding: "22px 24px",
+                      fontFamily: FONTS.mono,
+                      fontSize: 26,
+                      fontWeight: 700,
+                      color: BACKEND_COLORS[b],
+                      textAlign: "center",
+                    }}
+                  >
+                    {b}
+                  </div>
+                ))}
+              </div>
+
+              {/* Data rows */}
+              {TEASER_ROWS.map((row, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "340px repeat(4, 220px)",
+                    borderBottom:
+                      i < TEASER_ROWS.length - 1 ? `1px solid ${COLORS.border}` : "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "20px 28px",
+                      fontFamily: FONTS.body,
+                      fontSize: 22,
+                      color: COLORS.textMuted,
+                    }}
+                  >
+                    {row.metric}
+                  </div>
+                  {row.values.map((v, vi) => (
+                    <div
+                      key={vi}
+                      style={{
+                        padding: "20px 24px",
+                        fontFamily: FONTS.mono,
+                        fontSize: 26,
+                        fontWeight: 600,
+                        color: COLORS.text,
+                        textAlign: "center",
+                      }}
+                    >
+                      {v}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* Phase 3: The question (446 → 611f) */}
         <div
           style={{
             position: "absolute",
             left: 120,
             right: 120,
-            top: 380,
+            top: 180,
             opacity: interpolate(
               frame,
               [CUE.chatEnd, CUE.theQuestion - 4, CUE.benchmark - 8, CUE.benchmark + 4],
               [0, 1, 1, 0],
               { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
             ),
+            zIndex: 1,
           }}
         >
           <AnimatedText
@@ -307,11 +455,11 @@ export const Scene1_Hook: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.mono,
-              fontSize: 14,
+              fontSize: 20,
               color: COLORS.accent,
-              letterSpacing: 6,
+              letterSpacing: 8,
               textTransform: "uppercase",
-              marginBottom: 20,
+              marginBottom: 24,
             }}
           >
             Benchmark
@@ -345,9 +493,10 @@ export const Scene1_Hook: React.FC = () => {
           <div
             style={{
               fontFamily: FONTS.mono,
-              fontSize: 18,
+              fontSize: 26,
               color: COLORS.textMuted,
-              marginTop: 32,
+              marginTop: 36,
+              letterSpacing: 1,
               opacity: interpolate(
                 frame,
                 [CUE.showdownWord, CUE.showdownWord + 10],
