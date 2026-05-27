@@ -12,32 +12,32 @@ import { FadeTransition } from "../components/FadeTransition";
 
 // Cue points synced to public/audio/scene07.wav (whisper word-level, 30fps).
 const CUE = {
-  elephant: 2,                  // 0.08s
-  doesItMatter: 76,             // 2.56s
-  questionEnd: 166,             // 5.54s
-  atThisScale: 168,             // 5.60s
-  noWord: 209,                  // 6.96s
-  noEnd: 240,                   // ~8.0s buffer before stats
-  qdrantLatency: 242,           // 8.07s Qdrant 7001ms
-  pgvectorLatency: 339,         // 11.30s pgvector 7021ms
-  recallRow: 458,               // 15.25s "82%"
-  costRow: 505,                 // 16.82s "$418"
-  cost416: 586,                 // 19.51s
-  tokensRow: 606,               // 20.19s
-  identical: 677,               // 22.57s
-  statsEnd: 720,                // ~24s
-  ifAlreadyPostgres: 725,       // 24.16s
-  justAddPgv: 851,              // 28.34s
-  zeroExtra: 914,               // 30.47s
-  pgvecRecEnd: 1050,            // 35.00s
-  ifScale: 1050,                // 35.00s "If you're building"
-  millionsVectors: 1137,        // 37.91s
-  qdrantPurpose: 1188,          // 39.61s
-  edge: 1300,                   // 43.33s
-  qdrantRecEnd: 1308,           // 43.63s
-  butForPerSession: 1318,       // 43.92s
-  pgvectorPragmatic: 1404,      // 46.79s
-  end: 1472,                    // 49.03s
+  elephant: 0,                  // 0.08s
+  doesItMatter: 61,             // 2.56s
+  questionEnd: 151,             // 5.54s
+  atThisScale: 153,             // 5.60s
+  noWord: 194,                  // 6.96s
+  noEnd: 225,                   // ~8.0s buffer before stats
+  qdrantLatency: 227,           // 8.07s Qdrant 7001ms
+  pgvectorLatency: 324,         // 11.30s pgvector 7021ms
+  recallRow: 443,               // 15.25s "82%"
+  costRow: 490,                 // 16.82s "$418"
+  cost416: 571,                 // 19.51s
+  tokensRow: 591,               // 20.19s
+  identical: 662,               // 22.57s
+  statsEnd: 705,                // ~24s
+  ifAlreadyPostgres: 710,       // 24.16s
+  justAddPgv: 836,              // 28.34s
+  zeroExtra: 899,               // 30.47s
+  pgvecRecEnd: 1035,            // 35.00s
+  ifScale: 1035,                // 35.00s "If you're building"
+  millionsVectors: 1122,        // 37.91s
+  qdrantPurpose: 1173,          // 39.61s
+  edge: 1285,                   // 43.33s
+  qdrantRecEnd: 1293,           // 43.63s
+  butForPerSession: 1303,       // 43.92s
+  pgvectorPragmatic: 1389,      // 46.79s
+  end: 1449,                    // 49.03s
 };
 
 // Comparison rows aligned with narration cues

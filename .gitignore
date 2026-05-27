@@ -20,5 +20,8 @@ remotion/out/
 # Raw QuickTime audio recordings (redundant with .wav). Preserve locally.
 remotion/public/audio/*.aifc
 
+# Pre-trim audio backups (originals before silence removal). Preserve locally.
+remotion/public/audio/*_original.wav
+
 # Personal scratch notes
 ToDo.txt

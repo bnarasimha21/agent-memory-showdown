@@ -25,48 +25,48 @@ import {
 // Cue points synced to public/audio/scene04.wav (whisper word-level, 30fps).
 const CUE = {
   intro: 0,                      // 0.00 "Let's start"
-  canItRemember: 87,             // 2.79s
-  introEnd: 128,                 // 4.25s
-  atTurn15: 131,                 // 4.36s
-  fourBackends: 182,             // 6.14s
-  hundredPctRecall: 222,         // 7.42s "100%"
-  recallWord: 258,               // 8.62s
-  onlyFourFacts: 270,            // 9.00s
-  noChallenge: 429,              // 14.31s
-  turn15End: 464,                // 15.48s
-  butAtTurn50: 464,              // 15.48s "But at turn 50"
-  storyChanges: 626,             // 20.79s
-  dramatically: 653,             // 21.78s
-  turn50SetupEnd: 684,           // 22.80s
-  bufferReveal: 703,             // 23.44s "Buffer"
-  buffer90: 727,                 // 24.24s "90%"
-  bufferReason: 787,             // 26.23s "it has"
-  ofCourseRemembers: 901,        // 30.03s
-  onlyFailures: 940,             // 31.32s
-  wifiPasswordBankPIN: 982,      // 32.71s
-  claudeSafety: 1051,            // 35.04s
-  notMemoryFailure: 1186,        // 39.56s
-  qdrantPgvectorReveal: 1244,    // 41.48s
-  qdrantPgvector82: 1299,        // 43.33s
-  solidPerformance: 1328,        // 44.27s
-  sameSafetyDrops: 1496,         // 49.87s
-  summaryReveal: 1602,           // 53.40s "And then"
-  summary42: 1663,               // 55.43s "42%"
-  lessThanHalf: 1683,            // 56.19s
-  scoreboardEnd: 1735,           // 57.84s
-  letsLookAt: 1735,              // 57.84s
-  summaryRemembersT1to12: 1791,  // 59.73s
-  perfectly: 1894,               // 63.13s
-  everythingAfter18: 1922,       // 64.08s
-  turn18Zero: 1982,              // 66.06s
-  summarizerCompressed: 2024,    // 67.48s
-  sistersWedding: 2078,          // 69.22s
-  bookReading: 2142,             // 71.41s
-  supplementDosage: 2190,        // 73.02s
-  allGone: 2230,                 // 74.34s
-  notJustForget: 2294,           // 76.40s
-  activelyDestroys: 2356,        // 78.55s
-  end: 2469,                     // 82.27s
+  canItRemember: 76,             // 2.79s
+  introEnd: 117,                 // 4.25s
+  atTurn15: 120,                 // 4.36s
+  fourBackends: 171,             // 6.14s
+  hundredPctRecall: 211,         // 7.42s "100%"
+  recallWord: 247,               // 8.62s
+  onlyFourFacts: 259,            // 9.00s
+  noChallenge: 418,              // 14.31s
+  turn15End: 453,                // 15.48s
+  butAtTurn50: 453,              // 15.48s "But at turn 50"
+  storyChanges: 615,             // 20.79s
+  dramatically: 642,             // 21.78s
+  turn50SetupEnd: 673,           // 22.80s
+  bufferReveal: 692,             // 23.44s "Buffer"
+  buffer90: 716,                 // 24.24s "90%"
+  bufferReason: 776,             // 26.23s "it has"
+  ofCourseRemembers: 890,        // 30.03s
+  onlyFailures: 929,             // 31.32s
+  wifiPasswordBankPIN: 971,      // 32.71s
+  claudeSafety: 1040,            // 35.04s
+  notMemoryFailure: 1175,        // 39.56s
+  qdrantPgvectorReveal: 1233,    // 41.48s
+  qdrantPgvector82: 1288,        // 43.33s
+  solidPerformance: 1317,        // 44.27s
+  sameSafetyDrops: 1485,         // 49.87s
+  summaryReveal: 1591,           // 53.40s "And then"
+  summary42: 1652,               // 55.43s "42%"
+  lessThanHalf: 1672,            // 56.19s
+  scoreboardEnd: 1724,           // 57.84s
+  letsLookAt: 1724,              // 57.84s
+  summaryRemembersT1to12: 1780,  // 59.73s
+  perfectly: 1883,               // 63.13s
+  everythingAfter18: 1911,       // 64.08s
+  turn18Zero: 1971,              // 66.06s
+  summarizerCompressed: 2013,    // 67.48s
+  sistersWedding: 2067,          // 69.22s
+  bookReading: 2131,             // 71.41s
+  supplementDosage: 2179,        // 73.02s
+  allGone: 2219,                 // 74.34s
+  notJustForget: 2283,           // 76.40s
+  activelyDestroys: 2345,        // 78.55s
+  end: 2447,                     // 82.27s
 };
 
 export const Scene4_Recall: React.FC = () => {

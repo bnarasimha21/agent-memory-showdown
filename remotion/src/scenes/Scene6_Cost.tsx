@@ -15,33 +15,33 @@ import { BACKENDS, COST_PER_1K, AVG_TOKENS } from "../data/benchmarkData";
 // Cue points synced to public/audio/scene06.wav (whisper word-level, 30fps).
 const CUE = {
   intro: 0,                  // 0.00s "Here"
-  reallyInteresting: 31,     // 1.03s
-  extrapolate: 96,           // 3.21s
-  thousandConv: 124,         // 4.14s
-  introEnd: 190,             // 6.32s
-  bufferReveal: 202,         // 6.72s "Buffer"
-  bufferAmount: 249,         // 8.29s "$4,303"
-  bufferReason: 303,         // 10.11s "it sends the entire"
-  byTurn50: 423,             // 14.12s
-  bufferEnd: 604,            // 20.12s
-  summaryReveal: 604,        // 20.12s "Summary"
-  summaryAmount: 625,        // 20.83s "$2,256"
-  summaryReason: 666,        // 22.22s
-  payingTwice: 843,          // 28.11s
-  summaryEnd: 910,           // 30.34s
-  qdrantReveal: 912,         // 30.41s
-  qdrantAmount: 947,         // 31.56s "$418"
-  pgvectorAmount: 1025,      // 34.18s "$416"
-  ninetyPctReduction: 1083,  // 36.10s
-  vectorExplain: 1175,       // 39.07s
-  flatTokens: 1330,          // 44.42s
-  vectorEnd: 1428,           // 47.61s
-  putAnotherWay: 1436,       // 47.88s
-  forEveryDollar: 1475,      // 49.46s
-  vectorMemoryWord: 1530,    // 51.01s
-  tenDollars: 1571,          // 52.39s
-  bufferMemWord: 1605,       // 53.51s
-  end: 1686,                 // 56.19s
+  reallyInteresting: 16,     // 1.03s
+  extrapolate: 81,           // 3.21s
+  thousandConv: 109,         // 4.14s
+  introEnd: 175,             // 6.32s
+  bufferReveal: 187,         // 6.72s "Buffer"
+  bufferAmount: 234,         // 8.29s "$4,303"
+  bufferReason: 288,         // 10.11s "it sends the entire"
+  byTurn50: 408,             // 14.12s
+  bufferEnd: 589,            // 20.12s
+  summaryReveal: 589,        // 20.12s "Summary"
+  summaryAmount: 610,        // 20.83s "$2,256"
+  summaryReason: 651,        // 22.22s
+  payingTwice: 828,          // 28.11s
+  summaryEnd: 895,           // 30.34s
+  qdrantReveal: 897,         // 30.41s
+  qdrantAmount: 932,         // 31.56s "$418"
+  pgvectorAmount: 1010,      // 34.18s "$416"
+  ninetyPctReduction: 1068,  // 36.10s
+  vectorExplain: 1160,       // 39.07s
+  flatTokens: 1315,          // 44.42s
+  vectorEnd: 1413,           // 47.61s
+  putAnotherWay: 1421,       // 47.88s
+  forEveryDollar: 1460,      // 49.46s
+  vectorMemoryWord: 1515,    // 51.01s
+  tenDollars: 1556,          // 52.39s
+  bufferMemWord: 1590,       // 53.51s
+  end: 1658,                 // 56.19s
 };
 
 export const Scene6_Cost: React.FC = () => {

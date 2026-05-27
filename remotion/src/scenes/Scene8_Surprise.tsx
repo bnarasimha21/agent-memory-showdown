@@ -20,35 +20,35 @@ const SENSITIVE_FACTS = [
 
 // Cue points synced to public/audio/scene08.wav (whisper word-level, 30fps).
 const CUE = {
-  intro: 11,                  // 0.36s "There"
-  oneFinding: 30,             // 0.99s
-  didntExpect: 71,            // 2.38s
-  introEnd: 96,               // 3.21s
-  everyBackend: 100,          // 3.36s
-  includingBuffer: 121,       // 4.04s
-  dataInPrompt: 184,          // 6.14s
-  failedToRecall: 219,        // 7.29s
-  wifiPassword: 262,          // 8.73s
-  bankPIN: 311,               // 10.37s
-  atTurn50: 333,              // 11.11s — FLASH HAPPENS HERE
-  recallEnd: 363,             // 12.11s
-  thisIsntMemory: 372,        // 12.42s
-  safetyBehavior: 436,        // 14.53s
-  safetyEnd: 469,             // 15.63s
-  claudeRecognizes: 473,      // 15.78s
-  sensitiveDataWord: 507,     // 16.92s
-  declinesRepeat: 588,        // 19.62s
-  explicitlyProvided: 672,    // 22.40s
-  convHistory: 718,           // 23.94s
-  claudeEnd: 757,             // 25.22s
-  thisMatters: 764,           // 25.46s
-  benchmarkDesign: 791,       // 26.36s
-  testFacts: 921,             // 30.70s
-  misleadingRecall: 1004,     // 33.49s
-  matterEnd: 1044,            // 34.80s
-  failureNotMemory: 1052,     // 35.06s
-  llmSafetyLayer: 1133,       // 37.78s
-  end: 1198,                  // 39.91s
+  intro: 0,                  // 0.36s "There"
+  oneFinding: 15,             // 0.99s
+  didntExpect: 56,            // 2.38s
+  introEnd: 81,               // 3.21s
+  everyBackend: 85,          // 3.36s
+  includingBuffer: 106,       // 4.04s
+  dataInPrompt: 169,          // 6.14s
+  failedToRecall: 204,        // 7.29s
+  wifiPassword: 247,          // 8.73s
+  bankPIN: 296,               // 10.37s
+  atTurn50: 318,              // 11.11s — FLASH HAPPENS HERE
+  recallEnd: 348,             // 12.11s
+  thisIsntMemory: 357,        // 12.42s
+  safetyBehavior: 421,        // 14.53s
+  safetyEnd: 454,             // 15.63s
+  claudeRecognizes: 458,      // 15.78s
+  sensitiveDataWord: 492,     // 16.92s
+  declinesRepeat: 573,        // 19.62s
+  explicitlyProvided: 657,    // 22.40s
+  convHistory: 703,           // 23.94s
+  claudeEnd: 742,             // 25.22s
+  thisMatters: 749,           // 25.46s
+  benchmarkDesign: 776,       // 26.36s
+  testFacts: 906,             // 30.70s
+  misleadingRecall: 989,     // 33.49s
+  matterEnd: 1029,            // 34.80s
+  failureNotMemory: 1037,     // 35.06s
+  llmSafetyLayer: 1118,       // 37.78s
+  end: 1164,                  // 39.91s
 };
 
 const FLASH_FRAME = CUE.atTurn50;

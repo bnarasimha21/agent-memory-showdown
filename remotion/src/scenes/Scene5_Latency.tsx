@@ -20,39 +20,39 @@ import {
 
 // Cue points synced to public/audio/scene05.wav (whisper word-level, 30fps).
 const CUE = {
-  intro: 2,                    // 0.06s "Now"
-  speedWord: 56,               // 1.88s "speed"
-  chartTitle: 81,              // 2.70s "This chart"
-  chartDrawStart: 215,         // 7.12s (Qdrant/pgvector start being discussed)
-  qdrantPgvFlat: 273,          // 9.10s "stay flat"
-  sevenSeconds: 304,           // 10.13s
-  topK: 503,                   // 16.81s "top-K snippets"
-  qdrantPgvEnd: 582,           // 19.41s
-  bufferStart: 588,            // 19.60s "Buffer"
-  bufferClimb12: 669,          // 22.32s "climbs to 12+"
-  byTurn30: 715,               // 23.95s "by turn 30"
-  bufferEnd: 866,              // 28.87s
-  summaryStart: 870,           // 29.00s "But look at summary"
-  summaryRockets: 996,         // 33.05s "rockets to 50"
-  byTurn20: 1054,              // 35.14s
-  summaryEnd: 1074,            // 35.80s
-  whyWord: 1084,               // 36.14s "Why?"
-  twoLLMCalls: 1183,           // 39.42s "two LLM calls"
-  oneToRespond: 1209,          // 40.28s
-  oneToUpdate: 1247,           // 41.25s "update the running summary"
-  doublesLatency: 1303,        // 43.42s
-  whyEnd: 1433,                // 47.77s
-  onAverage: 1441,             // 48.02s "On average"
-  vector7: 1490,               // 49.91s
-  buffer10: 1542,              // 51.43s
-  summaryWhopping: 1604,       // 53.47s
-  thirtySixSec: 1625,          // 54.18s
-  fiveTimesSlower: 1707,       // 56.77s
-  totalWallclock: 1758,        // 58.60s
-  qdrantPgv32min: 1920,        // 63.99s
-  buffer45min: 1973,           // 65.75s
-  summary3hrs: 2060,           // 68.66s
-  end: 2112,                   // 70.40s
+  intro: 0,                    // 0.06s "Now"
+  speedWord: 44,               // 1.88s "speed"
+  chartTitle: 69,              // 2.70s "This chart"
+  chartDrawStart: 203,         // 7.12s (Qdrant/pgvector start being discussed)
+  qdrantPgvFlat: 261,          // 9.10s "stay flat"
+  sevenSeconds: 292,           // 10.13s
+  topK: 491,                   // 16.81s "top-K snippets"
+  qdrantPgvEnd: 570,           // 19.41s
+  bufferStart: 576,            // 19.60s "Buffer"
+  bufferClimb12: 657,          // 22.32s "climbs to 12+"
+  byTurn30: 703,               // 23.95s "by turn 30"
+  bufferEnd: 854,              // 28.87s
+  summaryStart: 858,           // 29.00s "But look at summary"
+  summaryRockets: 984,         // 33.05s "rockets to 50"
+  byTurn20: 1042,              // 35.14s
+  summaryEnd: 1062,            // 35.80s
+  whyWord: 1072,               // 36.14s "Why?"
+  twoLLMCalls: 1171,           // 39.42s "two LLM calls"
+  oneToRespond: 1197,          // 40.28s
+  oneToUpdate: 1235,           // 41.25s "update the running summary"
+  doublesLatency: 1291,        // 43.42s
+  whyEnd: 1421,                // 47.77s
+  onAverage: 1429,             // 48.02s "On average"
+  vector7: 1478,               // 49.91s
+  buffer10: 1530,              // 51.43s
+  summaryWhopping: 1592,       // 53.47s
+  thirtySixSec: 1613,          // 54.18s
+  fiveTimesSlower: 1695,       // 56.77s
+  totalWallclock: 1746,        // 58.60s
+  qdrantPgv32min: 1908,        // 63.99s
+  buffer45min: 1961,           // 65.75s
+  summary3hrs: 2048,           // 68.66s
+  end: 2072,                   // 70.40s
 };
 
 export const Scene5_Latency: React.FC = () => {

@@ -21,26 +21,26 @@ const TEASER_ROWS = [
 ];
 
 // Cue points synced to public/audio/scene01.wav (whisper word-level timestamps, 30fps).
-// Times in seconds → frames at 30fps.
+// Audio trimmed by 0.6s at start, end at 25.78s (shift -18 frames from original).
 const CUE = {
-  mostStart: 2,        // 0.05s "Most"
-  cantRemember: 47,    // 1.58s "cannot"
-  hookEnd: 142,        // 4.72s end of first sentence
-  chatStart: 142,      // 4.72s "You ..."
-  msg1Start: 149,      // 4.96s user msg 1 starts
-  msg2Start: 235,      // 7.83s user msg 2 starts
-  msg3Start: 297,      // 9.91s user msg 3 starts
-  twentyTurns: 358,    // 11.92s "20 turns later"
-  questionMsg: 395,    // 13.16s "What's my dog's name?"
-  failMsg: 419,        // 13.95s bot fails
-  redFlash: 430,       // ~14.3s red flash
-  chatEnd: 446,        // 14.88s chat fades
-  theQuestion: 454,    // 15.14s "The question"
-  whichArch: 524,      // 17.48s "It's which"
-  benchmark: 611,      // 20.36s "So I built"
-  titleStart: 682,     // 22.72s "This is"
-  showdownWord: 763,   // 25.44s "showdown"
-  end: 777,            // 25.888s audio end
+  mostStart: 0,        // 0s "Most"
+  cantRemember: 29,    // 0.98s "cannot"
+  hookEnd: 124,        // 4.12s end of first sentence
+  chatStart: 124,      // 4.12s "You ..."
+  msg1Start: 131,      // 4.36s user msg 1 starts
+  msg2Start: 217,      // 7.23s user msg 2 starts
+  msg3Start: 279,      // 9.31s user msg 3 starts
+  twentyTurns: 340,    // 11.32s "20 turns later"
+  questionMsg: 377,    // 12.56s "What's my dog's name?"
+  failMsg: 401,        // 13.35s bot fails
+  redFlash: 412,       // ~13.7s red flash
+  chatEnd: 428,        // 14.28s chat fades
+  theQuestion: 436,    // 14.54s "The question"
+  whichArch: 506,      // 16.88s "It's which"
+  benchmark: 593,      // 19.76s "So I built"
+  titleStart: 664,     // 22.12s "This is"
+  showdownWord: 745,   // 24.84s "showdown"
+  end: 755,            // 25.18s audio end (25.18s × 30fps = 755 frames)
 };
 
 export const Scene1_Hook: React.FC = () => {

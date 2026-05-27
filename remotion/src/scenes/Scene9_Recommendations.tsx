@@ -11,18 +11,18 @@ import { FadeTransition } from "../components/FadeTransition";
 
 // Cue points synced to public/audio/scene09.wav (whisper word-level, 30fps).
 const CUE = {
-  intro: 4,                    // 0.15s "So"
-  whatShouldUse: 32,           // 1.08s
-  introEnd: 72,                // 2.40s
-  productionChatbots: 73,      // 2.44s "For production"
-  bufferShort: 412,            // 13.72s "For short conversations"
-  alreadyPostgres: 700,        // 23.32s "If you already done PostgreSQL"
-  millionsVectors: 902,        // 30.08s
-  summarySkip: 1091,           // 36.35s "And summary memory"
-  destroysDetails: 1271,       // 42.38s
-  fortyTwoPctRecall: 1391,     // 46.39s
-  forgottenMore: 1498,         // 49.96s
-  end: 1557,                   // 51.88s
+  intro: 0,                    // 0.15s "So"
+  whatShouldUse: 27,           // 1.08s
+  introEnd: 67,                // 2.40s
+  productionChatbots: 68,      // 2.44s "For production"
+  bufferShort: 407,            // 13.72s "For short conversations"
+  alreadyPostgres: 695,        // 23.32s "If you already done PostgreSQL"
+  millionsVectors: 897,        // 30.08s
+  summarySkip: 1086,           // 36.35s "And summary memory"
+  destroysDetails: 1266,       // 42.38s
+  fortyTwoPctRecall: 1386,     // 46.39s
+  forgottenMore: 1493,         // 49.96s
+  end: 1539,                   // 51.88s
 };
 
 const RECS = [

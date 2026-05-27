@@ -16,47 +16,48 @@ import { FadeTransition } from "../components/FadeTransition";
 import { SEEDED_FACTS, BACKENDS } from "../data/benchmarkData";
 
 // Cue points synced to public/audio/scene03.wav (whisper word-level, 30fps).
+// Audio trimmed 0.4s at start, end at 71.85s (shift -12 frames from original).
 const CUE = {
-  intro: 0,                  // 0.00s "Here"
-  introEnd: 70,              // 2.30s end "works"
-  dropletReveal: 70,         // 2.30s "I spun up"
-  ramSpec: 146,              // 4.87s "8 gigs of RAM"
-  vcpuSpec: 197,             // 6.56s "4 vCPUs"
-  ubuntuSpec: 227,           // 7.55s "Ubuntu 24.04"
-  bangaloreSpec: 308,        // 10.25s "Bangalore"
-  qdrantReveal: 354,         // 11.81s "Qdrant"
-  postgresReveal: 396,       // 13.20s "postgres"
-  pgvectorTag: 471,          // 15.70s "PG vector extension"
-  llmReveal: 521,            // 17.35s "The LLM is"
-  claudeName: 538,           // 17.93s "Claude"
-  doInferenceLink: 614,      // 20.51s "DigitalOcean serverless"
-  embeddingsReveal: 700,     // 23.33s "Embeddings"
-  modelName: 826,            // 27.52s "all-MiniLM-L6-v2"
-  infraEnd: 910,             // 30.34s (next phase starts)
-  conversationStart: 910,    // 30.34s "The benchmark generates"
-  topicTravel: 1046,         // 34.88s
-  topicTech: 1083,           // 36.13s
-  topicPersonal: 1114,       // 37.15s
-  topicWork: 1145,           // 38.16s
-  topicChatbot: 1184,        // 39.68s
-  butHidden: 1234,           // 41.12s "But hidden"
-  factsRevealStart: 1268,    // 42.27s pins start appearing
-  factsRevealEnd: 1390,      // 46.32s
-  atTurns15_50: 1390,        // 46.32s "At turns 15 and 50"
-  pauseAndQuiz: 1474,        // 49.14s "the benchmark pauses"
-  quizzesAI: 1542,           // 51.39s "quizzes the AI"
-  memoryDecayCurve: 1634,    // 54.48s "This builds the memory decay curve"
-  howMuchForget: 1719,       // 57.30s "How much"
-  decayEnd: 1814,            // 60.45s
-  eachBackend5x: 1824,       // 60.80s "Each backend runs 5 times"
-  statsReliable: 1899,       // 63.32s
-  thatsMath: 1955,           // 65.03s "That's"
-  fourBackends: 1970,        // 65.66s "four backends"
-  fiveRuns: 2016,            // 67.22s "five runs"
-  fiftyTurns: 2045,          // 68.16s "50 turns"
-  equalsAtLeast: 2070,       // 68.99s "equal to at least"
-  thousandLLMCalls: 2104,    // 70.13s "1000 LLM calls"
-  end: 2176,                 // 72.52s
+  intro: 0,                  // 0s "Here"
+  introEnd: 58,              // 1.93s end "works"
+  dropletReveal: 58,         // 1.93s "I spun up"
+  ramSpec: 134,              // 4.47s "8 gigs of RAM"
+  vcpuSpec: 185,             // 6.17s "4 vCPUs"
+  ubuntuSpec: 215,           // 7.17s "Ubuntu 24.04"
+  bangaloreSpec: 296,        // 9.87s "Bangalore"
+  qdrantReveal: 342,         // 11.40s "Qdrant"
+  postgresReveal: 384,       // 12.80s "postgres"
+  pgvectorTag: 459,          // 15.30s "PG vector extension"
+  llmReveal: 509,            // 16.97s "The LLM is"
+  claudeName: 526,           // 17.53s "Claude"
+  doInferenceLink: 602,      // 20.07s "DigitalOcean serverless"
+  embeddingsReveal: 688,     // 22.93s "Embeddings"
+  modelName: 814,            // 27.13s "all-MiniLM-L6-v2"
+  infraEnd: 898,             // 29.93s (next phase starts)
+  conversationStart: 898,    // 29.93s "The benchmark generates"
+  topicTravel: 1034,         // 34.47s
+  topicTech: 1071,           // 35.70s
+  topicPersonal: 1102,       // 36.73s
+  topicWork: 1133,           // 37.77s
+  topicChatbot: 1172,        // 39.07s
+  butHidden: 1222,           // 40.73s "But hidden"
+  factsRevealStart: 1256,    // 41.87s pins start appearing
+  factsRevealEnd: 1378,      // 45.93s
+  atTurns15_50: 1378,        // 45.93s "At turns 15 and 50"
+  pauseAndQuiz: 1462,        // 48.73s "the benchmark pauses"
+  quizzesAI: 1530,           // 51.00s "quizzes the AI"
+  memoryDecayCurve: 1622,    // 54.07s "memory decay curve"
+  howMuchForget: 1707,       // 56.90s "How much"
+  decayEnd: 1802,            // 60.07s
+  eachBackend5x: 1812,       // 60.40s "Each backend runs 5 times"
+  statsReliable: 1887,       // 62.90s
+  thatsMath: 1943,           // 64.77s "That's"
+  fourBackends: 1958,        // 65.27s "four backends"
+  fiveRuns: 2004,            // 66.80s "five runs"
+  fiftyTurns: 2033,          // 67.77s "50 turns"
+  equalsAtLeast: 2058,       // 68.60s "equal to at least"
+  thousandLLMCalls: 2092,    // 69.73s "1000 LLM calls"
+  end: 2143,                 // 71.45s audio end (71.45 × 30fps = 2143 frames)
 };
 
 // Box width used throughout the diagram

@@ -12,64 +12,65 @@ import { AnimatedText } from "../components/AnimatedText";
 import { FadeTransition } from "../components/FadeTransition";
 
 // Cue points synced to public/audio/scene02.wav (whisper word-level, 30fps).
+// Audio trimmed 0.6s at start, end at 71.10s (shift -18 frames from original).
 const CUE = {
-  introStart: 2,
-  introEnd: 100,
-  fourWaysStart: 110,
-  recallWord: 285,    // 9.50s — "recall"
-  speedWord: 307,     // 10.23s — "speed"
-  costWord: 332,      // 11.06s — "cost"
-  weDiscuss: 351,
-  fourOfThese: 391,
-  setupEnd: 433,
+  introStart: 0,
+  introEnd: 82,
+  fourWaysStart: 92,
+  recallWord: 267,    // ~8.90s — "recall"
+  speedWord: 289,     // ~9.63s — "speed"
+  costWord: 314,      // ~10.46s — "cost"
+  weDiscuss: 333,
+  fourOfThese: 373,
+  setupEnd: 415,
 
   // Buffer
-  bufferReveal: 433,
-  bufferJustPass: 510,
-  bufferEntire: 530,
-  bufferIntoPrompt: 590,
-  bufferWorksGreat: 613,
-  bufferContextWindow: 657,
-  bufferExplodes: 687,
-  bufferAPIBill: 720,
-  bufferRoof: 753,
-  bufferEnd: 773,
+  bufferReveal: 415,
+  bufferJustPass: 492,
+  bufferEntire: 512,
+  bufferIntoPrompt: 572,
+  bufferWorksGreat: 595,
+  bufferContextWindow: 639,
+  bufferExplodes: 669,
+  bufferAPIBill: 702,
+  bufferRoof: 735,
+  bufferEnd: 755,
 
   // Summary
-  summaryReveal: 773,
-  summaryWord: 813,
-  summaryCompresses: 866,
-  summarySoundsClever: 985,
-  summaryWhatHappens: 1024,
-  summaryFlightDate: 1088,
-  summaryIsntWorth: 1124,
-  summaryEnd: 1165,
+  summaryReveal: 755,
+  summaryWord: 795,
+  summaryCompresses: 848,
+  summarySoundsClever: 967,
+  summaryWhatHappens: 1006,
+  summaryFlightDate: 1070,
+  summaryIsntWorth: 1106,
+  summaryEnd: 1147,
 
   // Qdrant
-  qdrantReveal: 1165,
-  qdrantVectorMem: 1185,
-  qdrantEmbed: 1262,
-  qdrantQueryTime: 1342,
-  qdrantPullBack: 1373,
-  qdrantSnippets: 1461,
-  qdrantSurgical: 1482,
-  qdrantEnd: 1551,
+  qdrantReveal: 1147,
+  qdrantVectorMem: 1167,
+  qdrantEmbed: 1244,
+  qdrantQueryTime: 1324,
+  qdrantPullBack: 1355,
+  qdrantSnippets: 1443,
+  qdrantSurgical: 1464,
+  qdrantEnd: 1533,
 
   // pgvector
-  pgvecReveal: 1551,
-  pgvecWord: 1611,
-  pgvecSameIdea: 1635,
-  pgvecPostgres: 1691,
-  pgvecExtension: 1742,
-  pgvecInsteadOf: 1776,
-  pgvecOneLess: 1853,
-  pgvecToManage: 1897,
-  pgvecEnd: 1922,
+  pgvecReveal: 1533,
+  pgvecWord: 1593,
+  pgvecSameIdea: 1617,
+  pgvecPostgres: 1673,
+  pgvecExtension: 1724,
+  pgvecInsteadOf: 1758,
+  pgvecOneLess: 1835,
+  pgvecToManage: 1879,
+  pgvecEnd: 1904,
 
   // Closing
-  questionAppear: 1922,
-  whoSurvives: 2099,
-  end: 2138,
+  questionAppear: 1904,
+  whoSurvives: 2081,
+  end: 2115,            // 70.50s × 30fps = 2115 frames
 };
 
 const BACKENDS_META = [
