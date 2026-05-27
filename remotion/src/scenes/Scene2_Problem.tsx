@@ -16,6 +16,9 @@ const CUE = {
   introStart: 2,
   introEnd: 100,
   fourWaysStart: 110,
+  recallWord: 285,    // 9.50s — "recall"
+  speedWord: 307,     // 10.23s — "speed"
+  costWord: 332,      // 11.06s — "cost"
   weDiscuss: 351,
   fourOfThese: 391,
   setupEnd: 433,
@@ -170,6 +173,58 @@ export const Scene2_Problem: React.FC = () => {
           >
             Four memory strategies
           </div>
+
+          {/* Trade-off criteria chips — pop in as narrator says each word */}
+          <div style={{ display: "flex", gap: 30, marginBottom: 40 }}>
+            {[
+              { label: "Recall",   icon: "🧠", reveal: CUE.recallWord, color: "#7eb6ff" },
+              { label: "Speed",    icon: "⚡", reveal: CUE.speedWord,  color: "#ffd166" },
+              { label: "Cost",     icon: "💰", reveal: CUE.costWord,   color: "#9affd0" },
+            ].map((c) => {
+              const popScale = spring({
+                frame: Math.max(0, frame - c.reveal),
+                fps,
+                config: { damping: 9, stiffness: 150 },
+              });
+              const opacity = interpolate(
+                frame,
+                [c.reveal, c.reveal + 12],
+                [0, 1],
+                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+              );
+              return (
+                <div
+                  key={c.label}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "14px 28px",
+                    background: `${c.color}1a`,
+                    border: `1px solid ${c.color}66`,
+                    borderRadius: 999,
+                    boxShadow: `0 0 24px ${c.color}33`,
+                    opacity,
+                    transform: `scale(${0.6 + 0.4 * popScale})`,
+                  }}
+                >
+                  <span style={{ fontSize: 32 }}>{c.icon}</span>
+                  <span
+                    style={{
+                      fontFamily: FONTS.body,
+                      fontSize: 26,
+                      fontWeight: 700,
+                      color: c.color,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {c.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
           <div style={{ display: "flex", gap: 50 }}>
             {BACKENDS_META.map((b, i) => {
               const lightUp = CUE.fourWaysStart + 90 + i * 50;
@@ -359,7 +414,7 @@ const BufferDemo: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
       <BackendChyron name="buffer" icon="📋" tagline="pass entire history → prompt" />
 
       {/* LEFT: chat history */}
-      <div style={{ position: "absolute", top: 160, left: 80, width: 540 }}>
+      <div style={{ position: "absolute", top: 260, left: 80, width: 540 }}>
         <PanelHeading>chat history</PanelHeading>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
           {MESSAGES.slice(0, 6).map((msg, i) => {
@@ -381,7 +436,7 @@ const BufferDemo: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
       <div
         style={{
           position: "absolute",
-          top: 480,
+          top: 580,
           left: 640,
           fontFamily: FONTS.mono,
           fontSize: 36,
@@ -396,7 +451,7 @@ const BufferDemo: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
       </div>
 
       {/* RIGHT: prompt container with context-window bar */}
-      <div style={{ position: "absolute", top: 160, left: 720, width: 1080 }}>
+      <div style={{ position: "absolute", top: 260, left: 720, width: 1080 }}>
         <PanelHeading>LLM prompt</PanelHeading>
 
         {/* Context-window fill bar */}
@@ -558,7 +613,7 @@ const SummaryDemo: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =
       <div
         style={{
           position: "absolute",
-          top: 200,
+          top: 300,
           left: 80,
           right: 80,
           display: "grid",
@@ -779,7 +834,7 @@ const QdrantDemo: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
       <div
         style={{
           position: "absolute",
-          top: 200,
+          top: 240,
           left: 80,
           width: 900,
           height: 700,
@@ -926,7 +981,7 @@ const QdrantDemo: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
       <div
         style={{
           position: "absolute",
-          top: 200,
+          top: 240,
           right: 80,
           width: 480,
           opacity: interpolate(
@@ -1012,7 +1067,7 @@ const PgvectorDemo: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) 
       <div
         style={{
           position: "absolute",
-          top: 200,
+          top: 300,
           left: 0,
           right: 0,
           textAlign: "center",
@@ -1036,7 +1091,7 @@ const PgvectorDemo: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) 
       <div
         style={{
           position: "absolute",
-          top: 270,
+          top: 370,
           left: 80,
           right: 80,
           display: "grid",

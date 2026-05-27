@@ -369,44 +369,6 @@ export const Scene10_Closing: React.FC = () => {
             </span>
           </h1>
 
-          <div
-            style={{
-              marginTop: 50,
-              textAlign: "center",
-              opacity: interpolate(
-                frame,
-                [CUE.measure + 15, CUE.measure + 40],
-                [0, 1],
-                { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-              ),
-            }}
-          >
-            <div
-              style={{
-                fontFamily: FONTS.mono,
-                fontSize: 22,
-                color: COLORS.accent,
-                background: `${COLORS.accent}11`,
-                border: `1px solid ${COLORS.accent}44`,
-                borderRadius: 10,
-                padding: "12px 32px",
-                display: "inline-block",
-                boxShadow: `0 0 30px ${COLORS.accentGlow}`,
-              }}
-            >
-              github.com/bnarasimha21/agent-memory-showdown
-            </div>
-            <div
-              style={{
-                fontFamily: FONTS.body,
-                fontSize: 22,
-                color: COLORS.textMuted,
-                marginTop: 20,
-              }}
-            >
-              Full code, raw results, and all charts. Open source.
-            </div>
-          </div>
         </div>
 
         {/* Bottom progress bar (full gradient at the very end) */}

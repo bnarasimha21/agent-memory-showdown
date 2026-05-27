@@ -69,8 +69,23 @@ export const AnimatedText: React.FC<Props> = ({
   }
 
   if (mode === "wordByWord") {
-    const words = text.split(" ");
-    const framesPerWord = durationFrames / words.length;
+    // Smooth whole-line fade + subtle scale.
+    // (Kept the "wordByWord" mode name so existing scenes auto-upgrade,
+    // but this now renders the entire line as one polished reveal instead
+    // of jittery per-word staggering.)
+    const revealDuration = Math.min(20, Math.max(12, durationFrames / 4));
+    const opacity = interpolate(
+      relFrame,
+      [0, revealDuration],
+      [0, 1],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    );
+    const scale = interpolate(
+      relFrame,
+      [0, revealDuration],
+      [0.97, 1],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    );
 
     return (
       <div
@@ -81,38 +96,14 @@ export const AnimatedText: React.FC<Props> = ({
           fontWeight,
           lineHeight,
           textAlign,
+          opacity,
+          transform: `scale(${scale})`,
+          transformOrigin: "center",
+          textShadow: glow ? `0 0 20px ${glowColor}` : undefined,
           ...style,
         }}
       >
-        {words.map((word, i) => {
-          const wordStart = i * framesPerWord;
-          const opacity = interpolate(
-            relFrame,
-            [wordStart, wordStart + 8],
-            [0, 1],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-          );
-          const y = interpolate(
-            relFrame,
-            [wordStart, wordStart + 8],
-            [8, 0],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-          );
-          return (
-            <span
-              key={i}
-              style={{
-                opacity,
-                transform: `translateY(${y}px)`,
-                display: "inline-block",
-                marginRight: "0.3em",
-                textShadow: glow ? `0 0 20px ${glowColor}` : undefined,
-              }}
-            >
-              {word}
-            </span>
-          );
-        })}
+        {text}
       </div>
     );
   }
