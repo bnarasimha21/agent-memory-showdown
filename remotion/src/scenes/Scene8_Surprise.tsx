@@ -11,7 +11,7 @@ import { COLORS, FONTS, BACKEND_COLORS } from "../styles/theme";
 import { AnimatedText } from "../components/AnimatedText";
 import { GlassCard } from "../components/GlassCard";
 import { FadeTransition } from "../components/FadeTransition";
-import { BACKENDS, RECALL_BY_SEED_TURN_AT_50 } from "../data/benchmarkData";
+import { BACKENDS } from "../data/benchmarkData";
 
 const SENSITIVE_FACTS = [
   { turn: 30, fact: "Wi-Fi password", index: 6 },
@@ -20,35 +20,35 @@ const SENSITIVE_FACTS = [
 
 // Cue points synced to public/audio/scene08.wav (whisper word-level, 30fps).
 const CUE = {
-  intro: 0,                  // 0.36s "There"
-  oneFinding: 15,             // 0.99s
-  didntExpect: 56,            // 2.38s
-  introEnd: 81,               // 3.21s
-  everyBackend: 85,          // 3.36s
-  includingBuffer: 106,       // 4.04s
-  dataInPrompt: 169,          // 6.14s
-  failedToRecall: 204,        // 7.29s
-  wifiPassword: 247,          // 8.73s
-  bankPIN: 296,               // 10.37s
-  atTurn50: 318,              // 11.11s — FLASH HAPPENS HERE
-  recallEnd: 348,             // 12.11s
-  thisIsntMemory: 357,        // 12.42s
-  safetyBehavior: 421,        // 14.53s
-  safetyEnd: 454,             // 15.63s
-  claudeRecognizes: 458,      // 15.78s
-  sensitiveDataWord: 492,     // 16.92s
-  declinesRepeat: 573,        // 19.62s
-  explicitlyProvided: 657,    // 22.40s
-  convHistory: 703,           // 23.94s
-  claudeEnd: 742,             // 25.22s
-  thisMatters: 749,           // 25.46s
-  benchmarkDesign: 776,       // 26.36s
-  testFacts: 906,             // 30.70s
-  misleadingRecall: 989,     // 33.49s
-  matterEnd: 1029,            // 34.80s
-  failureNotMemory: 1037,     // 35.06s
-  llmSafetyLayer: 1118,       // 37.78s
-  end: 1164,                  // 39.91s
+  intro: 0,                  // 0.33s "There"
+  oneFinding: 6,             // 0.46s
+  didntExpect: 39,            // 1.57s
+  introEnd: 74,               // 2.73s
+  everyBackend: 78,          // 2.88s
+  includingBuffer: 101,       // 3.62s
+  dataInPrompt: 176,          // 6.15s
+  failedToRecall: 200,        // 6.95s
+  wifiPassword: 244,          // 8.40s
+  bankPIN: 295,               // 10.11s
+  atTurn50: 307,              // 10.50s — FLASH HAPPENS HERE
+  recallEnd: 342,             // 11.67s
+  thisIsntMemory: 351,        // 11.96s
+  safetyBehavior: 416,        // 14.12s
+  safetyEnd: 449,             // 15.23s
+  claudeRecognizes: 453,      // 15.36s
+  sensitiveDataWord: 488,     // 16.53s
+  declinesRepeat: 567,        // 19.16s
+  explicitlyProvided: 643,    // 21.70s
+  convHistory: 702,           // 23.67s
+  claudeEnd: 728,             // 24.53s
+  thisMatters: 735,           // 24.76s
+  benchmarkDesign: 765,       // 25.76s
+  testFacts: 892,             // 29.99s
+  misleadingRecall: 979,     // 32.90s
+  matterEnd: 1029,            // 34.58s
+  failureNotMemory: 1037,     // 34.84s
+  llmSafetyLayer: 1121,       // 37.64s
+  end: 1175,                  // 39.73s
 };
 
 const FLASH_FRAME = CUE.atTurn50;
@@ -225,7 +225,6 @@ export const Scene8_Surprise: React.FC = () => {
                       </div>
 
                       {SENSITIVE_FACTS.map((sf, si) => {
-                        const val = RECALL_BY_SEED_TURN_AT_50[b][sf.index];
                         const tileLeft = gridLeft + rowHeaderW + si * (tileW + gapX);
 
                         const flashProgress = interpolate(
@@ -304,29 +303,37 @@ export const Scene8_Surprise: React.FC = () => {
                                 ?
                               </div>
                             ) : (
-                              <>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                }}
+                              >
                                 <div
                                   style={{
                                     fontFamily: FONTS.mono,
-                                    fontSize: 44,
-                                    fontWeight: 700,
+                                    fontSize: 52,
+                                    fontWeight: 800,
                                     color: "#fff",
                                     lineHeight: 1,
                                   }}
                                 >
-                                  {val}%
+                                  ✗
                                 </div>
                                 <div
                                   style={{
                                     fontFamily: FONTS.mono,
-                                    fontSize: 22,
-                                    color: "rgba(255,255,255,0.9)",
-                                    marginTop: 6,
+                                    fontSize: 24,
+                                    fontWeight: 700,
+                                    color: "#fff",
+                                    marginTop: 8,
+                                    letterSpacing: 2,
                                   }}
                                 >
-                                  ✗ FAILED
+                                  FAILED
                                 </div>
-                              </>
+                              </div>
                             )}
                           </div>
                         );

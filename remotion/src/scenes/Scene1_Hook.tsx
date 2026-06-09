@@ -23,24 +23,24 @@ const TEASER_ROWS = [
 // Cue points synced to public/audio/scene01.wav (whisper word-level timestamps, 30fps).
 // Audio trimmed by 0.6s at start, end at 25.78s (shift -18 frames from original).
 const CUE = {
-  mostStart: 0,        // 0s "Most"
-  cantRemember: 29,    // 0.98s "cannot"
-  hookEnd: 124,        // 4.12s end of first sentence
-  chatStart: 124,      // 4.12s "You ..."
-  msg1Start: 131,      // 4.36s user msg 1 starts
-  msg2Start: 217,      // 7.23s user msg 2 starts
-  msg3Start: 279,      // 9.31s user msg 3 starts
-  twentyTurns: 340,    // 11.32s "20 turns later"
-  questionMsg: 377,    // 12.56s "What's my dog's name?"
-  failMsg: 401,        // 13.35s bot fails
-  redFlash: 412,       // ~13.7s red flash
-  chatEnd: 428,        // 14.28s chat fades
-  theQuestion: 436,    // 14.54s "The question"
-  whichArch: 506,      // 16.88s "It's which"
-  benchmark: 593,      // 19.76s "So I built"
-  titleStart: 664,     // 22.12s "This is"
-  showdownWord: 745,   // 24.84s "showdown"
-  end: 755,            // 25.18s audio end (25.18s × 30fps = 755 frames)
+  mostStart: 0,       // 0.33s "Most"
+  cantRemember: 19,    // 1.35s "cannot"
+  hookEnd: 116,        // 4.56s end of first sentence
+  chatStart: 116,      // 4.56s "You ..."
+  msg1Start: 117,      // 4.60s user msg 1 starts ("You tell it your dog's name")
+  msg2Start: 191,      // 7.06s user msg 2 starts ("you tell it you are allergic")
+  msg3Start: 267,      // 9.61s user msg 3 starts ("you share your flight")
+  twentyTurns: 321,    // 11.41s "20 turns later"
+  questionMsg: 358,    // 12.63s "What's my dog's name?"
+  failMsg: 384,        // 13.50s bot fails
+  redFlash: 389,       // ~13.67s red flash (kept ≤ chatEnd-14 so the flash fade range stays monotonic)
+  chatEnd: 404,        // 14.17s chat fades
+  theQuestion: 410,    // 14.36s "The question"
+  whichArch: 495,      // 17.19s "It's which"
+  benchmark: 573,      // 19.80s "So I built"
+  titleStart: 641,     // 22.08s "This is"
+  showdownWord: 703,   // 24.14s "showdown"
+  end: 718,            // 24.73s audio end (742 frames @30fps)
 };
 
 export const Scene1_Hook: React.FC = () => {

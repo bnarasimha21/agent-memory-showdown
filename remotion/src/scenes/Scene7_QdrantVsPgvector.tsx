@@ -12,40 +12,40 @@ import { FadeTransition } from "../components/FadeTransition";
 
 // Cue points synced to public/audio/scene07.wav (whisper word-level, 30fps).
 const CUE = {
-  elephant: 0,                  // 0.08s
-  doesItMatter: 61,             // 2.56s
-  questionEnd: 151,             // 5.54s
-  atThisScale: 153,             // 5.60s
-  noWord: 194,                  // 6.96s
-  noEnd: 225,                   // ~8.0s buffer before stats
-  qdrantLatency: 227,           // 8.07s Qdrant 7001ms
-  pgvectorLatency: 324,         // 11.30s pgvector 7021ms
-  recallRow: 443,               // 15.25s "82%"
-  costRow: 490,                 // 16.82s "$418"
-  cost416: 571,                 // 19.51s
-  tokensRow: 591,               // 20.19s
-  identical: 662,               // 22.57s
-  statsEnd: 705,                // ~24s
-  ifAlreadyPostgres: 710,       // 24.16s
-  justAddPgv: 836,              // 28.34s
-  zeroExtra: 899,               // 30.47s
-  pgvecRecEnd: 1035,            // 35.00s
-  ifScale: 1035,                // 35.00s "If you're building"
-  millionsVectors: 1122,        // 37.91s
-  qdrantPurpose: 1173,          // 39.61s
-  edge: 1285,                   // 43.33s
-  qdrantRecEnd: 1293,           // 43.63s
-  butForPerSession: 1303,       // 43.92s
-  pgvectorPragmatic: 1389,      // 46.79s
-  end: 1449,                    // 49.03s
+  elephant: 0,                  // 0.00s
+  doesItMatter: 57,             // 2.36s
+  questionEnd: 120,             // 4.45s
+  atThisScale: 136,             // 5.00s
+  noWord: 196,                  // 7.00s
+  noEnd: 211,                   // ~7.5s buffer before stats
+  qdrantLatency: 213,           // 7.57s Qdrant 7001ms
+  pgvectorLatency: 286,         // 10.00s pgvector 7021ms
+  recallRow: 421,               // 14.50s "82%"
+  costRow: 466,                 // 16.00s "$418"
+  cost416: 537,                 // 18.36s
+  tokensRow: 606,               // 20.67s
+  identical: 657,               // 22.36s
+  statsEnd: 671,                // ~22.8s
+  ifAlreadyPostgres: 676,       // 23.00s
+  justAddPgv: 796,              // 27.00s
+  zeroExtra: 865,               // 29.30s
+  pgvecRecEnd: 976,             // 33.00s
+  ifScale: 976,                 // 33.00s "If you're building"
+  millionsVectors: 1047,        // 35.36s
+  qdrantPurpose: 1155,          // 38.97s
+  edge: 1230,                   // 41.46s
+  qdrantRecEnd: 1236,           // 41.67s
+  butForPerSession: 1246,       // 42.00s
+  pgvectorPragmatic: 1370,      // 46.12s
+  end: 1406,                    // 47.67s
 };
 
 // Comparison rows aligned with narration cues
 const COMPARISON = [
-  { metric: "Avg Latency", qdrant: "7,001 ms", pgvector: "7,021 ms", reveal: 242 },
-  { metric: "Recall @ 50", qdrant: "82%", pgvector: "82%", reveal: 458 },
-  { metric: "Cost / 1K", qdrant: "$418", pgvector: "$416", reveal: 505 },
-  { metric: "Tokens / Run", qdrant: "69,595", pgvector: "69,366", reveal: 606 },
+  { metric: "Avg Latency", qdrant: "7,001 ms", pgvector: "7,021 ms", reveal: 228 },
+  { metric: "Recall @ 50", qdrant: "82%", pgvector: "82%", reveal: 436 },
+  { metric: "Cost / 1K", qdrant: "$418", pgvector: "$416", reveal: 481 },
+  { metric: "Tokens / Run", qdrant: "69,595", pgvector: "69,366", reveal: 621 },
 ];
 
 export const Scene7_QdrantVsPgvector: React.FC = () => {

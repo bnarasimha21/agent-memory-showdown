@@ -23,50 +23,51 @@ import {
 } from "../data/benchmarkData";
 
 // Cue points synced to public/audio/scene04.wav (whisper word-level, 30fps).
+// Re-synced to the re-recorded narration. The Wi-Fi/PIN safety explanation was
+// pulled out of this scene (now "...and we'll come back to this later") and is
+// revealed as the surprise in Scene 8.
 const CUE = {
   intro: 0,                      // 0.00 "Let's start"
-  canItRemember: 76,             // 2.79s
-  introEnd: 117,                 // 4.25s
-  atTurn15: 120,                 // 4.36s
-  fourBackends: 171,             // 6.14s
-  hundredPctRecall: 211,         // 7.42s "100%"
-  recallWord: 247,               // 8.62s
-  onlyFourFacts: 259,            // 9.00s
-  noChallenge: 418,              // 14.31s
-  turn15End: 453,                // 15.48s
-  butAtTurn50: 453,              // 15.48s "But at turn 50"
-  storyChanges: 615,             // 20.79s
-  dramatically: 642,             // 21.78s
-  turn50SetupEnd: 673,           // 22.80s
-  bufferReveal: 692,             // 23.44s "Buffer"
-  buffer90: 716,                 // 24.24s "90%"
-  bufferReason: 776,             // 26.23s "it has"
-  ofCourseRemembers: 890,        // 30.03s
-  onlyFailures: 929,             // 31.32s
-  wifiPasswordBankPIN: 971,      // 32.71s
-  claudeSafety: 1040,            // 35.04s
-  notMemoryFailure: 1175,        // 39.56s
-  qdrantPgvectorReveal: 1233,    // 41.48s
-  qdrantPgvector82: 1288,        // 43.33s
-  solidPerformance: 1317,        // 44.27s
-  sameSafetyDrops: 1485,         // 49.87s
-  summaryReveal: 1591,           // 53.40s "And then"
-  summary42: 1652,               // 55.43s "42%"
-  lessThanHalf: 1672,            // 56.19s
-  scoreboardEnd: 1724,           // 57.84s
-  letsLookAt: 1724,              // 57.84s
-  summaryRemembersT1to12: 1780,  // 59.73s
-  perfectly: 1883,               // 63.13s
-  everythingAfter18: 1911,       // 64.08s
-  turn18Zero: 1971,              // 66.06s
-  summarizerCompressed: 2013,    // 67.48s
-  sistersWedding: 2067,          // 69.22s
-  bookReading: 2131,             // 71.41s
-  supplementDosage: 2179,        // 73.02s
-  allGone: 2219,                 // 74.34s
-  notJustForget: 2283,           // 76.40s
-  activelyDestroys: 2345,        // 78.55s
-  end: 2447,                     // 82.27s
+  canItRemember: 75,             // 3.07s "can it remember"
+  introEnd: 113,                 // ~4.3s phase 1 settle
+  atTurn15: 123,                 // 4.66s "at turn 15"
+  fourBackends: 157,             // 5.81s "all four"
+  hundredPctRecall: 215,         // 7.73s "100%"
+  recallWord: 230,               // ~8.2s "recall"
+  onlyFourFacts: 266,            // 9.44s "only four facts"
+  noChallenge: 419,              // 14.52s "no challenge"
+  turn15End: 459,                // 15.88s
+  butAtTurn50: 459,              // 15.88s "but at turn 50"
+  storyChanges: 603,             // 20.65s "the story changes"
+  dramatically: 631,             // 21.61s "dramatically"
+  turn50SetupEnd: 654,           // ~22.4s phase1 → phase2
+  bufferReveal: 674,             // 23.02s "Buffer"
+  buffer90: 701,                 // 23.93s "90%"
+  bufferReason: 765,             // 26.08s "it has"
+  ofCourseRemembers: 845,        // 28.73s "of course"
+  onlyFailures: 886,             // 30.11s "the only"
+  wifiPasswordBankPIN: 930,      // 31.58s "wi-fi password"
+  comeBackLater: 1011,           // 34.25s "come back to this later" (safety reveal deferred to Scene 8)
+  qdrantPgvectorReveal: 1052,    // 35.64s "Quadrant"
+  qdrantPgvector82: 1116,        // 37.78s "82%"
+  solidPerformance: 1144,        // 38.71s "solid performance"
+  summaryReveal: 1311,           // 44.28s "And then"
+  summary42: 1363,               // 45.99s "42%"
+  lessThanHalf: 1387,            // 46.79s "less than half"
+  scoreboardEnd: 1434,           // 48.38s phase2 → phase3
+  letsLookAt: 1434,              // 48.38s "let's look at this"
+  summaryRemembersT1to12: 1490,  // 50.24s "summary remembers"
+  perfectly: 1582,               // 53.31s "perfectly"
+  everythingAfter18: 1627,       // 54.81s "everything after"
+  turn18Zero: 1650,              // 55.57s "turn 18"
+  summarizerCompressed: 1733,    // 58.34s "compressed away"
+  sistersWedding: 1773,          // 59.67s "wedding"
+  bookReading: 1805,             // 60.74s "the book"
+  supplementDosage: 1863,        // 62.65s "supplement"
+  allGone: 1893,                 // 63.65s "all gone"
+  notJustForget: 1957,           // 65.81s "just forget"
+  activelyDestroys: 2009,        // 67.54s "actively destroys"
+  end: 2106,                     // 70.94s
 };
 
 export const Scene4_Recall: React.FC = () => {

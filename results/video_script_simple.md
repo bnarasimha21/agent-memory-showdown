@@ -89,9 +89,9 @@
 
 **[VISUAL: Animate the numbers appearing in a scoreboard]**
 
-> **Buffer: 90%.** Nearly perfect. It has the entire conversation in its prompt, so of course it remembers. The only failures are on the Wi-Fi password and bank PIN, and that's Claude's safety behavior refusing to repeat sensitive data, not a memory failure.
+> **Buffer: 90%.** Nearly perfect. It has the entire conversation in its prompt, so of course it remembers. The only failures are on the Wi-Fi password and bank PIN. And we'll come back to this later.
 
-> **Qdrant and pgvector: 82%.** Solid performance. The vector search finds the relevant snippets most of the time. Same safety-related drops on sensitive data.
+> **Qdrant and pgvector: 82%.** Solid performance. The vector search finds the relevant snippets most of the time.
 
 > And then... 
 **Summary: 42%.** Less than half.

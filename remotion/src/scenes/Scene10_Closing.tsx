@@ -14,28 +14,28 @@ import { FadeTransition } from "../components/FadeTransition";
 
 // Cue points synced to public/audio/scene10.wav (whisper word-level, 30fps).
 const CUE = {
-  thats: 0,                // 0.34s "That's"
-  agentMemory: 5,          // 0.85s
-  showdown: 36,             // 1.89s
-  introEnd: 56,             // 2.53s
-  fourBackends: 69,         // 2.96s
-  thousandCalls: 117,       // 4.56s
-  fiveHours: 167,           // 6.22s
-  digitalOceanDroplet: 221, // 8.06s
-  statsEnd: 283,            // 10.11s
-  ifBuilding: 294,          // 10.48s
-  haventBenchmarked: 359,   // 12.56s
-  youreGuessing: 432,       // 15.08s
-  guessingEnd: 453,         // 15.76s
-  theDifference: 460,       // 16.00s
-  tenTimesCost: 559,        // 19.34s
-  fiveTimesLatency: 611,    // 21.04s
-  twoTimesRecall: 658,      // 22.61s
-  recallEnd: 718,           // 24.60s
-  soDoNot: 718,             // 24.60s "So do not"
-  guess: 740,               // 25.31s
-  measure: 760,             // 26.02s
-  end: 784,                 // 27.38s
+  thats: 0,                // 0.29s "That's"
+  agentMemory: 17,         // 0.96s
+  showdown: 52,             // 2.12s
+  introEnd: 63,             // 2.50s
+  fourBackends: 78,         // 3.00s
+  thousandCalls: 125,       // 4.56s
+  fiveHours: 174,           // 6.20s
+  digitalOceanDroplet: 229, // 8.02s
+  statsEnd: 263,            // 9.17s
+  ifBuilding: 276,          // 9.60s
+  haventBenchmarked: 327,   // 11.30s
+  youreGuessing: 408,       // 14.01s
+  guessingEnd: 434,         // 14.87s
+  theDifference: 441,       // 15.11s
+  tenTimesCost: 525,        // 17.90s
+  fiveTimesLatency: 564,    // 19.20s
+  twoTimesRecall: 611,      // 20.76s
+  recallEnd: 663,           // 22.50s
+  soDoNot: 669,             // 22.70s "So do not"
+  guess: 694,               // 23.52s
+  measure: 714,             // 24.20s
+  end: 740,                 // 25.57s
 };
 
 const HEADLINE_STATS = [

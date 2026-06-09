@@ -15,62 +15,62 @@ import { FadeTransition } from "../components/FadeTransition";
 // Audio trimmed 0.6s at start, end at 71.10s (shift -18 frames from original).
 const CUE = {
   introStart: 0,
-  introEnd: 82,
-  fourWaysStart: 92,
-  recallWord: 267,    // ~8.90s — "recall"
-  speedWord: 289,     // ~9.63s — "speed"
-  costWord: 314,      // ~10.46s — "cost"
-  weDiscuss: 333,
-  fourOfThese: 373,
-  setupEnd: 415,
+  introEnd: 60,
+  fourWaysStart: 70,
+  recallWord: 260,    // ~9.28s — "recall"
+  speedWord: 287,     // ~10.17s — "speed"
+  costWord: 297,      // ~10.51s — "cost"
+  weDiscuss: 312,     // ~11.00s — "We will"
+  fourOfThese: 342,   // ~12.00s — "four methods"
+  setupEnd: 383,
 
   // Buffer
-  bufferReveal: 415,
-  bufferJustPass: 492,
-  bufferEntire: 512,
-  bufferIntoPrompt: 572,
-  bufferWorksGreat: 595,
-  bufferContextWindow: 639,
-  bufferExplodes: 669,
-  bufferAPIBill: 702,
-  bufferRoof: 735,
-  bufferEnd: 755,
+  bufferReveal: 383,           // ~13.36s — "Buffer"
+  bufferJustPass: 462,         // ~16.00s — "Just pass"
+  bufferEntire: 484,           // ~16.72s — "entire"
+  bufferIntoPrompt: 534,       // ~18.40s — "into the prompt"
+  bufferWorksGreat: 563,       // ~19.36s — "Works great"
+  bufferContextWindow: 604,    // ~20.73s — "context window"
+  bufferExplodes: 633,         // ~21.71s — "explodes"
+  bufferAPIBill: 663,          // ~22.69s — "API bill"
+  bufferRoof: 709,             // ~24.24s — "roof"
+  bufferEnd: 731,
 
   // Summary
-  summaryReveal: 755,
-  summaryWord: 795,
-  summaryCompresses: 848,
-  summarySoundsClever: 967,
-  summaryWhatHappens: 1006,
-  summaryFlightDate: 1070,
-  summaryIsntWorth: 1106,
-  summaryEnd: 1147,
+  summaryReveal: 731,          // ~24.96s — "Summary memory"
+  summaryWord: 757,            // ~25.84s — "an LLM"
+  summaryCompresses: 777,      // ~26.51s — "compresses"
+  summarySoundsClever: 907,    // ~30.84s — "Sounds clever"
+  summaryWhatHappens: 946,     // ~32.15s — "what happens"
+  summaryFlightDate: 1018,     // ~34.53s — "flight date"
+  summaryIsntWorth: 1048,      // ~35.53s — "worth keeping"
+  summaryEnd: 1088,
 
   // Qdrant
-  qdrantReveal: 1147,
-  qdrantVectorMem: 1167,
-  qdrantEmbed: 1244,
-  qdrantQueryTime: 1324,
-  qdrantPullBack: 1355,
-  qdrantSnippets: 1443,
-  qdrantSurgical: 1464,
-  qdrantEnd: 1533,
+  qdrantReveal: 1088,          // ~36.88s — "Vector memory"
+  qdrantVectorMem: 1121,       // ~37.98s — "with qdrant"
+  qdrantEmbed: 1159,           // ~39.22s — "embed every"
+  qdrantQueryTime: 1247,       // ~42.16s — "query time"
+  qdrantPullBack: 1268,        // ~42.86s — "pull back"
+  qdrantSnippets: 1353,        // ~45.71s — "snippets"
+  qdrantSurgical: 1378,        // ~46.52s — "surgical"
+  qdrantEnd: 1444,
 
   // pgvector
-  pgvecReveal: 1533,
-  pgvecWord: 1593,
-  pgvecSameIdea: 1617,
-  pgvecPostgres: 1673,
-  pgvecExtension: 1724,
-  pgvecInsteadOf: 1758,
-  pgvecOneLess: 1835,
-  pgvecToManage: 1879,
-  pgvecEnd: 1904,
+  pgvecReveal: 1444,           // ~48.72s — "Vector memory"
+  pgvecWord: 1491,             // ~50.30s — "PG vector"
+  pgvecSameIdea: 1520,         // ~51.28s — "same idea"
+  pgvecPostgres: 1557,         // ~52.51s — "PostgreSQL"
+  pgvecExtension: 1618,        // ~54.52s — "extension"
+  pgvecInsteadOf: 1634,        // ~55.07s — "Instead of"
+  pgvecOneLess: 1716,          // ~57.80s — "One less"
+  pgvecToManage: 1748,         // ~58.86s — "to manage"
+  pgvecEnd: 1774,
 
   // Closing
-  questionAppear: 1904,
-  whoSurvives: 2081,
-  end: 2115,            // 70.50s × 30fps = 2115 frames
+  questionAppear: 1774,        // ~59.72s — "The question"
+  whoSurvives: 1928,           // ~64.86s — "whose arrives"
+  end: 1962,                   // 66.13s × 30fps audio length
 };
 
 const BACKENDS_META = [
