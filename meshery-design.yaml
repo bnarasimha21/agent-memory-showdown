@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agent-memory
+  labels:
+    app: agent-memory-showdown
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qdrant
+  namespace: agent-memory
+  labels:
+    app: qdrant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+    spec:
+      containers:
+      - name: qdrant
+        image: qdrant/qdrant:v1.12.4
+        ports:
+        - containerPort: 6333
+          name: http
+        - containerPort: 6334
+          name: grpc
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        volumeMounts:
+        - mountPath: /qdrant/storage
+          name: storage
+      volumes:
+      - emptyDir: {}
+        name: storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  namespace: agent-memory
+  labels:
+    app: qdrant
+spec:
+  selector:
+    app: qdrant
+  ports:
+  - name: http
+    port: 6333
+    targetPort: 6333
+  - name: grpc
+    port: 6334
+    targetPort: 6334
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-pgvector
+  namespace: agent-memory
+  labels:
+    app: postgres-pgvector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-pgvector
+  template:
+    metadata:
+      labels:
+        app: postgres-pgvector
+    spec:
+      containers:
+      - name: postgres
+        image: pgvector/pgvector:pg16
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          value: agent_memory
+        - name: POSTGRES_USER
+          value: memory
+        - name: POSTGRES_PASSWORD
+          value: memory_demo_pw
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: pgdata
+      volumes:
+      - emptyDir: {}
+        name: pgdata
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-pgvector
+  namespace: agent-memory
+  labels:
+    app: postgres-pgvector
+spec:
+  selector:
+    app: postgres-pgvector
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
