@@ -9,6 +9,7 @@ import { Scene7_QdrantVsPgvector } from "./scenes/Scene7_QdrantVsPgvector";
 import { Scene8_Surprise } from "./scenes/Scene8_Surprise";
 import { Scene9_Recommendations } from "./scenes/Scene9_Recommendations";
 import { Scene10_Closing } from "./scenes/Scene10_Closing";
+import { ShortVertical, ShortVerticalTight, CUE_TIGHT } from "./ShortVertical";
 import { FPS, WIDTH, HEIGHT } from "./styles/theme";
 
 const SCENES = [
@@ -55,6 +56,26 @@ export const RemotionRoot: React.FC = () => {
         fps={FPS}
         width={WIDTH}
         height={HEIGHT}
+      />
+
+      {/* 45s vertical short-form cut for X (1080x1920) */}
+      <Composition
+        id="ShortVertical"
+        component={ShortVertical}
+        durationInFrames={1350}
+        fps={FPS}
+        width={1080}
+        height={1920}
+      />
+
+      {/* Tightened music-only cut (~28s) — gaps removed, no narration sync */}
+      <Composition
+        id="ShortVerticalTight"
+        component={ShortVerticalTight}
+        durationInFrames={CUE_TIGHT.end}
+        fps={FPS}
+        width={1080}
+        height={1920}
       />
 
       {/* Individual scene compositions for preview/debugging */}
