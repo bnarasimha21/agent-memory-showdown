@@ -31,7 +31,7 @@ def get_embeddings() -> Embeddings:
     from langchain_community.embeddings import HuggingFaceEmbeddings
 
     return HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2",
+        model_name=config.EMBEDDING_MODEL,
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True},
     )

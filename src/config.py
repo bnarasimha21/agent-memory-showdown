@@ -14,8 +14,9 @@ class Config:
     # LLM (Claude via DO Serverless Inference)
     LLM_MODEL: str = os.getenv("LLM_MODEL", "anthropic-claude-4.5-sonnet")
 
-    # Embeddings (DO Serverless Inference)
-    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "gte-large-en-v1.5")
+    # Embeddings: local sentence-transformers (see src/llm_factory.py). The dimension
+    # must match the model output (all-MiniLM-L6-v2 = 384) and scripts/init_pgvector.sql.
+    EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
     EMBEDDING_DIMENSION: int = int(os.getenv("EMBEDDING_DIMENSION", "384"))
 
     # Vector DBs
