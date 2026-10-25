@@ -72,7 +72,7 @@ flowchart TD
   - "I take 10mg of melatonin before bed"
   - "My childhood best friend is Priya Sharma"
   - "My bank PIN is 7294"
-- **Recall probed** at turns 15, 25, 35 and 50 (builds the memory decay curve); at each of these turns every fact planted earlier is asked about
+- **Recall probed** at turns 15 and 50 (builds the memory decay curve); at each of these turns every fact planted earlier is asked about. Turns 25 and 35 appear in the default recall list but are also fact-seeding turns, and seeding wins, so they are never probed
 - **Scoring:** exact match = correct / partial word match = partial / miss = failed
 - **5 runs per backend** for statistical reliability
 
@@ -80,11 +80,11 @@ flowchart TD
 
 These are properties of the harness as written, not bugs, and they affect how the numbers should be read.
 
-- **Probe reinforcement.** Recall probes are sent as ordinary chat turns (`src/harness.py`), so each probe and the model's answer are written into memory. The same probe text is asked again at later recall turns. For the vector backends, the turn-50 recall of a fact can therefore retrieve the turn-15 (or 25, 35) question and answer pair, not only the original statement. Buffer and summary also carry those earlier probes. The turn-50 scores measure recall of the fact plus any reinforcement from earlier probing, and the decay curve is flattered accordingly, especially for facts planted before turn 15. A clean measurement would probe each fact once, or probe against a memory snapshot that is not written back to.
+- **Probe reinforcement.** Recall probes are sent as ordinary chat turns (`src/harness.py`), so each probe and the model's answer are written into memory. The same probe text is asked again at later recall turns. For the vector backends, the turn-50 recall of a fact can therefore retrieve the turn-15 question and answer pair, not only the original statement. Buffer and summary also carry those earlier probes. The turn-50 scores measure recall of the fact plus any reinforcement from earlier probing, and the decay curve is flattered accordingly, especially for facts planted before turn 15. A clean measurement would probe each fact once, or probe against a memory snapshot that is not written back to.
 - **Different prompts per backend family.** `buffer` and `summary` use LangChain's default `ConversationChain` prompt, while `qdrant` and `pgvector` use the custom `MEMORY_PROMPT` ("uses the relevant memory snippets below to answer accurately"). The wording differs, so part of any gap between the two families may come from prompt wording rather than the memory mechanism.
 - **Probe turns are excluded from latency.** Recall turns record no `TurnMetrics`, so latency averages cover filler and seed turns only. Their tokens do count toward the totals.
 - **Substring scoring.** `score_recall` checks that each word of the answer key appears anywhere in the reply, so a reply that merely mentions the words can score as correct.
-- **Embeddings are local.** `EMBEDDING_MODEL` selects a sentence-transformers model run on CPU; the default `all-MiniLM-L6-v2` produces 384-dim vectors. `EMBEDDING_DIMENSION` (Qdrant collection size) and the `vector(384)` column in `scripts/init_pgvector.sql` must be changed together with it.
+- **Embeddings are local.** `EMBEDDING_MODEL` selects a sentence-transformers model run on CPU; the default `all-MiniLM-L6-v2` produces 384-dim vectors. `EMBEDDING_DIMENSION` (Qdrant collection size) must be changed together with it. The pgvector backend uses LangChain's `PGVector`, which creates its own tables, so the `memory_embeddings` table in `scripts/init_pgvector.sql` is not used.
 
 ## Metrics
 
