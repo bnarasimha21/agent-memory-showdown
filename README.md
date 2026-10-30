@@ -102,12 +102,19 @@ flowchart TD
 
 ## Metrics
 
-| Metric | Description |
-|--------|-------------|
-| Recall Accuracy | Correct rate per checkpoint (the decay curve) with 95% intervals; refused and abstained answers counted separately from misses |
-| Retrieval Latency | Time to fetch memory context per turn (ms) |
-| Total Tokens Used | Input + output tokens across 50 turns |
-| Cost per 1,000 Conversations | Extrapolated from token usage at Claude pricing |
+| Metric | What it measures |
+|--------|------------------|
+| Recall | Correct rate per checkpoint (the decay curve) and overall, with 95% intervals; `partial`, `wrong`, `refused` and `abstained` are counted separately |
+| `retrieve_ms` | Time for the backend to produce the memory context for a message: reading the buffer, the summary, or embedding the query plus the vector search. No LLM call. |
+| `llm_ms` | Time of the answering LLM call, with the rendered prompt. |
+| `write_ms` | Time to store the finished exchange: appending messages, embedding and upserting the exchange, or (summary) the summarizer LLM call plus the update. Zero for probes. |
+| Latency p50 / p95 | Percentiles of each component and of their sum over every conversation turn of every valid run. Probes are timed the same way and reported separately (`probe_latency`). |
+| Input / output tokens | Provider-reported tokens per call, summed per conversation. Answering calls (`chat`) and memory maintenance calls (`memory`, the summarizer) are reported separately; probe tokens are reported separately and excluded from conversation totals. |
+| Cost per conversation | input tokens x input price + output tokens x output price, prices from [`pricing.yaml`](pricing.yaml) (each entry has a source URL and a checked-on date). Also shown per 1K conversations. |
+| Cost per correct recall | (conversation spend + probe spend) / number of correct probes, across all valid runs. |
+| Memory size at end | What the backend holds after the last turn: messages (buffer), summary characters (summary), points (Qdrant), rows (pgvector). |
+
+v1 reported a single "retrieval latency" that actually wrapped retrieval, generation and the memory write, and priced every token at a 75/25 input/output blend; the v1 table at the top of this page uses those definitions.
 
 ## Results
 

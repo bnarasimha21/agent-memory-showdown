@@ -1,0 +1,29 @@
+# Model prices used to compute cost from recorded token counts.
+# Cost = input_tokens * input_per_mtok / 1e6 + output_tokens * output_per_mtok / 1e6
+# Keys are the model ids recorded in run manifests (LLM_MODEL / JUDGE_MODEL).
+# Update `checked_on` whenever a price is re-checked against its source.
+currency: USD
+models:
+  anthropic-claude-4.5-sonnet:
+    display_name: Claude Sonnet 4.5 (DigitalOcean Serverless Inference)
+    input_per_mtok: 3.00
+    output_per_mtok: 15.00
+    note: standard tier, prompts up to 200K tokens
+    source: https://docs.digitalocean.com/products/gradient-ai-platform/details/pricing/
+    checked_on: "2026-10-30"
+  # The offline fake model is priced like the default model so sample runs show
+  # how cost is computed. Sample-run costs are not real costs.
+  fake-memory-v1:
+    display_name: Fake memory model (offline tests and sample runs only)
+    input_per_mtok: 3.00
+    output_per_mtok: 15.00
+    note: mirrors anthropic-claude-4.5-sonnet; not a real price
+    source: pricing.yaml (mirrors anthropic-claude-4.5-sonnet)
+    checked_on: "2026-10-30"
+  fake-judge-v1:
+    display_name: Fake judge (offline tests and sample runs only)
+    input_per_mtok: 3.00
+    output_per_mtok: 15.00
+    note: mirrors anthropic-claude-4.5-sonnet; not a real price
+    source: pricing.yaml (mirrors anthropic-claude-4.5-sonnet)
+    checked_on: "2026-10-30"

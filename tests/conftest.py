@@ -30,7 +30,8 @@ FORCED_ENV = {
 }
 for _key in ("FAKE_LLM_SLEEP_MS", "FAKE_LLM_INPUT_TOKENS", "FAKE_LLM_OUTPUT_TOKENS",
              "CHECKPOINTS", "RECALL_TURNS", "SEED_TURNS", "RETRIEVAL_K", "NUM_RUNS",
-             "NUM_TURNS", "BASE_SEED", "RESULTS_DIR"):
+             "NUM_TURNS", "BASE_SEED", "RESULTS_DIR", "JUDGE", "JUDGE_MODEL",
+             "PRICING_FILE"):
     os.environ.pop(_key, None)
 os.environ.update(FORCED_ENV)
 
@@ -47,4 +48,5 @@ def fresh_config(monkeypatch):
         return config.reload()
 
     yield apply
+    monkeypatch.undo()  # restore the environment before reloading from it
     config.reload()

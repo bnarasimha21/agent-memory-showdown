@@ -165,35 +165,35 @@ def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None
     plt.close()
 
 
+COMPONENT_COLORS = {"retrieve_ms": "#4C72B0", "llm_ms": "#DD8452", "write_ms": "#55A868"}
+
+
+def _latency_rows(results: dict) -> tuple[list[str], dict[str, dict[str, list[float]]]]:
+    backends = [b for b, d in results.items() if "error" not in d]
+    rows = {
+        comp: {
+            stat: [results[b]["latency"][comp][stat] for b in backends] for stat in ("p50", "p95")
+        }
+        for comp in COMPONENT_COLORS
+    }
+    return backends, rows
+
+
 def plot_latency_bar_plotly(results: dict, output_path: Path) -> None:
-    backends = []
-    avg_lats = []
-    std_lats = []
-
-    for backend, data in results.items():
-        if "error" in data:
-            continue
-        backends.append(backend)
-        avg_lats.append(data["avg_latency_ms"])
-        std_lats.append(data["std_latency_ms"])
-
-    colors = [BACKEND_COLORS.get(b, "#888") for b in backends]
-
-    fig = go.Figure(
-        go.Bar(
-            x=backends,
-            y=avg_lats,
-            error_y=dict(type="data", array=std_lats, visible=True),
-            marker_color=colors,
-        )
-    )
+    """p50 per component, stacked; the p95 of the total is drawn as a marker."""
+    backends, rows = _latency_rows(results)
+    fig = go.Figure()
+    for comp, color in COMPONENT_COLORS.items():
+        fig.add_trace(go.Bar(name=f"{comp} p50", x=backends, y=rows[comp]["p50"], marker_color=color))
+    fig.add_trace(go.Scatter(
+        name="total p95", x=backends, mode="markers",
+        y=[results[b]["latency"]["total_ms"]["p95"] for b in backends],
+        marker=dict(symbol="line-ew-open", size=30, color="#222"),
+    ))
     fig.update_layout(
-        title="Average Retrieval Latency per Backend",
-        xaxis_title="Memory Backend",
-        yaxis_title="Latency (ms)",
-        template="plotly_white",
-        width=700,
-        height=450,
+        barmode="stack", title="Latency per conversation turn (p50 by component, p95 total)",
+        xaxis_title="Memory Backend", yaxis_title="Latency (ms)",
+        template="plotly_white", width=800, height=450,
     )
     fig.write_html(str(output_path.with_suffix(".html")))
     try:
@@ -203,42 +203,92 @@ def plot_latency_bar_plotly(results: dict, output_path: Path) -> None:
 
 
 def plot_latency_bar_matplotlib(results: dict, output_path: Path) -> None:
-    backends = []
-    avg_lats = []
-    std_lats = []
-
-    for backend, data in results.items():
-        if "error" in data:
-            continue
-        backends.append(backend)
-        avg_lats.append(data["avg_latency_ms"])
-        std_lats.append(data["std_latency_ms"])
-
-    colors = [BACKEND_COLORS.get(b, "#888") for b in backends]
+    backends, rows = _latency_rows(results)
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.bar(backends, avg_lats, color=colors, yerr=std_lats, capsize=5)
-    ax.set_title("Average Retrieval Latency per Backend")
+    bottom = [0.0] * len(backends)
+    for comp, color in COMPONENT_COLORS.items():
+        ax.bar(backends, rows[comp]["p50"], bottom=bottom, color=color, label=f"{comp} p50")
+        bottom = [b + v for b, v in zip(bottom, rows[comp]["p50"])]
+    ax.scatter(backends, [results[b]["latency"]["total_ms"]["p95"] for b in backends],
+               marker="_", s=600, color="#222", label="total p95", zorder=3)
+    ax.set_title("Latency per conversation turn (p50 by component, p95 total)")
     ax.set_xlabel("Memory Backend")
     ax.set_ylabel("Latency (ms)")
+    ax.legend(fontsize=8)
     ax.grid(True, axis="y", alpha=0.3)
     plt.tight_layout()
     plt.savefig(str(output_path), dpi=150)
     plt.close()
 
 
+def plot_latency_by_turn_matplotlib(results: dict, output_path: Path) -> None:
+    """One panel per latency component, one line per backend, x = turn."""
+    backends = [b for b, d in results.items() if "error" not in d]
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharex=True)
+    for ax, comp in zip(axes, COMPONENT_COLORS):
+        for b in backends:
+            by_turn = results[b]["latency_by_turn"]
+            turns = sorted(by_turn, key=int)
+            ax.plot([int(t) for t in turns], [by_turn[t][comp] for t in turns],
+                    color=BACKEND_COLORS.get(b, "#888"), label=b, linewidth=1.5)
+        ax.set_title(comp)
+        ax.set_xlabel("Turn")
+        ax.grid(True, alpha=0.3)
+    axes[0].set_ylabel("Mean latency (ms)")
+    axes[0].legend(fontsize=8)
+    plt.tight_layout()
+    plt.savefig(str(output_path), dpi=150)
+    plt.close()
+
+
+def plot_latency_by_turn_plotly(results: dict, output_path: Path) -> None:
+    from plotly.subplots import make_subplots
+
+    backends = [b for b, d in results.items() if "error" not in d]
+    comps = list(COMPONENT_COLORS)
+    fig = make_subplots(rows=1, cols=3, subplot_titles=comps, shared_xaxes=True)
+    for col, comp in enumerate(comps, start=1):
+        for b in backends:
+            by_turn = results[b]["latency_by_turn"]
+            turns = sorted(by_turn, key=int)
+            fig.add_trace(go.Scatter(
+                x=[int(t) for t in turns], y=[by_turn[t][comp] for t in turns], mode="lines",
+                name=b, legendgroup=b, showlegend=col == 1,
+                line=dict(color=BACKEND_COLORS.get(b, "#888")),
+            ), row=1, col=col)
+    fig.update_layout(title="Latency by turn, per component (mean ms)", template="plotly_white",
+                      width=1200, height=420)
+    fig.write_html(str(output_path.with_suffix(".html")))
+    try:
+        fig.write_image(str(output_path.with_suffix(".png")))
+    except Exception:
+        pass
+
+
 def build_cost_table(results: dict) -> str:
-    """Build a markdown cost comparison table."""
+    """Markdown cost table computed from recorded tokens and pricing.yaml."""
     lines = [
-        "| Backend | Avg Tokens/Run | Est. Cost/1K Conversations (USD) |",
-        "|---------|---------------|----------------------------------|",
+        "| Backend | Input tok/conv | Output tok/conv | Summarizer calls/conv | Cost/conv (USD) "
+        "| Cost/1K conv (USD) | Cost/correct recall (USD) |",
+        "|---------|---------------:|----------------:|----------------------:|----------------:"
+        "|-------------------:|--------------------------:|",
     ]
     for backend, data in results.items():
         if "error" in data:
-            lines.append(f"| {backend} | ERROR | ERROR |")
+            lines.append(f"| {backend} | ERROR | ERROR | ERROR | ERROR | ERROR | ERROR |")
             continue
-        avg_tokens = data.get("avg_tokens_per_run", 0)
-        cost = data.get("estimated_cost_per_1k_conversations_usd", 0)
-        lines.append(f"| {backend} | {avg_tokens:.0f} | ${cost:.4f} |")
+        tok = data["tokens"]
+        cost = data.get("cost")
+        if cost:
+            per_correct = cost["per_correct_recall_usd"]
+            money = (f"${cost['per_conversation_usd']:.4f} | ${cost['per_1k_conversations_usd']:,.2f} | "
+                     f"{'n/a' if per_correct is None else f'${per_correct:.4f}'}")
+        else:
+            money = "unpriced | unpriced | unpriced"
+        lines.append(
+            f"| {backend} | {tok['input_tokens']:,.0f} | {tok['output_tokens']:,.0f} | "
+            f"{tok['memory']['calls']:.0f} | {money} |"
+        )
     return "\n".join(lines)
 
 
@@ -255,6 +305,8 @@ def generate_all(results_path: str | Path, out_dir: str | Path) -> None:
     plot_label_breakdown_matplotlib(results, out_dir / "probe_outcomes.png")
     plot_latency_bar_plotly(results, out_dir / "latency_bar")
     plot_latency_bar_matplotlib(results, out_dir / "latency_bar.png")
+    plot_latency_by_turn_plotly(results, out_dir / "latency_by_turn")
+    plot_latency_by_turn_matplotlib(results, out_dir / "latency_by_turn.png")
 
     cost_table = build_cost_table(results)
     (out_dir / "cost_table.md").write_text(cost_table)
