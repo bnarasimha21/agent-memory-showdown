@@ -8,7 +8,9 @@ Layout of `results/runs/<run_id>/`:
 - `transcript.jsonl`  one JSON object per line: run_start, turn, checkpoint,
                       probe and run_end records, with inputs, retrieved
                       context, responses, tokens and timings
-- `aggregate.json`    metrics computed from the transcript
+- `scores.jsonl`      matcher and judge label for every probe
+- `scoring.json`      matcher version, judge provider/model and prompt hash
+- `aggregate.json`    metrics computed from the transcript and scores
 
 The transcript is written line by line as the run progresses, so a crashed
 run still leaves an inspectable partial bundle.
@@ -92,6 +94,13 @@ class BundleWriter:
         self._write_json("manifest.json", self.manifest)
         self._transcript = open(self.path / "transcript.jsonl", "a", encoding="utf-8")
 
+    def write_json(self, name: str, data: Any) -> None:
+        self._write_json(name, data)
+
+    def close_transcript(self) -> None:
+        if not self._transcript.closed:
+            self._transcript.close()
+
     def _write_json(self, name: str, data: Any) -> None:
         (self.path / name).write_text(
             json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False) + "\n",
@@ -106,7 +115,7 @@ class BundleWriter:
         self._transcript.flush()
 
     def finalize(self, **manifest_updates: Any) -> None:
-        self._transcript.close()
+        self.close_transcript()
         self.manifest.update(manifest_updates)
         self._write_json("manifest.json", self.manifest)
 

@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from src.backends.registry import AVAILABLE_BACKENDS  # noqa: E402
 from src.config import config  # noqa: E402
 from src.harness import run_benchmark  # noqa: E402
+from src.report import format_summary  # noqa: E402,F401  (re-exported)
 
 
 def parse_args(argv=None):
@@ -55,27 +56,9 @@ def parse_args(argv=None):
                         help=f"Directory to write results (default: {config.RESULTS_DIR})")
     parser.add_argument("--label", default=None, help="Suffix for the run id")
     parser.add_argument("--no-viz", action="store_true", help="Skip generating visualizations")
+    parser.add_argument("--no-judge", action="store_true",
+                        help="Score with the deterministic matcher only (no judge LLM calls)")
     return parser.parse_args(argv)
-
-
-def format_summary(aggregate: dict) -> str:
-    lines = ["", "=== BENCHMARK SUMMARY ===", ""]
-    if aggregate.get("is_sample"):
-        lines.append("SAMPLE RUN (fake LLM): numbers below are not benchmark results.")
-        lines.append("")
-    for backend, data in aggregate["backends"].items():
-        if "error" in data:
-            lines.append(f"{backend:12s}  ERROR: {data['error']}")
-            continue
-        overall = data["recall_overall"]
-        lines.append(
-            f"{backend:12s}  "
-            f"latency={data['avg_latency_ms']:7.1f}+/-{data['std_latency_ms']:5.1f}ms  "
-            f"recall={overall['correct_rate'] * 100:5.1f}% (n={overall['total_probes']})  "
-            f"cost/1K=${data['estimated_cost_per_1k_conversations_usd']:.2f}"
-        )
-    lines.append("")
-    return "\n".join(lines)
 
 
 def main(argv=None):
@@ -94,6 +77,7 @@ def main(argv=None):
         checkpoints=args.checkpoints,
         results_dir=args.results_dir,
         run_label=args.label,
+        judge=False if args.no_judge else None,
     )
     aggregate_path = bundle / "aggregate.json"
     logger.info("Benchmark complete. Bundle: %s", bundle)

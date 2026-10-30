@@ -203,17 +203,3 @@ class BaseMemoryBackend(ABC):
 def format_exchange(human_message: str, ai_message: str) -> str:
     return f"Human: {human_message}\nAI: {ai_message}"
 
-
-def score_recall(response: str, answer_key: str) -> str:
-    response_lower = response.lower()
-    answer_lower = answer_key.lower()
-
-    words = answer_lower.split()
-    matches = sum(1 for w in words if w in response_lower)
-
-    if matches == len(words):
-        return "correct"
-    elif matches > 0:
-        return "partial"
-    else:
-        return "failed"

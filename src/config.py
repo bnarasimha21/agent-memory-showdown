@@ -49,6 +49,15 @@ class Config:
         self.EMBEDDING_MODEL: str = env("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
         self.EMBEDDING_DIMENSION: int = int(env("EMBEDDING_DIMENSION", "384"))
 
+        # Judge for scoring probe responses (src/scoring/judge.py). Defaults to
+        # the same provider as the conversation LLM, so a fake run is judged by
+        # the fake judge. JUDGE=0 skips the judge at the end of a run (the
+        # deterministic matcher always runs; rescore later with
+        # `python -m src.scoring.rescore`).
+        self.JUDGE_PROVIDER: str = (env("JUDGE_PROVIDER") or self.LLM_PROVIDER).strip().lower()
+        self.JUDGE_MODEL: str = env("JUDGE_MODEL", "anthropic-claude-4.5-sonnet")
+        self.JUDGE_ENABLED: bool = env("JUDGE", "1").strip().lower() not in ("0", "false", "no")
+
         # Retrieval depth for vector backends
         self.RETRIEVAL_K: int = int(env("RETRIEVAL_K", "4"))
 

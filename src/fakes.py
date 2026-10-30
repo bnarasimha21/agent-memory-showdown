@@ -11,7 +11,8 @@ the Memory section, the one sharing the most content words with the user's
 question (later sentences win ties), and says the user has not told it when
 nothing overlaps enough. Recall therefore depends entirely on what the memory
 backend put in front of it. It also handles the summarizer prompt (keeps the
-most recent first-person sentences, so the summary is lossy).
+most recent first-person sentences, so the summary is lossy) and the judge
+prompt (applies the deterministic matcher, so fake judge and matcher agree).
 """
 
 from __future__ import annotations
@@ -138,6 +139,8 @@ class FakeMemoryChatModel(BaseChatModel):
         return "fake-memory"
 
     def respond(self, text: str) -> str:
+        if "JUDGE_INPUT_JSON:" in text:
+            return self._judge(text)
         if text.rstrip().endswith("New summary:"):
             current = _section(text, "Current summary:", "New lines of conversation:")
             new_lines = _section(text, "New lines of conversation:", "New summary:")
@@ -148,6 +151,16 @@ class FakeMemoryChatModel(BaseChatModel):
             memory = _section(head, "Memory:", None)
             return fake_answer(memory, question)
         return fake_answer("", text)
+
+    @staticmethod
+    def _judge(text: str) -> str:
+        """Fake judge: applies the deterministic matcher to the judge input."""
+        from src.scoring.matcher import match
+
+        raw = text.split("JUDGE_INPUT_JSON:", 1)[1]
+        data = json.loads(raw[raw.index("{"): raw.rindex("}") + 1])
+        label, reason = match(data["response"], data["required_parts"], data.get("stale_values", []))
+        return json.dumps({"label": label, "rationale": f"fake judge (matcher rule): {reason}"})
 
     def _generate(
         self,

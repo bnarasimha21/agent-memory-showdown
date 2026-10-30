@@ -96,7 +96,8 @@ def _run_checkpoint(backend, dataset, checkpoint, writer, base, facts_by_id) -> 
         writer.record(
             {**base, "type": "probe", "checkpoint": checkpoint, "order": position,
              "fact_id": fact.id, "planted_at": fact.turn, "question": fact.probe,
-             "answer_key": fact.answer_key, **exchange.to_dict()}
+             "answer_key": fact.answer_key, "answers": fact.answers, "stale": fact.stale,
+             **exchange.to_dict()}
         )
     after = backend.memory_fingerprint()
     unchanged = before == after
@@ -144,9 +145,19 @@ def run_benchmark(
     results_dir: str | Path | None = None,
     run_label: str | None = None,
     backend_kwargs: dict | None = None,
+    judge: bool | None = None,
 ) -> Path:
-    """Run the benchmark and write a bundle. Returns the bundle directory."""
+    """Run the benchmark and write a bundle. Returns the bundle directory.
+
+    After the conversations, every probe is scored by the deterministic matcher
+    and (unless `judge` is False, or JUDGE=0) by the LLM judge; the labels go to
+    `scores.jsonl` and the judge settings into the manifest.
+    """
     from src.aggregate import aggregate_bundle
+    from src.bundle import read_transcript
+    from src.scoring.rescore import score_probes, scoring_info, write_jsonl
+
+    use_judge = config.JUDGE_ENABLED if judge is None else judge
 
     num_runs = num_runs or config.NUM_RUNS
     num_turns = num_turns or config.NUM_TURNS
@@ -174,7 +185,18 @@ def run_benchmark(
             logger.info("  Run %d / %d", run_idx + 1, num_runs)
             run_single(backend_cls, dataset, run_idx, writer, backend_kwargs)
 
-    writer.finalize(finished_at=utc_now(), duration_s=time.perf_counter() - started)
+    duration = time.perf_counter() - started
+    judge_obj = None
+    if use_judge:
+        from src.scoring.judge import get_judge
+
+        judge_obj = get_judge()
+    writer.close_transcript()
+    scores = score_probes(read_transcript(writer.path), judge_obj)
+    info = scoring_info(judge_obj)
+    write_jsonl(writer.path / "scores.jsonl", scores)
+    writer.write_json("scoring.json", info)
+    writer.finalize(finished_at=utc_now(), duration_s=duration, scoring=info)
     writer.write_aggregate(aggregate_bundle(writer.path))
     logger.info("Run bundle written to %s", writer.path)
     return writer.path

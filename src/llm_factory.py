@@ -29,6 +29,38 @@ def embedding_model_id() -> str:
     return config.EMBEDDING_MODEL
 
 
+def judge_model_id() -> str:
+    if config.JUDGE_PROVIDER == "fake":
+        return "fake-judge-v1"
+    return config.JUDGE_MODEL
+
+
+def _do_chat_model(model: str) -> BaseChatModel:
+    if not config.DO_API_KEY:
+        raise RuntimeError(
+            "The 'do' provider needs DO_API_KEY in the environment or .env. "
+            "Set LLM_PROVIDER=fake (and JUDGE_PROVIDER=fake) for an offline run."
+        )
+    from langchain_openai import ChatOpenAI
+
+    return ChatOpenAI(
+        model=model,
+        openai_api_key=config.DO_API_KEY,
+        openai_api_base=config.DO_INFERENCE_URL,
+        temperature=0.0,
+    )
+
+
+def get_judge_llm() -> BaseChatModel:
+    if config.JUDGE_PROVIDER == "fake":
+        from src.fakes import FakeMemoryChatModel
+
+        return FakeMemoryChatModel(model_name="fake-judge-v1")
+    if config.JUDGE_PROVIDER != "do":
+        raise ValueError(f"Unknown JUDGE_PROVIDER {config.JUDGE_PROVIDER!r} (use 'do' or 'fake')")
+    return _do_chat_model(config.JUDGE_MODEL)
+
+
 def get_llm() -> BaseChatModel:
     if config.LLM_PROVIDER == "fake":
         from src.fakes import FakeMemoryChatModel
@@ -41,19 +73,7 @@ def get_llm() -> BaseChatModel:
         )
     if config.LLM_PROVIDER != "do":
         raise ValueError(f"Unknown LLM_PROVIDER {config.LLM_PROVIDER!r} (use 'do' or 'fake')")
-    if not config.DO_API_KEY:
-        raise RuntimeError(
-            "LLM_PROVIDER=do needs DO_API_KEY in the environment or .env. "
-            "Set LLM_PROVIDER=fake for an offline run."
-        )
-    from langchain_openai import ChatOpenAI
-
-    return ChatOpenAI(
-        model=config.LLM_MODEL,
-        openai_api_key=config.DO_API_KEY,
-        openai_api_base=config.DO_INFERENCE_URL,
-        temperature=0.0,
-    )
+    return _do_chat_model(config.LLM_MODEL)
 
 
 def get_embeddings() -> Embeddings:

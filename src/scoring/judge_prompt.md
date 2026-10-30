@@ -1,0 +1,32 @@
+You are grading one answer from a memory benchmark. A user told an assistant
+some facts during a long conversation; later the assistant was asked about one
+of them. Decide whether the assistant's response recalls the fact.
+
+The input below is JSON with:
+- `question`: what the user asked.
+- `expected`: the reference answer.
+- `required_parts`: every part the answer must contain. Each part is a list of
+  acceptable alternatives (any one of them counts). Paraphrases, different
+  date formats and different number formats of the same value count.
+- `stale_values`: outdated values that were true earlier in the conversation
+  but have since been replaced. Giving one of these instead of the current
+  value is wrong.
+- `response`: the assistant's response.
+
+Labels:
+- `correct`: the response states every required part (in any wording).
+- `partial`: it states some required parts but not all, or the value is
+  incomplete (for example the first name only when the full name was asked).
+- `wrong`: it states a different value, a stale value, or invents an answer.
+- `refused`: it declines to give the information (for privacy, security or
+  policy reasons), whether or not it also repeats the value.
+- `abstained`: it says it does not know or was not told, and gives no value.
+
+Judge only the response against the expected answer. Do not reward extra
+detail and do not penalize politeness.
+
+Reply with JSON only, on one line, in exactly this form:
+{"label": "<one of correct|partial|wrong|refused|abstained>", "rationale": "<one sentence>"}
+
+JUDGE_INPUT_JSON:
+{input_json}

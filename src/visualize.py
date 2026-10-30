@@ -36,8 +36,63 @@ def _get_recall_curve_data(results: dict) -> dict:
         curves[backend] = {
             "turns": [int(t) for t in turns],
             "correct_rates": [by_cp[t]["correct_rate"] for t in turns],
+            "ci_low": [by_cp[t]["correct_ci95"][0] for t in turns],
+            "ci_high": [by_cp[t]["correct_ci95"][1] for t in turns],
         }
     return curves
+
+
+LABEL_COLORS = {
+    "correct": "#55A868",
+    "partial": "#CCB974",
+    "wrong": "#C44E52",
+    "refused": "#8172B2",
+    "abstained": "#8C8C8C",
+}
+
+
+def _label_breakdown(results: dict) -> tuple[list[str], dict[str, list[float]]]:
+    from src.scoring import LABELS
+
+    backends = [b for b, d in results.items() if "error" not in d]
+    rates = {lab: [results[b]["recall_overall"][f"{lab}_rate"] * 100 for b in backends]
+             for lab in LABELS}
+    return backends, rates
+
+
+def plot_label_breakdown_plotly(results: dict, output_path: Path) -> None:
+    backends, rates = _label_breakdown(results)
+    fig = go.Figure()
+    for label, values in rates.items():
+        fig.add_trace(go.Bar(name=label, x=backends, y=values,
+                             marker_color=LABEL_COLORS.get(label, "#888")))
+    fig.update_layout(
+        barmode="stack", title="Probe outcomes per backend (refusals separate from misses)",
+        xaxis_title="Memory Backend", yaxis_title="Share of probes (%)",
+        yaxis=dict(range=[0, 100]), template="plotly_white", width=800, height=450,
+    )
+    fig.write_html(str(output_path.with_suffix(".html")))
+    try:
+        fig.write_image(str(output_path.with_suffix(".png")))
+    except Exception:
+        pass
+
+
+def plot_label_breakdown_matplotlib(results: dict, output_path: Path) -> None:
+    backends, rates = _label_breakdown(results)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    bottom = [0.0] * len(backends)
+    for label, values in rates.items():
+        ax.bar(backends, values, bottom=bottom, label=label,
+               color=LABEL_COLORS.get(label, "#888"))
+        bottom = [b + v for b, v in zip(bottom, values)]
+    ax.set_title("Probe outcomes per backend (refusals separate from misses)")
+    ax.set_ylabel("Share of probes (%)")
+    ax.set_ylim(0, 100)
+    ax.legend(loc="lower right", fontsize=8)
+    plt.tight_layout()
+    plt.savefig(str(output_path), dpi=150)
+    plt.close()
 
 
 def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
@@ -52,6 +107,11 @@ def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
                 y=[r * 100 for r in data["correct_rates"]],
                 mode="lines+markers",
                 name=backend,
+                error_y=dict(
+                    type="data", symmetric=False,
+                    array=[(h - r) * 100 for h, r in zip(data["ci_high"], data["correct_rates"])],
+                    arrayminus=[(r - lo) * 100 for r, lo in zip(data["correct_rates"], data["ci_low"])],
+                ),
                 line=dict(color=color, width=2),
                 marker=dict(size=8),
             )
@@ -80,16 +140,21 @@ def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None
 
     for backend, data in curves.items():
         color = BACKEND_COLORS.get(backend, "#888")
-        ax.plot(
+        ax.errorbar(
             data["turns"],
             [r * 100 for r in data["correct_rates"]],
+            yerr=[
+                [(r - lo) * 100 for r, lo in zip(data["correct_rates"], data["ci_low"])],
+                [(h - r) * 100 for h, r in zip(data["ci_high"], data["correct_rates"])],
+            ],
             marker="o",
             color=color,
             linewidth=2,
+            capsize=4,
             label=backend,
         )
 
-    ax.set_title("Memory Decay Curve: Recall Accuracy by Checkpoint")
+    ax.set_title("Memory Decay Curve: Recall by Checkpoint (95% Wilson interval)")
     ax.set_xlabel("Checkpoint (after turn N)")
     ax.set_ylabel("Recall Accuracy (%)")
     ax.set_ylim(0, 105)
@@ -186,6 +251,8 @@ def generate_all(results_path: str | Path, out_dir: str | Path) -> None:
 
     plot_memory_decay_curve_plotly(results, out_dir / "memory_decay_curve")
     plot_memory_decay_curve_matplotlib(results, out_dir / "memory_decay_curve.png")
+    plot_label_breakdown_plotly(results, out_dir / "probe_outcomes")
+    plot_label_breakdown_matplotlib(results, out_dir / "probe_outcomes.png")
     plot_latency_bar_plotly(results, out_dir / "latency_bar")
     plot_latency_bar_matplotlib(results, out_dir / "latency_bar.png")
 

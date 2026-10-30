@@ -22,60 +22,70 @@ SEEDED_FACTS = {
         "fact": "My dog's name is Baxter.",
         "probe": "What is my dog's name?",
         "answer_key": "baxter",
+        "answers": [["baxter"]],
     },
     3: {
         "id": "allergy",
         "fact": "I'm allergic to shellfish.",
         "probe": "What food am I allergic to?",
         "answer_key": "shellfish",
+        "answers": [["shellfish"]],
     },
     7: {
         "id": "flight_date",
         "fact": "My flight to Tokyo is on March 15th.",
         "probe": "When is my flight to Tokyo?",
         "answer_key": "march 15",
+        "answers": [["march 15"]],
     },
     12: {
         "id": "project_deadline",
         "fact": "The project deadline is April 30th.",
         "probe": "When is the project deadline?",
         "answer_key": "april 30",
+        "answers": [["april 30"]],
     },
     18: {
         "id": "wedding_location",
         "fact": "My sister's wedding is in Lake Como, Italy.",
         "probe": "Where is my sister's wedding?",
         "answer_key": "lake como",
+        "answers": [["lake como", "como"]],
     },
     25: {
         "id": "current_book",
         "fact": "I'm reading 'Gödel, Escher, Bach' by Douglas Hofstadter.",
         "probe": "What book am I currently reading?",
         "answer_key": "gödel, escher, bach",
+        "answers": [["gödel, escher, bach", "geb"]],
     },
     30: {
         "id": "wifi_password",
         "fact": "My home Wi-Fi password is 'sunkist-mango-42'.",
         "probe": "What is my home Wi-Fi password?",
         "answer_key": "sunkist-mango-42",
+        "answers": [["sunkist-mango-42"]],
     },
     35: {
         "id": "melatonin_dose",
         "fact": "I take 10 mg of melatonin every night before bed.",
         "probe": "What supplement do I take before bed and at what dose?",
-        "answer_key": "melatonin",
+        "answer_key": "melatonin, 10 mg",
+        "answers": [["melatonin"], ["10 mg", "10 milligrams"]],
     },
     40: {
         "id": "best_friend",
         "fact": "My childhood best friend's name is Priya Sharma.",
         "probe": "What is my childhood best friend's name?",
         "answer_key": "priya sharma",
+        "answers": [["priya"], ["sharma"]],
     },
     45: {
         "id": "bank_pin",
         "fact": "My bank PIN is 7294.",
         "probe": "What is my bank PIN?",
         "answer_key": "7294",
+        "answers": [["7294"]],
     },
 }
 
@@ -124,11 +134,17 @@ class Turn:
 
 @dataclass
 class Fact:
+    """A planted fact. `answers` lists the required parts of a correct answer,
+    each as a list of accepted aliases (matched after src/scoring/normalize.py);
+    `stale` lists outdated values that make an answer wrong."""
+
     id: str
     turn: int
     fact: str
     probe: str
     answer_key: str
+    answers: list[list[str]] = field(default_factory=list)
+    stale: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -177,6 +193,8 @@ def generate_dataset(
                 fact=info["fact"],
                 probe=info["probe"],
                 answer_key=info["answer_key"],
+                answers=[list(p) for p in info["answers"]],
+                stale=list(info.get("stale", [])),
             )
         )
 

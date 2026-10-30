@@ -77,7 +77,13 @@ flowchart TD
 - **Recall checkpoints** after turns 15, 25, 35 and 50 (`CHECKPOINTS`). Checkpoints are separate from conversation turns, so a checkpoint can fall on a fact-seeding turn (25 and 35 do) without replacing it. At each checkpoint every fact planted at or before that turn is asked about, in a random order seeded per run and checkpoint.
 - **Probes are read-only.** A probe retrieves memory and asks the model, but nothing is written back. The harness fingerprints each backend's store (size plus a digest of its contents) before and after every checkpoint and aborts the run if anything changed.
 - **One prompt for every backend** (`src/prompts.py`). Each backend only decides what goes into the Memory section; the surrounding wording is identical, and its sha256 is recorded in the run manifest.
-- **Scoring:** exact match = correct / partial word match = partial / miss = failed
+- **Scoring (v2):** every probe response gets two labels from `correct | partial | wrong | refused | abstained`:
+  - a deterministic **matcher** (`src/scoring/matcher.py`): accents, punctuation, ordinals, number words and dates are normalized (`src/scoring/normalize.py`), each answer is a list of required parts with accepted aliases (melatonin needs the drug *and* the 10 mg dose), aliases match on token boundaries only, and refusal language is labelled `refused` even when the value is present;
+  - an **LLM judge** (`src/scoring/judge.py`) with a fixed rubric in [`src/scoring/judge_prompt.md`](src/scoring/judge_prompt.md). The judge model is `JUDGE_MODEL` (default `anthropic-claude-4.5-sonnet` via DO Serverless Inference, temperature 0); the model and the prompt's sha256 are written to the run manifest and `scoring.json`.
+  - Headline recall uses the judge label (the matcher label where the judge output could not be parsed). Matcher figures, Cohen's kappa between the two scorers, and every disagreement are written to `aggregate.json` for spot checks.
+  - **Observed agreement:** none yet. The only judged bundles so far use the fake judge, which applies the matcher rules by construction (kappa 1.0 is meaningless there). The first paid run will report the real figure.
+- **Intervals:** every recall rate carries a 95% Wilson interval over probes. Probes in one run share a memory, so they are not independent; the per-run recall mean with a bootstrap interval over runs is reported too and is the better basis for comparing backends.
+- **Re-scoring** never re-runs the conversation: `python -m src.scoring.rescore results/runs/<run_id>` writes new scores and an aggregate to `results/rescored/` and leaves the bundle untouched (`--no-judge` for matcher only).
 - **5 runs per backend** for statistical reliability
 
 ### Methodology notes and limitations
@@ -91,14 +97,14 @@ flowchart TD
 **Still true in v2:**
 
 - **Probe tokens are reported separately.** Probes are not part of the conversation, so their tokens and latency are recorded per probe in the transcript and kept out of the per-conversation totals.
-- **Substring scoring.** `score_recall` checks that each word of the answer key appears anywhere in the reply, so a reply that merely mentions the words can score as correct.
+- **Substring scoring (v1).** v1 checked that each word of the answer key appeared anywhere in the reply, so "march 15" matched "turn 15", "Godel Escher Bach" failed against the accented key, the melatonin dose was never checked, and "I won't repeat your PIN 7294" scored correct. v2 replaces it with the matcher and judge above.
 - **Embeddings are local.** `EMBEDDING_MODEL` selects a sentence-transformers model run on CPU; the default `all-MiniLM-L6-v2` produces 384-dim vectors. `EMBEDDING_DIMENSION` (Qdrant collection size) must be changed together with it. The pgvector backend uses LangChain's `PGVector`, which creates its own tables, so the `memory_embeddings` table in `scripts/init_pgvector.sql` is not used.
 
 ## Metrics
 
 | Metric | Description |
 |--------|-------------|
-| Recall Accuracy | Score at turns 15 and 50 (the decay curve) |
+| Recall Accuracy | Correct rate per checkpoint (the decay curve) with 95% intervals; refused and abstained answers counted separately from misses |
 | Retrieval Latency | Time to fetch memory context per turn (ms) |
 | Total Tokens Used | Input + output tokens across 50 turns |
 | Cost per 1,000 Conversations | Extrapolated from token usage at Claude pricing |
@@ -175,6 +181,7 @@ python run_benchmark.py --help
   --label     NAME suffix for the run id
   --results-dir    output directory           (default: results/)
   --no-viz         skip chart generation
+  --no-judge       matcher only, no judge LLM calls (rescore later)
 ```
 
 ## Testing

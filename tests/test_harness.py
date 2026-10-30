@@ -32,7 +32,7 @@ def test_bundle_has_manifest_transcript_and_aggregate(tmp_path):
     assert all(c["unchanged"] for c in records(bundle, "checkpoint"))
 
     aggregate = json.loads((bundle / "aggregate.json").read_text())
-    assert aggregate["backends"]["buffer"]["recall_overall"]["total_probes"] == 20
+    assert aggregate["backends"]["buffer"]["recall_overall"]["n"] == 20
     assert "SAMPLE RUN" in format_summary(aggregate)
 
 
