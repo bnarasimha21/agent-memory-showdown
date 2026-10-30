@@ -4,7 +4,9 @@
 
 A benchmark that stress-tests four LangChain memory backends across a 50-turn synthetic conversation and measures recall accuracy, retrieval latency, and token cost.
 
-## Key Results
+## Key Results (v1 methodology)
+
+These numbers come from the April 2026 run of the **v1 harness**. v1 had known flaws (listed under *Methodology notes and limitations* below): probes were written back into memory, buffer/summary and the vector backends used different prompts, and two of the four recall turns were silently dropped. Treat them as indicative, not as a clean measurement. The harness has since been rebuilt (v2); no v2 numbers have been published yet.
 
 | Backend | Recall @ Turn 50 | Avg Latency/Turn | Cost / 1K Convos | Tokens/Run |
 |---------|:-----------------:|:----------------:|:-----------------:|:----------:|
@@ -72,17 +74,23 @@ flowchart TD
   - "I take 10mg of melatonin before bed"
   - "My childhood best friend is Priya Sharma"
   - "My bank PIN is 7294"
-- **Recall probed** at turns 15 and 50 (builds the memory decay curve); at each of these turns every fact planted earlier is asked about. Turns 25 and 35 appear in the default recall list but are also fact-seeding turns, and seeding wins, so they are never probed
+- **Recall checkpoints** after turns 15, 25, 35 and 50 (`CHECKPOINTS`). Checkpoints are separate from conversation turns, so a checkpoint can fall on a fact-seeding turn (25 and 35 do) without replacing it. At each checkpoint every fact planted at or before that turn is asked about, in a random order seeded per run and checkpoint.
+- **Probes are read-only.** A probe retrieves memory and asks the model, but nothing is written back. The harness fingerprints each backend's store (size plus a digest of its contents) before and after every checkpoint and aborts the run if anything changed.
+- **One prompt for every backend** (`src/prompts.py`). Each backend only decides what goes into the Memory section; the surrounding wording is identical, and its sha256 is recorded in the run manifest.
 - **Scoring:** exact match = correct / partial word match = partial / miss = failed
 - **5 runs per backend** for statistical reliability
 
 ### Methodology notes and limitations
 
-These are properties of the harness as written, not bugs, and they affect how the numbers should be read.
+**Fixed in v2, but present in the published v1 numbers:**
 
-- **Probe reinforcement.** Recall probes are sent as ordinary chat turns (`src/harness.py`), so each probe and the model's answer are written into memory. The same probe text is asked again at later recall turns. For the vector backends, the turn-50 recall of a fact can therefore retrieve the turn-15 question and answer pair, not only the original statement. Buffer and summary also carry those earlier probes. The turn-50 scores measure recall of the fact plus any reinforcement from earlier probing, and the decay curve is flattered accordingly, especially for facts planted before turn 15. A clean measurement would probe each fact once, or probe against a memory snapshot that is not written back to.
-- **Different prompts per backend family.** `buffer` and `summary` use LangChain's default `ConversationChain` prompt, while `qdrant` and `pgvector` use the custom `MEMORY_PROMPT` ("uses the relevant memory snippets below to answer accurately"). The wording differs, so part of any gap between the two families may come from prompt wording rather than the memory mechanism.
-- **Probe turns are excluded from latency.** Recall turns record no `TurnMetrics`, so latency averages cover filler and seed turns only. Their tokens do count toward the totals.
+- **Probe reinforcement (v1).** v1 sent recall probes as ordinary chat turns, so each probe and its answer were written into memory and the turn-50 probe could retrieve the turn-15 question and answer. That flattered the turn-50 scores, especially for early facts. v2 probes are read-only and the harness checks it.
+- **Different prompts per backend family (v1).** v1 `buffer` and `summary` used LangChain's default `ConversationChain` prompt while `qdrant` and `pgvector` used a custom one, so part of the gap may have been prompt wording. v2 uses one shared prompt.
+- **Dropped recall turns (v1).** In v1 a recall turn that collided with a seed turn (25 and 35) was silently never probed. v2 checkpoints are separate from turns.
+
+**Still true in v2:**
+
+- **Probe tokens are reported separately.** Probes are not part of the conversation, so their tokens and latency are recorded per probe in the transcript and kept out of the per-conversation totals.
 - **Substring scoring.** `score_recall` checks that each word of the answer key appears anywhere in the reply, so a reply that merely mentions the words can score as correct.
 - **Embeddings are local.** `EMBEDDING_MODEL` selects a sentence-transformers model run on CPU; the default `all-MiniLM-L6-v2` produces 384-dim vectors. `EMBEDDING_DIMENSION` (Qdrant collection size) must be changed together with it. The pgvector backend uses LangChain's `PGVector`, which creates its own tables, so the `memory_embeddings` table in `scripts/init_pgvector.sql` is not used.
 
@@ -114,7 +122,7 @@ Summary collapses after turn 12 — the summarizer aggressively compresses away 
 
 ### Notable Finding
 
-The Wi-Fi password (turn 30) and bank PIN (turn 45) were missed by **all** backends — including buffer, which had the data in the prompt. This is Claude's safety behavior refusing to repeat sensitive data, not a memory failure.
+The Wi-Fi password (turn 30) and bank PIN (turn 45) were scored as missed by **all** backends, including buffer, which had the data in its prompt. The likely explanation is the model declining to repeat sensitive data rather than a memory failure, but v1 did not save model responses, so this was never verified. v2 saves every probe response in the run transcript, so a future run can show whether these were refusals.
 
 ## Setup
 
@@ -163,9 +171,26 @@ python run_benchmark.py --help
   --backends  buffer summary qdrant pgvector  (subset of backends)
   --runs      N    number of runs per backend (default: 5)
   --turns     N    conversation turns per run (default: 50)
+  --checkpoints 15 25 35 50   recall checkpoints (after these turns)
+  --label     NAME suffix for the run id
   --results-dir    output directory           (default: results/)
   --no-viz         skip chart generation
 ```
+
+## Testing
+
+Tests never call a paid API. They run with `LLM_PROVIDER=fake` and `EMBEDDING_PROVIDER=fake`: a deterministic chat model (`src/fakes.py`) that can only answer from the Memory section of its prompt, and a hashing embedding. Recall in tests therefore depends entirely on what each backend retrieved.
+
+```bash
+make venv              # .venv with requirements + requirements-dev
+make test-unit         # no services needed
+make test-integration  # starts Qdrant + Postgres as project `ams-test` on ports 16333/15432, then removes them
+make test              # both
+```
+
+Integration tests run every backend through the real harness against real Qdrant and Postgres. `scripts/test_services.sh` uses `docker compose -p ams-test` when the compose plugin is installed and plain `docker run` otherwise.
+
+A free offline run of the full pipeline (services must be up) is `make run-fake`. Its output is marked as a sample run and is not a benchmark result.
 
 ## Remotion Video
 

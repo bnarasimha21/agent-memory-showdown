@@ -1,57 +1,64 @@
-"""Vector-backed memory using pgvector on PostgreSQL."""
+"""Vector-backed memory using pgvector on PostgreSQL: each exchange is one row, top-k retrieved."""
 
 from __future__ import annotations
 
-from langchain.memory import VectorStoreRetrieverMemory
-from langchain.chains import ConversationChain
+import psycopg2
 from langchain_community.vectorstores import PGVector
-from langchain_community.callbacks import get_openai_callback
-from langchain_core.prompts import PromptTemplate
-from src.backends.base import BaseMemoryBackend
-from src.llm_factory import get_llm, get_embeddings
+
+from src.backends.base import (
+    BaseMemoryBackend,
+    Retrieval,
+    WriteStats,
+    format_exchange,
+    fingerprint,
+)
 from src.config import config
 
-MEMORY_PROMPT = PromptTemplate(
-    input_variables=["history", "input"],
-    template=(
-        "The following is a friendly conversation between a human and an AI. "
-        "The AI uses the relevant memory snippets below to answer accurately.\n\n"
-        "Relevant memory:\n{history}\n\n"
-        "Human: {input}\n"
-        "AI:"
-    ),
-)
+COLLECTION_PREFIX = "mem_bench_pg_"
 
 
 class PGVectorMemoryBackend(BaseMemoryBackend):
     name = "pgvector"
 
     def setup(self) -> None:
-        self._collection = f"mem_bench_pg_{self.session_id[:8]}"
-        self._embeddings = get_embeddings()
-
-        self._vectorstore = PGVector(
-            connection_string=config.postgres_dsn,
-            embedding_function=self._embeddings,
+        self._collection = f"{COLLECTION_PREFIX}{self.session_id[:8]}"
+        self._store = PGVector(
+            connection_string=config.postgres_sqlalchemy_url,
+            embedding_function=self.embeddings,
             collection_name=self._collection,
             pre_delete_collection=True,
         )
-        retriever = self._vectorstore.as_retriever(search_kwargs={"k": 4})
-        self._memory = VectorStoreRetrieverMemory(retriever=retriever)
-        self._chain = ConversationChain(
-            llm=get_llm(),
-            memory=self._memory,
-            prompt=MEMORY_PROMPT,
-            verbose=False,
-        )
 
     def teardown(self) -> None:
-        try:
-            self._vectorstore.delete_collection()
-        except Exception:
-            pass
+        store = getattr(self, "_store", None)
+        if store is not None:
+            store.delete_collection()
 
-    def chat(self, human_message: str) -> tuple[str, int]:
-        with get_openai_callback() as cb:
-            response = self._chain.predict(input=human_message)
-        return response, cb.total_tokens
+    def retrieve(self, query: str) -> Retrieval:
+        if not self._rows():
+            return Retrieval(text="", items=[])
+        docs = self._store.similarity_search(query, k=self.k)
+        items = [d.page_content for d in docs]
+        return Retrieval(text="\n\n".join(items), items=items)
+
+    def write(self, human_message: str, ai_message: str) -> WriteStats:
+        self._store.add_texts([format_exchange(human_message, ai_message)])
+        return WriteStats()
+
+    def _rows(self) -> list[tuple[str, str]]:
+        conn = psycopg2.connect(config.postgres_dsn)
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT e.custom_id, e.document FROM langchain_pg_embedding e "
+                    "JOIN langchain_pg_collection c ON e.collection_id = c.uuid "
+                    "WHERE c.name = %s ORDER BY e.custom_id",
+                    (self._collection,),
+                )
+                return [(str(a), str(b)) for a, b in cur.fetchall()]
+        finally:
+            conn.close()
+
+    def memory_fingerprint(self) -> dict:
+        rows = self._rows()
+        return fingerprint(len(rows), "rows", rows)

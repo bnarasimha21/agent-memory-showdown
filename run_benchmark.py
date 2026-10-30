@@ -2,9 +2,12 @@
 """Entry point for the Agent Memory Showdown benchmark.
 
 Usage:
-    python run_benchmark.py                     # run all backends
-    python run_benchmark.py --backends buffer summary   # subset
+    python run_benchmark.py                               # all backends, paid LLM
+    python run_benchmark.py --backends buffer summary     # subset
     python run_benchmark.py --runs 3 --turns 50
+    LLM_PROVIDER=fake EMBEDDING_PROVIDER=fake python run_benchmark.py   # free, offline
+
+Each invocation writes a run bundle to results/runs/<run_id>/.
 
 Docker:
     make run
@@ -13,9 +16,7 @@ Docker:
 from __future__ import annotations
 
 import argparse
-import json
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -28,25 +29,14 @@ logger = logging.getLogger("benchmark")
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.config import config
-from src.harness import run_benchmark, save_results
-from src.visualize import generate_all
-from src.backends.buffer_memory import BufferMemoryBackend
-from src.backends.summary_memory import SummaryMemoryBackend
-from src.backends.qdrant_memory import QdrantMemoryBackend
-from src.backends.pgvector_memory import PGVectorMemoryBackend
-
-AVAILABLE_BACKENDS = {
-    "buffer": BufferMemoryBackend,
-    "summary": SummaryMemoryBackend,
-    "qdrant": QdrantMemoryBackend,
-    "pgvector": PGVectorMemoryBackend,
-}
+from src.backends.registry import AVAILABLE_BACKENDS  # noqa: E402
+from src.config import config  # noqa: E402
+from src.harness import run_benchmark  # noqa: E402
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(
-        description="Agent Memory Showdown - LangChain memory backend benchmark"
+        description="Agent Memory Showdown - memory backend benchmark"
     )
     parser.add_argument(
         "--backends",
@@ -55,78 +45,67 @@ def parse_args():
         default=list(AVAILABLE_BACKENDS.keys()),
         help="Which backends to benchmark (default: all)",
     )
-    parser.add_argument(
-        "--runs",
-        type=int,
-        default=config.NUM_RUNS,
-        help=f"Number of runs per backend (default: {config.NUM_RUNS})",
-    )
-    parser.add_argument(
-        "--turns",
-        type=int,
-        default=config.NUM_TURNS,
-        help=f"Conversation turns per run (default: {config.NUM_TURNS})",
-    )
-    parser.add_argument(
-        "--results-dir",
-        default=config.RESULTS_DIR,
-        help=f"Directory to write results (default: {config.RESULTS_DIR})",
-    )
-    parser.add_argument(
-        "--no-viz",
-        action="store_true",
-        help="Skip generating visualizations",
-    )
-    return parser.parse_args()
+    parser.add_argument("--runs", type=int, default=config.NUM_RUNS,
+                        help=f"Number of runs per backend (default: {config.NUM_RUNS})")
+    parser.add_argument("--turns", type=int, default=config.NUM_TURNS,
+                        help=f"Conversation turns per run (default: {config.NUM_TURNS})")
+    parser.add_argument("--checkpoints", type=int, nargs="+", default=None,
+                        help=f"Probe after these turns (default: {config.CHECKPOINTS})")
+    parser.add_argument("--results-dir", default=config.RESULTS_DIR,
+                        help=f"Directory to write results (default: {config.RESULTS_DIR})")
+    parser.add_argument("--label", default=None, help="Suffix for the run id")
+    parser.add_argument("--no-viz", action="store_true", help="Skip generating visualizations")
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_args()
+def format_summary(aggregate: dict) -> str:
+    lines = ["", "=== BENCHMARK SUMMARY ===", ""]
+    if aggregate.get("is_sample"):
+        lines.append("SAMPLE RUN (fake LLM): numbers below are not benchmark results.")
+        lines.append("")
+    for backend, data in aggregate["backends"].items():
+        if "error" in data:
+            lines.append(f"{backend:12s}  ERROR: {data['error']}")
+            continue
+        overall = data["recall_overall"]
+        lines.append(
+            f"{backend:12s}  "
+            f"latency={data['avg_latency_ms']:7.1f}+/-{data['std_latency_ms']:5.1f}ms  "
+            f"recall={overall['correct_rate'] * 100:5.1f}% (n={overall['total_probes']})  "
+            f"cost/1K=${data['estimated_cost_per_1k_conversations_usd']:.2f}"
+        )
+    lines.append("")
+    return "\n".join(lines)
+
+
+def main(argv=None):
+    args = parse_args(argv)
     backend_classes = [AVAILABLE_BACKENDS[b] for b in args.backends]
 
     logger.info(
-        "Starting benchmark: %d backend(s), %d runs, %d turns",
-        len(backend_classes),
-        args.runs,
-        args.turns,
+        "Starting benchmark: %d backend(s), %d runs, %d turns, LLM_PROVIDER=%s",
+        len(backend_classes), args.runs, args.turns, config.LLM_PROVIDER,
     )
 
-    results = run_benchmark(
+    bundle = run_benchmark(
         backend_classes=backend_classes,
         num_runs=args.runs,
         num_turns=args.turns,
+        checkpoints=args.checkpoints,
+        results_dir=args.results_dir,
+        run_label=args.label,
     )
-
-    results_path = save_results(results, args.results_dir)
-    logger.info("Benchmark complete. Results: %s", results_path)
+    aggregate_path = bundle / "aggregate.json"
+    logger.info("Benchmark complete. Bundle: %s", bundle)
 
     if not args.no_viz:
-        viz_dir = Path(args.results_dir) / "charts"
-        generate_all(results_path, viz_dir)
+        from src.visualize import generate_all
 
-    print("\n=== BENCHMARK SUMMARY ===\n")
-    for backend, data in results.items():
-        if "error" in data:
-            print(f"{backend:12s}  ERROR: {data['error']}")
-            continue
-        avg_lat = data["avg_latency_ms"]
-        std_lat = data["std_latency_ms"]
-        recall_entries = data.get("recall_accuracy_by_probe_turn", {})
-        if recall_entries:
-            overall_correct = sum(
-                v["correct_rate"] for v in recall_entries.values()
-            ) / len(recall_entries)
-        else:
-            overall_correct = 0
-        cost = data.get("estimated_cost_per_1k_conversations_usd", 0)
-        print(
-            f"{backend:12s}  "
-            f"latency={avg_lat:7.1f}+/-{std_lat:5.1f}ms  "
-            f"recall={overall_correct*100:5.1f}%  "
-            f"cost/1K=${cost:.4f}"
-        )
+        generate_all(aggregate_path, bundle / "charts")
 
-    print()
+    import json
+
+    print(format_summary(json.loads(aggregate_path.read_text())))
     return 0
 
 

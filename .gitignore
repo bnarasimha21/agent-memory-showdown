@@ -10,6 +10,8 @@ venv/
 results/benchmark_*.json
 results/charts/*.html
 results/charts/*.png
+results/runs/*/charts/
+.pytest_cache/
 node_modules/
 package-lock.json
 remotion/out/

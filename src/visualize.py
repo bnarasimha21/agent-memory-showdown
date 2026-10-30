@@ -20,38 +20,22 @@ BACKEND_COLORS = {
 
 
 def load_results(results_path: str | Path) -> dict:
+    """Per-backend metrics from an aggregate.json written by src/aggregate.py."""
     with open(results_path) as f:
-        return json.load(f)
+        return json.load(f)["backends"]
 
 
 def _get_recall_curve_data(results: dict) -> dict:
-    """Extract recall accuracy at each probe turn for each backend.
-
-    The new results format uses 'recall_accuracy_by_probe_turn' keyed by the
-    turn where probes were asked (15, 25, 35, 50).
-    """
+    """Recall at each checkpoint for each backend (keys are checkpoint turns)."""
     curves = {}
     for backend, data in results.items():
         if "error" in data:
             continue
-
-        by_probe = data.get("recall_accuracy_by_probe_turn", {})
-        if not by_probe:
-            by_seed = data.get("recall_accuracy_by_seed_turn", {})
-            if by_seed:
-                sorted_turns = sorted(by_seed.keys(), key=int)
-                curves[backend] = {
-                    "turns": [int(t) for t in sorted_turns],
-                    "correct_rates": [by_seed[t]["correct_rate"] for t in sorted_turns],
-                }
-            continue
-
-        sorted_probe_turns = sorted(by_probe.keys(), key=int)
+        by_cp = data.get("recall_by_checkpoint", {})
+        turns = sorted(by_cp, key=int)
         curves[backend] = {
-            "turns": [int(t) for t in sorted_probe_turns],
-            "correct_rates": [
-                by_probe[t]["correct_rate"] for t in sorted_probe_turns
-            ],
+            "turns": [int(t) for t in turns],
+            "correct_rates": [by_cp[t]["correct_rate"] for t in turns],
         }
     return curves
 
@@ -74,8 +58,8 @@ def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
         )
 
     fig.update_layout(
-        title="Memory Decay Curve: Recall Accuracy by Probe Turn",
-        xaxis_title="Conversation Turn (Probe Point)",
+        title="Memory Decay Curve: Recall Accuracy by Checkpoint",
+        xaxis_title="Checkpoint (after turn N)",
         yaxis_title="Recall Accuracy (%)",
         yaxis=dict(range=[0, 105]),
         legend_title="Backend",
@@ -105,8 +89,8 @@ def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None
             label=backend,
         )
 
-    ax.set_title("Memory Decay Curve: Recall Accuracy by Probe Turn")
-    ax.set_xlabel("Conversation Turn (Probe Point)")
+    ax.set_title("Memory Decay Curve: Recall Accuracy by Checkpoint")
+    ax.set_xlabel("Checkpoint (after turn N)")
     ax.set_ylabel("Recall Accuracy (%)")
     ax.set_ylim(0, 105)
     ax.legend(title="Backend")

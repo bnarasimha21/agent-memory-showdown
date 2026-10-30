@@ -1,84 +1,138 @@
-"""Benchmark harness: runs all backends against the dataset with inline recall probing."""
+"""Benchmark harness: runs backends through the dataset and probes at checkpoints.
+
+Conversation turns go through `backend.chat` (retrieve, answer, write). After a
+checkpoint turn, every fact planted so far is asked through `backend.probe`
+(retrieve, answer, no write) in a seeded random order. The memory fingerprint is
+taken before and after the probes; if it changed, the run is aborted, because
+the measurement would be contaminated.
+"""
 
 from __future__ import annotations
 
-import json
 import logging
+import random
 import time
 from pathlib import Path
 from typing import Type
 
-import numpy as np
-
-from src.backends.base import (
-    BaseMemoryBackend,
-    RunResult,
-    TurnMetrics,
-    RecallResult,
-    score_recall,
+from src.backends.base import BaseMemoryBackend
+from src.bundle import (
+    BundleWriter,
+    environment_info,
+    git_info,
+    new_run_id,
+    package_versions,
+    utc_now,
 )
-from src.dataset import ConversationDataset, generate_dataset
 from src.config import config
+from src.dataset import ConversationDataset, generate_dataset
+from src.llm_factory import embedding_model_id, llm_model_id
+from src.prompts import CHAT_TEMPLATE, template_hash
 
 logger = logging.getLogger(__name__)
+
+
+class ProbeIsolationError(RuntimeError):
+    """A probe changed the memory it was supposed to only read."""
 
 
 def run_single(
     backend_cls: Type[BaseMemoryBackend],
     dataset: ConversationDataset,
     run_index: int,
-) -> RunResult:
-    backend = backend_cls()
-    result = RunResult(
-        backend_name=backend.name,
-        run_index=run_index,
-        session_id=backend.session_id,
+    writer: BundleWriter,
+    backend_kwargs: dict | None = None,
+) -> dict:
+    backend = backend_cls(**(backend_kwargs or {}))
+    base = {"backend": backend.name, "run_index": run_index}
+    writer.record(
+        {**base, "type": "run_start", "seed": dataset.seed, "session_id": backend.session_id,
+         "k": getattr(backend, "k", None), "started_at": utc_now()}
     )
-
+    facts_by_id = {f.id: f for f in dataset.facts}
+    checkpoints = set(dataset.checkpoints)
+    started = time.perf_counter()
+    error = None
+    memory_stats = None
     try:
         backend.setup()
-
         for turn in dataset.turns:
-            if turn.is_recall_turn:
-                for probe_info in turn.recall_probes:
-                    probe_response, probe_tokens, _ = backend.timed_chat(
-                        probe_info["probe"]
-                    )
-                    score = score_recall(probe_response, probe_info["answer_key"])
-                    result.recall_results.append(
-                        RecallResult(
-                            probe=probe_info["probe"],
-                            seeded_at_turn=probe_info["seeded_at_turn"],
-                            probed_at_turn=turn.turn_number,
-                            response=probe_response,
-                            score=score,
-                            answer_key=probe_info["answer_key"],
-                        )
-                    )
-                    result.total_tokens += probe_tokens
-            else:
-                _response, tokens, latency_ms = backend.timed_chat(turn.human_message)
-                result.turn_metrics.append(
-                    TurnMetrics(
-                        turn_number=turn.turn_number,
-                        retrieval_latency_ms=latency_ms,
-                        tokens_used=tokens,
-                    )
-                )
-                result.total_tokens += tokens
-
-    except Exception as exc:
-        logger.error(
-            "Backend %s run %d failed: %s", backend.name, run_index, exc, exc_info=True
-        )
-        result.error = str(exc)
+            exchange = backend.chat(turn.human_message)
+            writer.record(
+                {**base, "type": "turn", "turn": turn.turn_number, "fact_id": turn.fact_id,
+                 **exchange.to_dict()}
+            )
+            if turn.turn_number in checkpoints:
+                _run_checkpoint(backend, dataset, turn.turn_number, writer, base, facts_by_id)
+        memory_stats = backend.memory_stats()
+    except Exception as exc:  # recorded in the bundle; other runs continue
+        logger.error("Backend %s run %d failed: %s", backend.name, run_index, exc, exc_info=True)
+        error = f"{type(exc).__name__}: {exc}"
     finally:
+        teardown_error = None
         try:
             backend.teardown()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Teardown of %s run %d failed: %s", backend.name, run_index, exc)
+            teardown_error = f"{type(exc).__name__}: {exc}"
+    end = {
+        **base, "type": "run_end", "error": error, "teardown_error": teardown_error,
+        "duration_s": time.perf_counter() - started, "memory_stats": memory_stats,
+        "finished_at": utc_now(),
+    }
+    writer.record(end)
+    return end
 
-    return result
+
+def _run_checkpoint(backend, dataset, checkpoint, writer, base, facts_by_id) -> None:
+    facts = dataset.probes_at(checkpoint)
+    rng = random.Random(f"{dataset.seed}:{checkpoint}")
+    order = [f.id for f in facts]
+    rng.shuffle(order)
+    before = backend.memory_fingerprint()
+    for position, fact_id in enumerate(order):
+        fact = facts_by_id[fact_id]
+        exchange = backend.probe(fact.probe)
+        writer.record(
+            {**base, "type": "probe", "checkpoint": checkpoint, "order": position,
+             "fact_id": fact.id, "planted_at": fact.turn, "question": fact.probe,
+             "answer_key": fact.answer_key, **exchange.to_dict()}
+        )
+    after = backend.memory_fingerprint()
+    unchanged = before == after
+    writer.record(
+        {**base, "type": "checkpoint", "checkpoint": checkpoint, "num_probes": len(order),
+         "memory_before": before, "memory_after": after, "unchanged": unchanged}
+    )
+    if not unchanged:
+        raise ProbeIsolationError(
+            f"{backend.name}: memory changed during checkpoint {checkpoint}: {before} -> {after}"
+        )
+
+
+def build_manifest(backend_names, num_runs, num_turns, seed_turns, checkpoints, k) -> dict:
+    return {
+        "methodology": "v2",
+        "created_at": utc_now(),
+        "git": git_info(),
+        "llm_provider": config.LLM_PROVIDER,
+        "llm_model": llm_model_id(),
+        "embedding_provider": config.EMBEDDING_PROVIDER,
+        "embedding_model": embedding_model_id(),
+        "embedding_dimension": config.EMBEDDING_DIMENSION,
+        "k": k,
+        "backends": list(backend_names),
+        "num_runs": num_runs,
+        "num_turns": num_turns,
+        "seed_turns": list(seed_turns),
+        "checkpoints": list(checkpoints),
+        "seeds": [config.BASE_SEED + i for i in range(num_runs)],
+        "prompt_hash": template_hash(),
+        "prompt_template": CHAT_TEMPLATE,
+        "packages": package_versions(),
+        "environment": environment_info(),
+        "is_sample": config.LLM_PROVIDER == "fake",
+    }
 
 
 def run_benchmark(
@@ -86,132 +140,41 @@ def run_benchmark(
     num_runs: int | None = None,
     num_turns: int | None = None,
     seed_turns: list[int] | None = None,
-    recall_turns: list[int] | None = None,
-) -> dict:
+    checkpoints: list[int] | None = None,
+    results_dir: str | Path | None = None,
+    run_label: str | None = None,
+    backend_kwargs: dict | None = None,
+) -> Path:
+    """Run the benchmark and write a bundle. Returns the bundle directory."""
+    from src.aggregate import aggregate_bundle
+
     num_runs = num_runs or config.NUM_RUNS
     num_turns = num_turns or config.NUM_TURNS
-    seed_turns = seed_turns or config.SEED_TURNS
-    recall_turns = recall_turns or config.RECALL_TURNS
+    seed_turns = seed_turns if seed_turns is not None else config.SEED_TURNS
+    checkpoints = checkpoints if checkpoints is not None else config.CHECKPOINTS
+    k = (backend_kwargs or {}).get("k", config.RETRIEVAL_K)
+    runs_root = Path(results_dir or config.RESULTS_DIR) / "runs"
 
-    all_results: dict[str, list[RunResult]] = {
-        cls.name: [] for cls in backend_classes
-    }
+    datasets = [
+        generate_dataset(num_turns=num_turns, seed_turns=seed_turns, checkpoints=checkpoints,
+                         random_seed=config.BASE_SEED + i)
+        for i in range(num_runs)
+    ]
+    manifest = build_manifest(
+        [c.name for c in backend_classes], num_runs, num_turns, seed_turns,
+        datasets[0].checkpoints if datasets else checkpoints, k,
+    )
+    writer = BundleWriter(runs_root, new_run_id(run_label), manifest)
+    writer.write_dataset({str(i): d.to_dict() for i, d in enumerate(datasets)})
 
+    started = time.perf_counter()
     for backend_cls in backend_classes:
         logger.info("Benchmarking backend: %s", backend_cls.name)
-        for run_idx in range(num_runs):
-            dataset = generate_dataset(
-                num_turns=num_turns,
-                seed_turns=seed_turns,
-                recall_turns=recall_turns,
-                random_seed=42 + run_idx,
-            )
+        for run_idx, dataset in enumerate(datasets):
             logger.info("  Run %d / %d", run_idx + 1, num_runs)
-            run_result = run_single(backend_cls, dataset, run_idx)
-            all_results[backend_cls.name].append(run_result)
+            run_single(backend_cls, dataset, run_idx, writer, backend_kwargs)
 
-    return aggregate_results(all_results)
-
-
-def aggregate_results(all_results: dict[str, list[RunResult]]) -> dict:
-    summary = {}
-
-    for backend_name, runs in all_results.items():
-        valid_runs = [r for r in runs if r.error is None]
-        if not valid_runs:
-            summary[backend_name] = {"error": "All runs failed"}
-            continue
-
-        turn_latencies: dict[int, list[float]] = {}
-        for run in valid_runs:
-            for tm in run.turn_metrics:
-                turn_latencies.setdefault(tm.turn_number, []).append(
-                    tm.retrieval_latency_ms
-                )
-
-        avg_latency_per_turn = {
-            t: float(np.mean(lats)) for t, lats in sorted(turn_latencies.items())
-        }
-        overall_latency_values = [
-            lat for lats in turn_latencies.values() for lat in lats
-        ]
-
-        # Recall by (probed_at_turn, seeded_at_turn) for the decay curve
-        recall_by_probe_turn: dict[int, dict[int, list[str]]] = {}
-        for run in valid_runs:
-            for rr in run.recall_results:
-                recall_by_probe_turn.setdefault(rr.probed_at_turn, {}).setdefault(
-                    rr.seeded_at_turn, []
-                ).append(rr.score)
-
-        recall_accuracy = {}
-        for probe_turn in sorted(recall_by_probe_turn):
-            seeds = recall_by_probe_turn[probe_turn]
-            all_scores = [s for scores in seeds.values() for s in scores]
-            correct = all_scores.count("correct")
-            partial = all_scores.count("partial")
-            total = len(all_scores)
-            recall_accuracy[probe_turn] = {
-                "correct_rate": correct / total if total else 0,
-                "partial_rate": partial / total if total else 0,
-                "failed_rate": (total - correct - partial) / total if total else 0,
-                "total_probes": total,
-                "by_seed_turn": {
-                    seed_t: _score_dist(scores)
-                    for seed_t, scores in sorted(seeds.items())
-                },
-            }
-
-        token_counts = [r.total_tokens for r in valid_runs]
-        cost_per_1k = _estimate_cost_per_1k(float(np.mean(token_counts)))
-
-        summary[backend_name] = {
-            "num_valid_runs": len(valid_runs),
-            "avg_latency_ms": float(np.mean(overall_latency_values)) if overall_latency_values else 0,
-            "std_latency_ms": float(np.std(overall_latency_values)) if overall_latency_values else 0,
-            "avg_latency_per_turn": avg_latency_per_turn,
-            "recall_accuracy_by_probe_turn": recall_accuracy,
-            "avg_tokens_per_run": float(np.mean(token_counts)),
-            "std_tokens_per_run": float(np.std(token_counts)),
-            "estimated_cost_per_1k_conversations_usd": cost_per_1k,
-        }
-
-    return summary
-
-
-def _score_dist(scores: list[str]) -> dict:
-    correct = scores.count("correct")
-    partial = scores.count("partial")
-    total = len(scores)
-    return {
-        "correct_rate": correct / total if total else 0,
-        "partial_rate": partial / total if total else 0,
-        "failed_rate": (total - correct - partial) / total if total else 0,
-        "n": total,
-    }
-
-
-def _estimate_cost_per_1k(avg_tokens: float) -> float:
-    """Cost estimate using Claude 3.5 Sonnet pricing via DO Serverless Inference.
-
-    DO pricing for claude-3.5-sonnet:
-      Input:  $0.003  / 1K tokens
-      Output: $0.015  / 1K tokens
-    We approximate a 3:1 input:output ratio to get a blended rate.
-    """
-    blended_rate_per_token = (0.003 * 0.75 + 0.015 * 0.25) / 1000
-    return avg_tokens * blended_rate_per_token * 1000
-
-
-def save_results(results: dict, results_dir: str | None = None) -> Path:
-    results_dir = Path(results_dir or config.RESULTS_DIR)
-    results_dir.mkdir(parents=True, exist_ok=True)
-
-    timestamp = int(time.time())
-    output_path = results_dir / f"benchmark_{timestamp}.json"
-
-    with open(output_path, "w") as f:
-        json.dump(results, f, indent=2)
-
-    logger.info("Results saved to %s", output_path)
-    return output_path
+    writer.finalize(finished_at=utc_now(), duration_s=time.perf_counter() - started)
+    writer.write_aggregate(aggregate_bundle(writer.path))
+    logger.info("Run bundle written to %s", writer.path)
+    return writer.path
