@@ -2,7 +2,7 @@ import json
 
 from src.aggregate import aggregate_records
 from src.fakes import FakeMemoryChatModel
-from src.scoring.judge import Judge, judge_input, parse_verdict, prompt_hash, render
+from src.scoring.judge import Judge, judge_input, load_prompt, parse_verdict, prompt_hash, render
 from src.scoring.rescore import score_probes
 
 PROBE = {
@@ -68,3 +68,36 @@ def test_judge_errors_fall_back_to_the_matcher():
     b = aggregate_records(recs, scores=scores)["backends"]["b"]
     assert b["recall_overall"]["counts"]["partial"] == 1
     assert b["judge"]["errors"] == 1
+
+
+UPDATE = dict(PROBE, fact_id="flight_date", category="update", question="When is my flight to Tokyo?",
+              answer_key="May 18", answers=[["May 18"]], stale=["May 13"])
+ABSTAIN = dict(PROBE, fact_id="cat_name", category="abstention", question="What is my cat's name?",
+               answer_key=None, answers=[], stale=[])
+
+
+def test_rubric_marks_a_stale_update_value_wrong():
+    text = load_prompt()
+    assert "stale value" in text and "wrong" in text
+    payload = judge_input(UPDATE)
+    assert payload["stale_values"] == ["May 13"] and payload["expect_abstention"] is False
+    judge = Judge(FakeMemoryChatModel(), "fake", "fake-judge-v1")
+    assert judge.judge(dict(UPDATE, response="Your flight is on May 13."))["label"] == "wrong"
+    assert judge.judge(dict(UPDATE, response="It moved to May 18."))["label"] == "correct"
+
+
+def test_abstention_probe_reaches_the_judge_without_an_answer_key():
+    payload = judge_input(ABSTAIN)
+    assert payload["expect_abstention"] is True
+    assert payload["required_parts"] == [] and payload["expected"] == "(never stated)"
+    assert "expect_abstention" in render(ABSTAIN)
+    judge = Judge(FakeMemoryChatModel(), "fake", "fake-judge-v1")
+    assert judge.judge(dict(ABSTAIN, response="You never told me about a cat."))["label"] == "correct"
+    assert judge.judge(dict(ABSTAIN, response="Your cat is Miso."))["label"] == "wrong"
+
+
+def test_abstained_verdict_on_an_abstention_probe_counts_as_correct():
+    stub = StubLLM(reply='{"label": "abstained", "rationale": "says it was not told"}')
+    judge = Judge(stub, "stub", "stub")
+    assert judge.judge(dict(ABSTAIN, response="No idea."))["label"] == "correct"
+    assert judge.judge(dict(PROBE, response="No idea."))["label"] == "abstained"

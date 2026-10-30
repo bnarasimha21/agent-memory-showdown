@@ -25,7 +25,8 @@ def _tree_digest(path):
 
 def test_rescore_reproduces_labels_and_leaves_the_bundle_alone(services, tmp_path):
     bundle = run_benchmark([AVAILABLE_BACKENDS["pgvector"]], num_runs=1, num_turns=10,
-                           checkpoints=[5, 10], results_dir=tmp_path)
+                           checkpoints=[5, 10], results_dir=tmp_path,
+                           composition={"extraction": 2, "update": 1, "abstention": 1})
     original = json.loads((bundle / "aggregate.json").read_text())
     assert original["backends"]["pgvector"]["scorer"] == "judge"
     assert (bundle / "scores.jsonl").exists()

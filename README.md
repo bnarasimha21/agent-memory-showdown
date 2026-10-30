@@ -23,7 +23,7 @@ These numbers come from the April 2026 run of the **v1 harness**. v1 had known f
 flowchart TD
     E[".env / env vars"] --> C[config.py]
     C --> HN[harness.py]
-    HN --> DS[dataset.py\n50-turn synthetic convo\nseeded facts @ turns 1,3,7,12,18,25,30,35,40,45]
+    HN --> DS[src/dataset/\nconversation per run seed\nfrom data/facts_v2.yaml]
     DS --> HN
     HN --> B1[BufferMemoryBackend\nConversationBufferMemory]
     HN --> B2[SummaryMemoryBackend\nConversationSummaryMemory]
@@ -61,20 +61,21 @@ flowchart TD
 
 ## Benchmark Design
 
-- **50-turn synthetic conversation** — multi-topic (travel planning, tech preferences, personal details, work projects)
-- **10 facts planted** at turns: 1, 3, 7, 12, 18, 25, 30, 35, 40, 45
-- **Facts include:**
-  - "My dog's name is Baxter"
-  - "I'm allergic to shellfish"
-  - "My flight to Tokyo is on March 15th"
-  - "The project deadline is April 30th"
-  - "My sister's wedding is in Lake Como, Italy"
-  - "I'm reading 'Gödel, Escher, Bach'"
-  - "My Wi-Fi password is 'sunkist-mango-42'"
-  - "I take 10mg of melatonin before bed"
-  - "My childhood best friend is Priya Sharma"
-  - "My bank PIN is 7294"
-- **Recall checkpoints** after turns 15, 25, 35 and 50 (`CHECKPOINTS`). Checkpoints are separate from conversation turns, so a checkpoint can fall on a fact-seeding turn (25 and 35 do) without replacing it. At each checkpoint every fact planted at or before that turn is asked about, in a random order seeded per run and checkpoint.
+- **Dataset v2: one generated conversation per run seed** (`src/dataset/`, facts in [`data/facts_v2.yaml`](data/facts_v2.yaml)). The fact bank is data, not code: each template has slots, and every run seed samples which templates are used, their values, the turns their statements land on, a distractor turn per fact and varied filler. The same seed reproduces the same conversation; the full realized dataset of every run is saved in the bundle as `dataset.json`, and the bank's version and sha256 are in the manifest.
+- **Fact categories** (default counts per run, set with `--facts` or `FACTS_PER_CATEGORY`):
+
+  | Category | Default | What it tests |
+  |----------|:-------:|---------------|
+  | `extraction` | 3 | a single fact stated once ("My dog's name is Juniper.") |
+  | `update` | 2 | a fact stated, then corrected later; probed after the correction, and the old value counts as wrong |
+  | `temporal` | 1 | two dates stated in different turns; the probe asks how many days apart they are |
+  | `multi_hop` | 1 | two facts in different turns that must be combined |
+  | `abstention` | 2 | never stated; the right answer is to say so, and any concrete value is wrong |
+  | `sensitive` | 2 | passwords, PINs and codes; reported on their own (`recall_sensitive`) and **left out of the headline recall**, because models often decline to repeat them and that is not a memory failure |
+
+- **Distractors** (on by default, `--no-distractors` or `DISTRACTORS=0` to turn off): each non-sensitive fact gets one turn that mentions the same kind of thing with a different value ("My neighbour just adopted a dog called Biscuit."), so a backend that retrieves the wrong memory gets it wrong.
+- **Per-category recall** is in `aggregate.json` (`recall_by_category`), in the printed summary and in the `recall_by_category` chart, each with a 95% Wilson interval.
+- **Recall checkpoints** after turns 15, 25, 35 and 50 (`CHECKPOINTS`). Checkpoints are separate from conversation turns, so a checkpoint can fall on a turn that states a fact without replacing it. At each checkpoint every fact that is ready by that turn (its last statement made; abstention facts from the start) is asked about, in a random order seeded per run and checkpoint.
 - **Probes are read-only.** A probe retrieves memory and asks the model, but nothing is written back. The harness fingerprints each backend's store (size plus a digest of its contents) before and after every checkpoint and aborts the run if anything changed.
 - **One prompt for every backend** (`src/prompts.py`). Each backend only decides what goes into the Memory section; the surrounding wording is identical, and its sha256 is recorded in the run manifest.
 - **Scoring (v2):** every probe response gets two labels from `correct | partial | wrong | refused | abstained`:
@@ -135,7 +136,7 @@ Summary collapses after turn 12 — the summarizer aggressively compresses away 
 
 ### Notable Finding
 
-The Wi-Fi password (turn 30) and bank PIN (turn 45) were scored as missed by **all** backends, including buffer, which had the data in its prompt. The likely explanation is the model declining to repeat sensitive data rather than a memory failure, but v1 did not save model responses, so this was never verified. v2 saves every probe response in the run transcript, so a future run can show whether these were refusals.
+The Wi-Fi password (turn 30) and bank PIN (turn 45) were scored as missed by **all** backends, including buffer, which had the data in its prompt. The likely explanation is the model declining to repeat sensitive data rather than a memory failure, but v1 did not save model responses, so this was never verified. v2 saves every probe response in the run transcript, labels refusals as `refused`, and keeps sensitive facts out of the headline. `python scripts/test_sensitive_recall.py --seeds 5` asks only the sensitive probes, with the whole conversation in context, and prints how many were answered, refused or missed (it calls the configured LLM; `LLM_PROVIDER=fake` runs it offline).
 
 ## Setup
 
@@ -185,6 +186,8 @@ python run_benchmark.py --help
   --runs      N    number of runs per backend (default: 5)
   --turns     N    conversation turns per run (default: 50)
   --checkpoints 15 25 35 50   recall checkpoints (after these turns)
+  --facts     extraction=3,update=2,...  facts per category (default as in the table above)
+  --no-distractors  no distractor turns
   --label     NAME suffix for the run id
   --results-dir    output directory           (default: results/)
   --no-viz         skip chart generation
@@ -227,9 +230,11 @@ agent-memory-showdown/
 ├── Dockerfile
 ├── requirements.txt
 ├── .env.example
+├── data/
+│   └── facts_v2.yaml         # fact bank: templates, slots, distractors, filler
 ├── src/
 │   ├── config.py             # env-driven config (DO API key, DB URIs)
-│   ├── dataset.py            # synthetic conversation generator
+│   ├── dataset/              # dataset v2: bank.py (loads the fact bank), generate.py
 │   ├── harness.py            # benchmark runner + aggregator
 │   ├── llm_factory.py        # Claude + local embeddings
 │   ├── visualize.py          # Plotly + Matplotlib charts

@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from src.backends.registry import AVAILABLE_BACKENDS  # noqa: E402
 from src.config import config  # noqa: E402
+from src.dataset import parse_composition  # noqa: E402
 from src.harness import run_benchmark  # noqa: E402
 from src.report import format_summary  # noqa: E402,F401  (re-exported)
 
@@ -52,6 +53,12 @@ def parse_args(argv=None):
                         help=f"Conversation turns per run (default: {config.NUM_TURNS})")
     parser.add_argument("--checkpoints", type=int, nargs="+", default=None,
                         help=f"Probe after these turns (default: {config.CHECKPOINTS})")
+    parser.add_argument("--facts", default=None, metavar="CATEGORY=N,...",
+                        help="Facts per category, e.g. extraction=3,update=2,abstention=1 "
+                             "(default: FACTS_PER_CATEGORY or "
+                             f"{','.join(f'{c}={n}' for c, n in config.FACTS_PER_CATEGORY.items())})")
+    parser.add_argument("--no-distractors", action="store_true",
+                        help="Leave out distractor turns")
     parser.add_argument("--results-dir", default=config.RESULTS_DIR,
                         help=f"Directory to write results (default: {config.RESULTS_DIR})")
     parser.add_argument("--label", default=None, help="Suffix for the run id")
@@ -75,6 +82,8 @@ def main(argv=None):
         num_runs=args.runs,
         num_turns=args.turns,
         checkpoints=args.checkpoints,
+        composition=parse_composition(args.facts) if args.facts else None,
+        distractors=False if args.no_distractors else None,
         results_dir=args.results_dir,
         run_label=args.label,
         judge=False if args.no_judge else None,

@@ -25,7 +25,7 @@ from src.bundle import (
     utc_now,
 )
 from src.config import config
-from src.dataset import ConversationDataset, generate_dataset
+from src.dataset import NON_HEADLINE, ConversationDataset, generate_dataset, load_bank
 from src.llm_factory import embedding_model_id, llm_model_id
 from src.prompts import CHAT_TEMPLATE, template_hash
 
@@ -95,7 +95,8 @@ def _run_checkpoint(backend, dataset, checkpoint, writer, base, facts_by_id) -> 
         exchange = backend.probe(fact.probe)
         writer.record(
             {**base, "type": "probe", "checkpoint": checkpoint, "order": position,
-             "fact_id": fact.id, "planted_at": fact.turn, "question": fact.probe,
+             "fact_id": fact.id, "category": fact.category, "headline": fact.headline,
+             "planted_at": fact.turn if fact.statements else None, "question": fact.probe,
              "answer_key": fact.answer_key, "answers": fact.answers, "stale": fact.stale,
              **exchange.to_dict()}
         )
@@ -111,7 +112,7 @@ def _run_checkpoint(backend, dataset, checkpoint, writer, base, facts_by_id) -> 
         )
 
 
-def build_manifest(backend_names, num_runs, num_turns, seed_turns, checkpoints, k) -> dict:
+def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints, k) -> dict:
     return {
         "methodology": "v2",
         "created_at": utc_now(),
@@ -125,7 +126,7 @@ def build_manifest(backend_names, num_runs, num_turns, seed_turns, checkpoints, 
         "backends": list(backend_names),
         "num_runs": num_runs,
         "num_turns": num_turns,
-        "seed_turns": list(seed_turns),
+        "dataset": dataset_info,
         "checkpoints": list(checkpoints),
         "seeds": [config.BASE_SEED + i for i in range(num_runs)],
         "prompt_hash": template_hash(),
@@ -140,8 +141,9 @@ def run_benchmark(
     backend_classes: list[Type[BaseMemoryBackend]],
     num_runs: int | None = None,
     num_turns: int | None = None,
-    seed_turns: list[int] | None = None,
     checkpoints: list[int] | None = None,
+    composition: dict[str, int] | None = None,
+    distractors: bool | None = None,
     results_dir: str | Path | None = None,
     run_label: str | None = None,
     backend_kwargs: dict | None = None,
@@ -161,18 +163,28 @@ def run_benchmark(
 
     num_runs = num_runs or config.NUM_RUNS
     num_turns = num_turns or config.NUM_TURNS
-    seed_turns = seed_turns if seed_turns is not None else config.SEED_TURNS
+    composition = composition if composition is not None else config.FACTS_PER_CATEGORY
+    distractors = config.DISTRACTORS if distractors is None else distractors
     checkpoints = checkpoints if checkpoints is not None else config.CHECKPOINTS
     k = (backend_kwargs or {}).get("k", config.RETRIEVAL_K)
     runs_root = Path(results_dir or config.RESULTS_DIR) / "runs"
 
+    bank = load_bank()
     datasets = [
-        generate_dataset(num_turns=num_turns, seed_turns=seed_turns, checkpoints=checkpoints,
-                         random_seed=config.BASE_SEED + i)
+        generate_dataset(num_turns=num_turns, checkpoints=checkpoints, random_seed=config.BASE_SEED + i,
+                         composition=composition, distractors=distractors, bank=bank)
         for i in range(num_runs)
     ]
+    dataset_info = {
+        "bank": str(Path(bank.path).relative_to(Path(__file__).resolve().parents[1])),
+        "bank_version": bank.version,
+        "bank_sha256": bank.sha256,
+        "composition": dict(composition),
+        "distractors": bool(distractors),
+        "headline_excludes": sorted(NON_HEADLINE),
+    }
     manifest = build_manifest(
-        [c.name for c in backend_classes], num_runs, num_turns, seed_turns,
+        [c.name for c in backend_classes], num_runs, num_turns, dataset_info,
         datasets[0].checkpoints if datasets else checkpoints, k,
     )
     writer = BundleWriter(runs_root, new_run_id(run_label), manifest)

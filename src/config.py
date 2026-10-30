@@ -80,9 +80,18 @@ class Config:
         self.NUM_RUNS: int = int(env("NUM_RUNS", "5"))
         self.NUM_TURNS: int = int(env("NUM_TURNS", "50"))
         self.BASE_SEED: int = int(env("BASE_SEED", "42"))
-        self.SEED_TURNS: list[int] = _int_list(
-            env("SEED_TURNS", "1,3,7,12,18,25,30,35,40,45")
+        if env("SEED_TURNS") is not None:
+            logger.warning("SEED_TURNS is ignored: dataset v2 places facts per run seed "
+                           "(see FACTS_PER_CATEGORY)")
+        # How many facts of each category a run samples from data/facts_v2.yaml.
+        from src.dataset.generate import DEFAULT_COMPOSITION, parse_composition
+
+        facts = env("FACTS_PER_CATEGORY")
+        self.FACTS_PER_CATEGORY: dict[str, int] = (
+            parse_composition(facts) if facts else dict(DEFAULT_COMPOSITION)
         )
+        # Distractor turns: same kind of thing as a fact, different value.
+        self.DISTRACTORS: bool = env("DISTRACTORS", "1").strip().lower() not in ("0", "false", "no")
         # CHECKPOINTS replaces RECALL_TURNS. A checkpoint N means "after turn N,
         # probe every fact planted so far against a read-only memory snapshot".
         checkpoints = env("CHECKPOINTS")

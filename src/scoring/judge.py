@@ -17,7 +17,7 @@ from langchain_core.messages import HumanMessage
 
 from src.backends.base import usage_from_message
 from src.scoring import LABELS
-from src.scoring.matcher import answers_of
+from src.scoring.matcher import answers_of, expects_abstention
 
 PROMPT_PATH = Path(__file__).with_name("judge_prompt.md")
 INPUT_MARKER = "JUDGE_INPUT_JSON:"
@@ -32,9 +32,11 @@ def prompt_hash() -> str:
 
 
 def judge_input(record: dict) -> dict:
+    abstain = expects_abstention(record)
     return {
         "question": record["question"],
-        "expected": record["answer_key"],
+        "expect_abstention": abstain,
+        "expected": "(never stated)" if abstain else record["answer_key"],
         "required_parts": answers_of(record),
         "stale_values": list(record.get("stale") or []),
         "response": record["response"],
@@ -83,6 +85,10 @@ class Judge:
                     "input_tokens": 0, "output_tokens": 0}
         text = message.content if isinstance(message.content, str) else str(message.content)
         label, rationale = parse_verdict(text)
+        if label == "abstained" and expects_abstention(record):
+            # The rubric asks for `correct` here; an `abstained` verdict means
+            # the same thing, so it is mapped rather than counted as a miss.
+            label, rationale = "correct", f"(abstained, which is correct here) {rationale}"
         in_tok, out_tok = usage_from_message(message)
         return {"label": label, "rationale": rationale,
                 "input_tokens": in_tok, "output_tokens": out_tok}

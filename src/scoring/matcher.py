@@ -6,6 +6,10 @@ that, explicit refusal language ("I won't repeat your PIN") makes it `refused`
 even when the value is present. With no part matched, a stale value (an
 outdated answer for an update fact) makes it `wrong`, and "you haven't told me"
 style language makes it `abstained`. Anything else is `wrong`.
+
+Abstention probes ask about something the user never said, so there is no
+answer key: saying it was not told is `correct`, giving any answer is `wrong`,
+and refusal language without an abstention stays `refused`.
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ from typing import Iterable, Sequence
 
 from src.scoring.normalize import contains, fold, normalize
 
-MATCHER_VERSION = "matcher-v1"
+MATCHER_VERSION = "matcher-v2"
 
 _REFUSAL = [
     re.compile(
@@ -59,9 +63,16 @@ def match(
     response: str,
     answers: Sequence[Sequence[str]],
     stale: Sequence[str] = (),
+    expect_abstention: bool = False,
 ) -> tuple[str, str]:
     """(label, reason) for one response."""
     refusal, abstain = is_refusal(response), is_abstention(response)
+    if expect_abstention:
+        if abstain:
+            return "correct", "abstained on a fact that was never stated"
+        if refusal:
+            return "refused", "refusal language on a fact that was never stated"
+        return "wrong", "answered a question about a fact that was never stated"
     if refusal and not abstain:
         return "refused", "refusal language"
     hits = parts_matched(response, answers)
@@ -77,9 +88,22 @@ def match(
     return "wrong", "expected value absent"
 
 
+def expects_abstention(record: dict) -> bool:
+    return record.get("category") == "abstention"
+
+
 def answers_of(record: dict) -> list[list[str]]:
-    """Required parts for a probe record; old records only carry `answer_key`."""
+    """Required parts for a probe record; old records only carry `answer_key`.
+
+    Abstention probes have none."""
+    if expects_abstention(record):
+        return []
     answers = record.get("answers")
     if answers:
         return [list(p) for p in answers]
     return [[record["answer_key"]]]
+
+
+def match_record(record: dict) -> tuple[str, str]:
+    return match(record["response"], answers_of(record), record.get("stale") or [],
+                 expect_abstention=expects_abstention(record))

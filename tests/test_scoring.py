@@ -2,11 +2,19 @@
 
 import pytest
 
-from src.dataset import SEEDED_FACTS
-from src.scoring.matcher import match
+from src.scoring.matcher import match, match_record
 from src.scoring.normalize import normalize
 
-FACTS = {info["id"]: info for info in SEEDED_FACTS.values()}
+# Answer sets as the v1 dataset defined them; the matcher rules are about
+# these shapes (dates, accents, multi-part, PINs), not about any one dataset.
+FACTS = {
+    "flight_date": {"answers": [["march 15"]]},
+    "current_book": {"answers": [["gödel, escher, bach", "geb"]]},
+    "melatonin_dose": {"answers": [["melatonin"], ["10 mg", "10 milligrams"]]},
+    "bank_pin": {"answers": [["7294"]]},
+    "best_friend": {"answers": [["priya"], ["sharma"]]},
+    "wedding_location": {"answers": [["lake como", "como"]]},
+}
 
 
 def label(fact_id, response):
@@ -74,3 +82,20 @@ def test_normalize_examples():
     assert normalize("My flight is on March 15th!") == "my flight is on date-03-15"
     assert normalize("sunkist-mango-42") == "sunkist mango 42"
     assert normalize("15 may be late") == "15 may be late"
+
+
+def test_abstention_probe_is_scored_without_an_answer_key():
+    rec = {"category": "abstention", "answer_key": None, "answers": [], "stale": []}
+    assert match_record(dict(rec, response="You haven't told me your cat's name."))[0] == "correct"
+    assert match_record(dict(rec, response="I don't know, you never mentioned a cat."))[0] == "correct"
+    # naming the coworker's cat is answering a question it was never told
+    assert match_record(dict(rec, response="Your cat is called Miso."))[0] == "wrong"
+    assert match_record(dict(rec, response="I can't share that for privacy reasons."))[0] == "refused"
+
+
+def test_update_fact_stale_value_is_wrong_current_value_is_correct():
+    rec = {"category": "update", "answer_key": "May 18", "answers": [["May 18"]],
+           "stale": ["May 13"]}
+    assert match_record(dict(rec, response="Your flight to Tokyo is on May 13."))[0] == "wrong"
+    assert match_record(dict(rec, response="It moved from May 13 to the 18th of May."))[0] == "correct"
+    assert match_record(dict(rec, response="It's on 18 May."))[0] == "correct"

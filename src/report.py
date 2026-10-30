@@ -23,6 +23,9 @@ def format_summary(aggregate: dict) -> str:
         lines.append("Scored by the deterministic matcher (no judge).")
     lines.append("Recall = correct rate with 95% Wilson interval over probes; "
                  "run mean has a bootstrap interval over runs.")
+    excluded = (aggregate.get("headline") or {}).get("excludes_categories") or []
+    if excluded:
+        lines.append(f"Headline recall leaves out: {', '.join(excluded)} (shown separately).")
     lines.append("")
     for backend, data in aggregate["backends"].items():
         if "error" in data:
@@ -63,6 +66,17 @@ def format_summary(aggregate: dict) -> str:
             f"{'':12s}  tokens/conversation in={tok['input_tokens']:.0f} out={tok['output_tokens']:.0f}"
             f"{extra}  cost {cost_txt}"
         )
+        cats = data.get("recall_by_category") or {}
+        if cats:
+            lines.append(f"{'':12s}  by category: " + "  ".join(
+                f"{c} {_pct(d['correct_rate']).strip()} (n={d['n']})" for c, d in cats.items()
+            ))
+        sens = data.get("recall_sensitive")
+        if sens:
+            lines.append(
+                f"{'':12s}  sensitive (not in headline): correct {_pct(sens['correct_rate']).strip()}"
+                f" refused {_pct(sens['refused_rate']).strip()} (n={sens['n']})"
+            )
         size = data.get("memory_size_end")
         if size:
             lines.append(f"{'':12s}  memory at end: {size['mean']:.0f} {size['unit']}")

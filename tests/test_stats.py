@@ -29,3 +29,11 @@ def test_cohen_kappa():
     assert cohen_kappa(m, j) == pytest.approx(0.4)
     assert cohen_kappa([], []) is None
     assert cohen_kappa(["a", "a"], ["a", "a"]) == 1.0
+
+
+def test_wilson_bounds_contain_the_estimate_exactly_at_the_extremes():
+    for n in (1, 3, 7, 10, 49):
+        assert wilson(0, n)[0] == 0.0 and wilson(n, n)[1] == 1.0
+        for k in range(n + 1):
+            low, high = wilson(k, n)
+            assert low <= k / n <= high

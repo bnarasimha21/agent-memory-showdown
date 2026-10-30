@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Iterable
 
 from src.bundle import load_manifest, new_run_id, read_transcript, utc_now
-from src.scoring.matcher import MATCHER_VERSION, answers_of, match
+from src.scoring.matcher import MATCHER_VERSION, match_record
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def score_probes(records: Iterable[dict], judge=None) -> list[dict]:
     for rec in records:
         if rec.get("type") != "probe":
             continue
-        label, reason = match(rec["response"], answers_of(rec), rec.get("stale") or [])
+        label, reason = match_record(rec)
         score = {k: rec[k] for k in SCORE_KEY}
         score.update(
             matcher_label=label, matcher_reason=reason, judge_label=None,

@@ -18,6 +18,14 @@ otherwise; both scorers' figures are always reported. Every rate carries a 95%
 Wilson interval over probes. Probes from the same run are not independent, so
 the per-run recall mean with a bootstrap interval over runs is reported too;
 it is the more honest interval for comparing backends.
+
+Recall is broken down by fact category (`recall_by_category`). The headline
+figures (`recall_overall`, `recall_by_checkpoint`, `recall_run_mean`) leave out
+the `sensitive` category, which is reported on its own as `recall_sensitive`,
+because whether a model repeats a password back is a safety behaviour rather
+than a memory result. Abstention probes count as correct when the model says it
+was not told. Cost per correct recall divides all spend by correct probes of
+every category.
 """
 
 from __future__ import annotations
@@ -28,6 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from src.bundle import load_manifest, read_transcript
+from src.dataset import CATEGORIES, NON_HEADLINE, probe_category
 from src.pricing import Price, price_for
 from src.scoring import LABELS
 from src.stats import bootstrap_mean, cohen_kappa, wilson
@@ -189,6 +198,9 @@ def aggregate_records(
 
         by_checkpoint: dict[int, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
         by_run: dict[int, list[str]] = defaultdict(list)
+        by_category: dict[str, list[str]] = defaultdict(list)
+        matcher_by_category: dict[str, list[str]] = defaultdict(list)
+        all_labels: list[str] = []
         primary_labels, matcher_labels, judge_labels = [], [], []
         pairs: list[tuple[str, str]] = []
         judge_errors = 0
@@ -198,29 +210,36 @@ def aggregate_records(
             if score is None:  # a probe without a score: score it with the matcher now
                 score = score_probes([p])[0]
             label = _primary(score, judged)
-            primary_labels.append(label)
-            matcher_labels.append(score["matcher_label"])
-            by_checkpoint[p["checkpoint"]][p["fact_id"]].append(label)
-            by_run[p["run_index"]].append(label)
+            category = probe_category(p)
+            headline = category not in NON_HEADLINE
+            all_labels.append(label)
+            by_category[category].append(label)
+            matcher_by_category[category].append(score["matcher_label"])
+            if headline:
+                primary_labels.append(label)
+                matcher_labels.append(score["matcher_label"])
+                by_checkpoint[p["checkpoint"]][p["fact_id"]].append(label)
+                by_run[p["run_index"]].append(label)
             jl = score.get("judge_label")
             judge_in += score.get("judge_input_tokens", 0)
             judge_out += score.get("judge_output_tokens", 0)
             if jl == "error":
                 judge_errors += 1
             elif jl is not None:
-                judge_labels.append(jl)
+                if headline:
+                    judge_labels.append(jl)
                 pairs.append((score["matcher_label"], jl))
                 if jl != score["matcher_label"]:
                     disagreements.append({
                         "backend": backend, "run_index": p["run_index"],
                         "checkpoint": p["checkpoint"], "fact_id": p["fact_id"],
-                        "question": p["question"], "response": p["response"],
+                        "category": category, "question": p["question"], "response": p["response"],
                         "matcher_label": score["matcher_label"], "judge_label": jl,
                         "judge_rationale": score.get("judge_rationale"),
                     })
             probe_rows.append({
                 "backend": backend, "run_index": p["run_index"], "checkpoint": p["checkpoint"],
-                "fact_id": p["fact_id"], "label": label,
+                "fact_id": p["fact_id"], "category": category, "label": label,
                 "matcher_label": score["matcher_label"], "judge_label": jl,
                 "judge_rationale": score.get("judge_rationale"),
             })
@@ -237,7 +256,8 @@ def aggregate_records(
             (by_run[i].count("correct") / len(by_run[i])) for i in sorted(valid) if by_run[i]
         ]
 
-        n_correct = primary_labels.count("correct")
+        n_correct = all_labels.count("correct")
+        order = [c for c in CATEGORIES if c in by_category] + sorted(set(by_category) - set(CATEGORIES))
         if price is not None:
             total_spend = sum(conv_costs) + (probe_cost_total or 0.0)
             cost_per_correct = total_spend / n_correct if n_correct else None
@@ -266,7 +286,13 @@ def aggregate_records(
             "recall_by_checkpoint": recall_by_checkpoint,
             "recall_overall": _dist(primary_labels),
             "recall_run_mean": bootstrap_mean(run_rates),
-            "matcher": {"recall_overall": _dist(matcher_labels)},
+            "recall_by_category": {c: _dist(by_category[c]) for c in order},
+            "recall_sensitive": (
+                _dist([lab for c in NON_HEADLINE for lab in by_category.get(c, [])])
+                if any(c in by_category for c in NON_HEADLINE) else None
+            ),
+            "matcher": {"recall_overall": _dist(matcher_labels),
+                        "recall_by_category": {c: _dist(matcher_by_category[c]) for c in order}},
             "judge": (
                 {"recall_overall": _dist(judge_labels), "errors": judge_errors,
                  "input_tokens": judge_in, "output_tokens": judge_out}
@@ -286,6 +312,7 @@ def aggregate_records(
                                            "output_tokens * output_per_mtok / 1e6"}
             if price is not None else {"model": model, "unpriced": True}
         ),
+        "headline": {"excludes_categories": sorted(NON_HEADLINE)},
         "agreement": {**_agreement(all_pairs), "disagreement_list": disagreements} if judged else None,
         "backends": summary,
         "probes": probe_rows,

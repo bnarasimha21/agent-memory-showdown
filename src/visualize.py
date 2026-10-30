@@ -95,6 +95,70 @@ def plot_label_breakdown_matplotlib(results: dict, output_path: Path) -> None:
     plt.close()
 
 
+def _category_rows(results: dict) -> tuple[list[str], list[str], dict]:
+    """(backends, categories, {backend: {category: dist}}) for recall_by_category."""
+    from src.dataset import CATEGORIES
+
+    backends = [b for b, d in results.items() if "error" not in d and d.get("recall_by_category")]
+    present = {c for b in backends for c in results[b]["recall_by_category"]}
+    categories = [c for c in CATEGORIES if c in present] + sorted(present - set(CATEGORIES))
+    return backends, categories, {b: results[b]["recall_by_category"] for b in backends}
+
+
+def plot_recall_by_category_matplotlib(results: dict, output_path: Path) -> None:
+    """Grouped bars: correct rate per category per backend, with Wilson intervals.
+    `sensitive` is drawn too but is not part of the headline number."""
+    backends, categories, data = _category_rows(results)
+    if not backends:
+        return
+    fig, ax = plt.subplots(figsize=(10, 5))
+    width = 0.8 / len(backends)
+    for i, backend in enumerate(backends):
+        xs, ys, lo, hi = [], [], [], []
+        for j, cat in enumerate(categories):
+            d = data[backend].get(cat)
+            if not d:
+                continue
+            rate = d["correct_rate"] * 100
+            xs.append(j + i * width - 0.4 + width / 2)
+            ys.append(rate)
+            lo.append(rate - d["correct_ci95"][0] * 100)
+            hi.append(d["correct_ci95"][1] * 100 - rate)
+        ax.bar(xs, ys, width, yerr=[lo, hi], capsize=3, label=backend,
+               color=BACKEND_COLORS.get(backend, "#888"))
+    ax.set_xticks(range(len(categories)))
+    ax.set_xticklabels([c + (" *" if c == "sensitive" else "") for c in categories])
+    ax.set_ylabel("Correct (%)")
+    ax.set_ylim(0, 105)
+    ax.set_title("Recall by fact category (* not in the headline number)")
+    ax.legend(fontsize=8)
+    plt.tight_layout()
+    plt.savefig(str(output_path), dpi=150)
+    plt.close()
+
+
+def plot_recall_by_category_plotly(results: dict, output_path: Path) -> None:
+    backends, categories, data = _category_rows(results)
+    if not backends:
+        return
+    fig = go.Figure()
+    for backend in backends:
+        ys = [data[backend][c]["correct_rate"] * 100 if c in data[backend] else None
+              for c in categories]
+        fig.add_trace(go.Bar(name=backend, x=categories, y=ys,
+                             marker_color=BACKEND_COLORS.get(backend, "#888")))
+    fig.update_layout(
+        barmode="group", title="Recall by fact category (sensitive is not in the headline number)",
+        yaxis_title="Correct (%)", yaxis=dict(range=[0, 105]), template="plotly_white",
+        width=900, height=450,
+    )
+    fig.write_html(str(output_path.with_suffix(".html")))
+    try:
+        fig.write_image(str(output_path.with_suffix(".png")))
+    except Exception:
+        pass
+
+
 def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
     curves = _get_recall_curve_data(results)
     fig = go.Figure()
@@ -303,6 +367,8 @@ def generate_all(results_path: str | Path, out_dir: str | Path) -> None:
     plot_memory_decay_curve_matplotlib(results, out_dir / "memory_decay_curve.png")
     plot_label_breakdown_plotly(results, out_dir / "probe_outcomes")
     plot_label_breakdown_matplotlib(results, out_dir / "probe_outcomes.png")
+    plot_recall_by_category_plotly(results, out_dir / "recall_by_category")
+    plot_recall_by_category_matplotlib(results, out_dir / "recall_by_category.png")
     plot_latency_bar_plotly(results, out_dir / "latency_bar")
     plot_latency_bar_matplotlib(results, out_dir / "latency_bar.png")
     plot_latency_by_turn_plotly(results, out_dir / "latency_by_turn")

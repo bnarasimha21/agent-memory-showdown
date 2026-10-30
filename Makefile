@@ -35,13 +35,15 @@ clean:
 run-local:
 	$(PYTHON) run_benchmark.py
 
-# Quick smoke test (2 runs, 10 turns, buffer + summary only)
+# Quick smoke test (2 runs, 10 turns, buffer + summary only, a small fact mix)
 run-quick:
-	$(PYTHON) run_benchmark.py --runs 2 --turns 10 --backends buffer summary
+	$(PYTHON) run_benchmark.py --runs 2 --turns 10 --checkpoints 5 10 --backends buffer summary \
+		--facts extraction=2,update=1,abstention=1
 
 # Free offline run with the deterministic fake LLM and embeddings (services must be up)
 run-fake:
-	LLM_PROVIDER=fake EMBEDDING_PROVIDER=fake $(PYTHON) run_benchmark.py --runs 2 --turns 20 --checkpoints 10 20
+	LLM_PROVIDER=fake EMBEDDING_PROVIDER=fake JUDGE_PROVIDER=fake $(PYTHON) run_benchmark.py --runs 2 --turns 30 \
+		--checkpoints 15 30 --facts extraction=1,update=1,temporal=1,multi_hop=1,abstention=1,sensitive=1
 
 # Create the local virtualenv used by the test targets
 venv:

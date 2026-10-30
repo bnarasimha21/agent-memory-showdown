@@ -9,8 +9,11 @@ The input below is JSON with:
   acceptable alternatives (any one of them counts). Paraphrases, different
   date formats and different number formats of the same value count.
 - `stale_values`: outdated values that were true earlier in the conversation
-  but have since been replaced. Giving one of these instead of the current
-  value is wrong.
+  but have since been replaced. A response whose answer is a stale value is
+  wrong; mentioning the old value as history while giving the current one
+  is fine.
+- `expect_abstention`: true when the user never told the assistant this at
+  all. There is no expected value and `required_parts` is empty.
 - `response`: the assistant's response.
 
 Labels:
@@ -21,6 +24,11 @@ Labels:
 - `refused`: it declines to give the information (for privacy, security or
   policy reasons), whether or not it also repeats the value.
 - `abstained`: it says it does not know or was not told, and gives no value.
+
+When `expect_abstention` is true, grade differently: `correct` if the response
+says it does not know or was not told and gives no value; `wrong` if it gives
+any value (including one that belongs to someone else in the conversation);
+`refused` if it only declines for privacy or policy reasons.
 
 Judge only the response against the expected answer. Do not reward extra
 detail and do not penalize politeness.

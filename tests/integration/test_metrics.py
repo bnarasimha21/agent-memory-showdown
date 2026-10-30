@@ -21,7 +21,8 @@ def test_latency_split_and_cost(services, tmp_path, monkeypatch, fresh_config):
     monkeypatch.setenv("FAKE_LLM_OUTPUT_TOKENS", str(OUT_TOK))
     fresh_config()
     bundle = run_benchmark([AVAILABLE_BACKENDS[b] for b in BACKENDS], num_runs=1, num_turns=10,
-                           checkpoints=[10], results_dir=tmp_path, judge=False)
+                           checkpoints=[10], results_dir=tmp_path, judge=False,
+                           composition={"extraction": 2, "abstention": 1})
     agg = json.loads((bundle / "aggregate.json").read_text())
     price = price_for("fake-memory-v1")
     for name in BACKENDS:
