@@ -61,3 +61,39 @@ def test_summary_write_counts_the_summarizer_call():
     assert (ex.write_input_tokens, ex.write_output_tokens) == (5, 2)
     assert (ex.input_tokens, ex.output_tokens) == (5, 2)
     assert "Baxter" in backend.retrieve("x").text
+
+
+class _OneSearchStore:
+    """Stands in for the vector store; counts similarity searches."""
+
+    def __init__(self):
+        self.searches = 0
+
+    def similarity_search(self, query, k):
+        from langchain_core.documents import Document
+
+        self.searches += 1
+        return [Document(page_content="Human: hi\nAI: hello")][:k]
+
+
+class _NoCalls:
+    def __getattr__(self, name):
+        raise AssertionError(f"retrieve made an extra call: client.{name}")
+
+
+@pytest.mark.parametrize("name", ["qdrant", "pgvector"])
+def test_vector_retrieve_is_one_search_and_nothing_else(name, monkeypatch):
+    """retrieve_ms is compared across backends: no row count or new connection inside it."""
+    import psycopg
+
+    def no_connect(*args, **kwargs):
+        raise AssertionError("retrieve opened a database connection")
+
+    monkeypatch.setattr(psycopg, "connect", no_connect)
+    backend = AVAILABLE_BACKENDS[name](llm=FakeMemoryChatModel(), k=3)
+    backend._store = _OneSearchStore()
+    backend._client = _NoCalls()
+    backend._collection = "unused"
+    result = backend.retrieve("what did I say?")
+    assert backend._store.searches == 1
+    assert result.items == ["Human: hi\nAI: hello"]

@@ -49,8 +49,9 @@ class QdrantMemoryBackend(BaseMemoryBackend):
             client.close()
 
     def retrieve(self, query: str) -> Retrieval:
-        if self._point_count() == 0:
-            return Retrieval(text="", items=[])
+        # One similarity search and nothing else: retrieve_ms is compared across
+        # backends, so no extra round trip (a row count, a connection) belongs here.
+        # An empty store simply returns no documents.
         docs = self._store.similarity_search(query, k=self.k)
         items = [d.page_content for d in docs]
         return Retrieval(text="\n\n".join(items), items=items)

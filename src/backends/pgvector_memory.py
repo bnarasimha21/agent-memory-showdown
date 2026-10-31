@@ -51,8 +51,9 @@ class PGVectorMemoryBackend(BaseMemoryBackend):
                 store._engine.dispose()
 
     def retrieve(self, query: str) -> Retrieval:
-        if not self._rows():
-            return Retrieval(text="", items=[])
+        # One similarity search and nothing else: retrieve_ms is compared across
+        # backends, so no extra round trip (a row count, a connection) belongs here.
+        # An empty store simply returns no documents.
         docs = self._store.similarity_search(query, k=self.k)
         items = [d.page_content for d in docs]
         return Retrieval(text="\n\n".join(items), items=items)
