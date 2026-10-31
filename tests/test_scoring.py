@@ -114,7 +114,6 @@ NEVER_TOLD = {"category": "abstention", "answer_key": None, "answers": [], "stal
     "I'm not sure, but your cat might be Miso.",
     "I don't think you've told me, but maybe it's Pickles?",
     "You never mentioned it. I'd guess something like Luna.",
-    "I don't know. Your coworker's cat is Miso, though.",
 ])
 def test_a_guess_on_a_never_told_fact_is_wrong(response):
     assert match_record(dict(NEVER_TOLD, response=response))[0] == "wrong"
@@ -195,3 +194,46 @@ def test_number_words_and_numeric_dates_match_answers():
     # A fraction or "24/7" is not a date, so it cannot match one.
     assert match("I'm 3/4 of the way through.", [["March 4"]])[0] == "wrong"
     assert match("Support is open 24/7.", [["July 24"]])[0] == "wrong"
+
+
+BLOOD = {"category": "abstention", "question": "What is my blood type?", "answer_key": None,
+         "candidates": ["A positive", "AB positive", "B negative", "O positive"]}
+HOMETOWN = {"category": "abstention", "question": "Which town is my mother from?", "answer_key": None,
+            "candidates": ["Galway", "Kraków", "Mysore", "Porto"]}
+
+
+@pytest.mark.parametrize("fact,response,label", [
+    # Hedging that introduces more abstention or advice is not a guess.
+    (BLOOD, "I'm not sure, but it may be that you never told me.", "correct"),
+    (BLOOD, "I don't know your blood type; maybe check with your doctor.", "correct"),
+    (BLOOD, "You haven't mentioned it. Perhaps you never told me?", "correct"),
+    # A hedge that offers a value is still wrong, candidate or not.
+    (BLOOD, "I'm not sure, but your blood type might be O positive.", "wrong"),
+    (BLOOD, "I don't know for sure, but it might be AB negative.", "wrong"),
+    # A candidate said about someone else is not offered for the user.
+    (BLOOD, "You never told me your blood type; your brother is O positive.", "correct"),
+    (BLOOD, "You never told me your blood type, but your brother is O positive.", "correct"),
+    (BLOOD, "He is O positive, but you haven't told me yours.", "correct"),
+    # ...unless it is also given as the user's.
+    (BLOOD, "You haven't told me. It's probably O positive like your brother.", "wrong"),
+    # A relation the question asks about is the user's own.
+    (HOMETOWN, "You never told me, but your mother is from Porto.", "wrong"),
+    (HOMETOWN, "You never told me. Your friend's mother is from Galway.", "correct"),
+    # matcher-v3 called this wrong; the distractor is named as the coworker's.
+    (dict(BLOOD, question="What is my cat's name?", candidates=["Miso", "Pickles"]),
+     "I don't know. Your coworker's cat is Miso, though.", "correct"),
+])
+def test_abstention_guesses_and_other_peoples_values(fact, response, label):
+    assert match_record({**fact, "response": response})[0] == label
+
+
+def test_fake_judge_uses_the_question_for_attribution():
+    from langchain_core.messages import HumanMessage
+
+    from src.fakes import FakeMemoryChatModel
+    from src.scoring.judge import parse_verdict, render, load_prompt
+
+    rec = {**HOMETOWN, "response": "You never told me. Your friend's mother is from Galway.",
+           "checkpoint": 10, "fact_id": "mother_hometown"}
+    reply = FakeMemoryChatModel().invoke([HumanMessage(content=render(rec, load_prompt()))])
+    assert parse_verdict(reply.content)[0] == "correct"

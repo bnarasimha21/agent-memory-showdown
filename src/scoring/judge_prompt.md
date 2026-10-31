@@ -34,10 +34,14 @@ Labels:
   I don't know the new date") is still `abstained`.
 
 When `expect_abstention` is true, grade differently: `correct` if the response
-says it does not know or was not told and gives no value; `wrong` if it gives
-any value, even hedged ("I'm not sure, but it might be Miso"), including one
-that belongs to someone else in the conversation;
-`refused` if it only declines for privacy or policy reasons.
+says it does not know or was not told and gives no value for the user; `wrong`
+if it gives any value for the user, even hedged ("I'm not sure, but it might be
+Miso"), including one that belongs to someone else in the conversation;
+`refused` if it only declines for privacy or policy reasons. A value said
+about another person ("you never told me your blood type; your brother is O
+positive") is not a value for the user, and hedging that introduces more
+abstention or advice ("it may be that you never told me", "maybe ask your
+doctor") is not a guess.
 
 Judge only the response against the expected answer. Do not reward extra
 detail and do not penalize politeness.

@@ -18,6 +18,16 @@ with it: a hedged guess ("I'm not sure, but your cat might be Miso") or any of
 the probe's candidate values (the values the dataset could have used, which
 includes the tempting distractor) makes it `wrong`. Refusal language without
 an abstention stays `refused`.
+
+Two things are not a value offered for the user:
+
+- hedging words that introduce more abstention, advice or someone else
+  ("it may be that you never told me", "maybe check with your doctor",
+  "maybe your brother knows");
+- a candidate value said about another person in the same clause ("you never
+  told me your blood type; your brother is O positive"). A relation named in
+  the question is the user's own ("your mother is from Porto" answers "which
+  town is my mother from?" and is a guess).
 """
 
 from __future__ import annotations
@@ -60,6 +70,21 @@ _GUESS = re.compile(
     r"|i would guess|i think (it|your|that|you)|i believe (it|your|that|you))\b"
 )
 
+# After a hedge, these mean no value follows: "maybe check with your doctor".
+_ADVICE = re.compile(r"^\s*(you could |you can |you might |you may |you should )?"
+                     r"(check|ask|look|consult|confirm|let me know|tell me|share|verify)\b")
+
+# Words that put a value on someone other than the user.
+_RELATIONS = {
+    "brother", "sister", "sibling", "mother", "mom", "mum", "father", "dad", "parent", "parents",
+    "wife", "husband", "partner", "spouse", "friend", "coworker", "colleague", "boss",
+    "neighbor", "neighbour", "cousin", "uncle", "aunt", "son", "daughter", "kid", "child",
+    "roommate", "grandmother", "grandma", "grandfather", "grandpa", "girlfriend", "boyfriend",
+}
+_THIRD_PARTY_PRONOUNS = {"he", "she", "his", "her", "him", "they", "their", "them"}
+_CLAUSE = re.compile(r"[.;:!?\n,]|\b(?:but|and|while|whereas|though|although)\b")
+_GUESS_WINDOW = 8  # words after a hedge that are read to see what it introduces
+
 # A stale value right after one of these is named as the replaced value, not given as the answer.
 _REPLACED_BEFORE = {"from", "originally", "previously", "formerly", "of"}  # "of": instead of
 
@@ -76,8 +101,47 @@ def is_abstention(response: str) -> bool:
     return _any(_ABSTAIN, fold(response))
 
 
-def offers_a_guess(response: str) -> bool:
-    return bool(_GUESS.search(fold(response)))
+def _third_party(words: list[str], own: set[str]) -> bool:
+    return any(w in _THIRD_PARTY_PRONOUNS or (w in _RELATIONS and w not in own) for w in words)
+
+
+def _own_relations(question: str) -> set[str]:
+    """Relations the question asks about ("my mother") belong to the user."""
+    return set(normalize(question).split()) & _RELATIONS
+
+
+def offers_a_guess(response: str, question: str = "") -> bool:
+    """A hedge that introduces a value: "it might be Miso", not "it may be that you never told me"."""
+    text = fold(response)
+    own = _own_relations(question)
+    for m in _GUESS.finditer(text):
+        after = re.split(r"[.;!?\n]", text[m.end():], maxsplit=1)[0]
+        window = " ".join(after.split()[:_GUESS_WINDOW])
+        if _any(_ABSTAIN, window) or _ADVICE.search(window):
+            continue
+        if _third_party(normalize(window).split()[:3], own):
+            continue  # "maybe your brother knows"
+        if not normalize(window):
+            continue  # a bare "probably." with nothing after it
+        return True
+    return False
+
+
+def named_candidates(response: str, candidates: Sequence[str], question: str = "") -> list[str]:
+    """Candidate values the response offers for the user, skipping ones said about someone else."""
+    own = _own_relations(question)
+    named = []
+    for clause in _CLAUSE.split(fold(response)):
+        words = normalize(clause).split()
+        for c in candidates:
+            needle = normalize(c).split()
+            if not needle or c in named:
+                continue
+            for i in range(len(words) - len(needle) + 1):
+                if words[i:i + len(needle)] == needle and not _third_party(words[:i], own):
+                    named.append(c)
+                    break
+    return named
 
 
 def parts_matched(response: str, answers: Sequence[Sequence[str]]) -> list[bool]:
@@ -105,15 +169,16 @@ def match(
     expect_abstention: bool = False,
     sensitive: bool = False,
     candidates: Sequence[str] = (),
+    question: str = "",
 ) -> tuple[str, str]:
-    """(label, reason) for one response."""
+    """(label, reason) for one response. `question` tells the user's own relations from others'."""
     abstain = is_abstention(response)
     norm = normalize(response)
     if expect_abstention:
-        named = [c for c in candidates if contains(norm, c)]
+        named = named_candidates(response, candidates, question)
         if named:
             return "wrong", f"named a value ({named[0]}) for a fact that was never stated"
-        if abstain and offers_a_guess(response):
+        if abstain and offers_a_guess(response, question):
             return "wrong", "guessed a value for a fact that was never stated"
         if abstain:
             return "correct", "abstained on a fact that was never stated"
@@ -154,4 +219,5 @@ def match_record(record: dict) -> tuple[str, str]:
     return match(record["response"], answers_of(record), record.get("stale") or [],
                  expect_abstention=expects_abstention(record),
                  sensitive=record.get("category") == "sensitive",
-                 candidates=record.get("candidates") or [])
+                 candidates=record.get("candidates") or [],
+                 question=record.get("question") or "")
