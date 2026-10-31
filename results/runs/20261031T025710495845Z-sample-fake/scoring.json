@@ -1,8 +1,0 @@
-{
-  "matcher": "matcher-v2",
-  "scored_at": "2026-10-31T02:57:14Z",
-  "judge_provider": "fake",
-  "judge_model": "fake-judge-v1",
-  "judge_prompt": "src/scoring/judge_prompt.md",
-  "judge_prompt_hash": "c06cca73fba42dce31a2648506749636c2b8e406f9c24e5f22713bf2be6239e7"
-}
