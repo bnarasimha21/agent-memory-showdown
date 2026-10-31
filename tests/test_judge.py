@@ -101,3 +101,32 @@ def test_abstained_verdict_on_an_abstention_probe_counts_as_correct():
     judge = Judge(stub, "stub", "stub")
     assert judge.judge(dict(ABSTAIN, response="No idea."))["label"] == "correct"
     assert judge.judge(dict(PROBE, response="No idea."))["label"] == "abstained"
+
+
+def test_parse_verdict_reads_whole_json_objects():
+    # braces inside the rationale used to defeat the flat-object regex
+    assert parse_verdict('{"label": "wrong", "rationale": "said {Miso} instead"}') == ("wrong", "said {Miso} instead")
+    text = 'Here: {"label": "partial", "rationale": "dose missing", "meta": {"confidence": 0.7}}'
+    assert parse_verdict(text) == ("partial", "dose missing")
+    # a label only inside a nested object is not the verdict
+    assert parse_verdict('{"verdict": {"label": "correct"}}')[0] == "error"
+    # a broken object first, then the real one
+    assert parse_verdict('{oops} then {"label": "abstained", "rationale": "r"}')[0] == "abstained"
+
+
+def test_a_judge_grading_its_own_model_is_flagged(monkeypatch, fresh_config, caplog):
+    from src.scoring import judge as judge_mod
+
+    same = Judge(StubLLM(), "do", "m-1", answering_model="m-1")
+    other = Judge(StubLLM(), "do", "m-2", answering_model="m-1")
+    assert same.info()["judge_is_answering_model"] is True
+    assert other.info()["judge_is_answering_model"] is False
+    # get_judge warns for a real provider, using the bundle's model when rescoring
+    monkeypatch.setattr("src.llm_factory.get_judge_llm", lambda: StubLLM())
+    monkeypatch.setattr("src.llm_factory.judge_model_id", lambda: "m-1")
+    monkeypatch.setenv("JUDGE_PROVIDER", "do")
+    fresh_config()
+    with caplog.at_level("WARNING", logger="src.scoring.judge"):
+        assert judge_mod.get_judge(answering_model="m-1").same_as_answerer
+    assert "favour its own answers" in caplog.text
+    assert not judge_mod.get_judge(answering_model="m-0").same_as_answerer

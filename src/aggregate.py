@@ -14,22 +14,37 @@ correct recall, which is (conversation + probe spend) / correct probes.
 
 Recall figures use the judge label when the bundle was judged (falling back to
 the matcher label for probes the judge could not score) and the matcher label
-otherwise; both scorers' figures are always reported. Every rate carries a 95%
-Wilson interval over probes. Probes from the same run are not independent, so
-the per-run recall mean with a bootstrap interval over runs is reported too;
-it is the more honest interval for comparing backends.
+otherwise; both scorers' figures are always reported. The headline interval is
+run-level: `recall_run_mean` is the mean of the per-run recall rates with a 95%
+Student t interval over runs (a bootstrap over a handful of runs is too
+narrow; it is kept as `bootstrap_ci95`). Every rate also carries a Wilson
+interval over probes, which is only approximate: probes from one run share a
+memory, so they are not independent and that interval is too narrow.
 
 Recall is broken down by fact category (`recall_by_category`). The headline
 figures (`recall_overall`, `recall_by_checkpoint`, `recall_run_mean`) leave out
-the `sensitive` category, which is reported on its own as `recall_sensitive`,
-because whether a model repeats a password back is a safety behaviour rather
-than a memory result. Abstention probes count as correct when the model says it
-was not told. Cost per correct recall divides all spend by correct probes of
-every category.
+two categories, each reported on its own:
+
+- `abstention` (`recall_abstention`): facts that were never told, probed at
+  every checkpoint, correct when the model says it was not told. In the
+  headline they would let a backend that remembers nothing score well.
+- `sensitive` (`recall_sensitive`): whether a model repeats a password back is
+  a safety behaviour rather than a memory result.
+
+Cost per correct recall divides the conversation spend plus the spend on
+headline probes by the correct headline probes.
+
+Backends are compared on paired seeds: run i uses the same dataset for every
+backend, so when a run fails for one backend it is dropped for all of them,
+and every figure comes from the runs that completed everywhere (`seeds`). If
+no run completed for every backend that has any valid run, each backend falls
+back to its own valid runs and `seeds.paired` is false. Either way the dropped
+runs are listed and logged as a warning.
 """
 
 from __future__ import annotations
 
+import logging
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -39,7 +54,9 @@ from src.bundle import load_manifest, read_transcript
 from src.dataset import CATEGORIES, NON_HEADLINE, probe_category
 from src.pricing import Price, price_for
 from src.scoring import LABELS
-from src.stats import bootstrap_mean, cohen_kappa, wilson
+from src.stats import bootstrap_mean, cohen_kappa, t_mean_interval, wilson
+
+logger = logging.getLogger(__name__)
 
 
 def _dist(labels: list[str]) -> dict:
@@ -128,9 +145,27 @@ def aggregate_records(
     all_pairs: list[tuple[str, str]] = []
     disagreements: list[dict] = []
 
+    ends_by_backend = {b: {r["run_index"]: r for r in recs if r["type"] == "run_end"}
+                       for b, recs in by_backend.items()}
+    own_valid = {b: {i for i, r in ends.items() if r.get("error") is None}
+                 for b, ends in ends_by_backend.items()}
+    usable = [v for v in own_valid.values() if v]
+    common = set.intersection(*usable) if usable else set()
+    paired = bool(common)
+    dropped = {b: sorted(v - common) for b, v in sorted(own_valid.items()) if paired and v - common}
+    if dropped:
+        logger.warning(
+            "PAIRED SEEDS: comparing backends on runs %s only; dropped runs that failed elsewhere: %s",
+            sorted(common), dropped)
+    elif usable and not paired:
+        logger.warning(
+            "UNPAIRED: no run completed for every backend, so each backend uses its own valid runs "
+            "(%s); the backends are not compared on the same datasets",
+            {b: sorted(v) for b, v in sorted(own_valid.items())})
+
     for backend, recs in by_backend.items():
-        ends = {r["run_index"]: r for r in recs if r["type"] == "run_end"}
-        valid = {i for i, r in ends.items() if r.get("error") is None}
+        ends = ends_by_backend[backend]
+        valid = own_valid[backend] & common if paired else own_valid[backend]
         if not valid:
             errors = sorted({r.get("error") or "incomplete" for r in ends.values()})
             summary[backend] = {"error": "All runs failed", "run_errors": errors}
@@ -202,7 +237,7 @@ def aggregate_records(
         matcher_by_category: dict[str, list[str]] = defaultdict(list)
         primary_labels, matcher_labels, judge_labels = [], [], []
         pairs: list[tuple[str, str]] = []
-        judge_errors = 0
+        judge_errors = judge_ok = 0
         judge_in = judge_out = 0
         headline_probe_in = headline_probe_out = 0
         for p in probes:
@@ -227,6 +262,7 @@ def aggregate_records(
             if jl == "error":
                 judge_errors += 1
             elif jl is not None:
+                judge_ok += 1
                 if headline:
                     judge_labels.append(jl)
                 pairs.append((score["matcher_label"], jl))
@@ -278,8 +314,10 @@ def aggregate_records(
 
         summary[backend] = {
             "num_runs": len(ends),
-            "num_valid_runs": len(valid),
-            "scorer": "judge" if judged else "matcher",
+            "num_valid_runs": len(own_valid[backend]),
+            "runs_used": sorted(valid),
+            # Every judge call failing leaves the matcher label on every probe.
+            "scorer": "judge" if judged and judge_ok else "matcher",
             "latency": _latency(turns),
             "probe_latency": _latency(probes),
             "latency_by_turn": latency_by_turn,
@@ -288,12 +326,11 @@ def aggregate_records(
             "memory_size_end": memory_size,
             "recall_by_checkpoint": recall_by_checkpoint,
             "recall_overall": _dist(primary_labels),
-            "recall_run_mean": bootstrap_mean(run_rates),
+            "recall_run_mean": {**t_mean_interval(run_rates, bounds=(0.0, 1.0)),
+                                "bootstrap_ci95": bootstrap_mean(run_rates)["ci95"]},
             "recall_by_category": {c: _dist(by_category[c]) for c in order},
-            "recall_sensitive": (
-                _dist([lab for c in NON_HEADLINE for lab in by_category.get(c, [])])
-                if any(c in by_category for c in NON_HEADLINE) else None
-            ),
+            **{f"recall_{c}": (_dist(by_category[c]) if c in by_category else None)
+               for c in sorted(NON_HEADLINE)},
             "matcher": {"recall_overall": _dist(matcher_labels),
                         "recall_by_category": {c: _dist(matcher_by_category[c]) for c in order}},
             "judge": (
@@ -316,6 +353,11 @@ def aggregate_records(
             if price is not None else {"model": model, "unpriced": True}
         ),
         "headline": {"excludes_categories": sorted(NON_HEADLINE)},
+        "seeds": {
+            "paired": paired,
+            "runs": sorted(common) if paired else None,
+            "dropped": dropped,
+        },
         "agreement": {**_agreement(all_pairs), "disagreement_list": disagreements} if judged else None,
         "backends": summary,
         "probes": probe_rows,

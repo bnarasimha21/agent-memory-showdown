@@ -183,7 +183,9 @@ class FakeMemoryChatModel(BaseChatModel):
         raw = text.split("JUDGE_INPUT_JSON:", 1)[1]
         data = json.loads(raw[raw.index("{"): raw.rindex("}") + 1])
         label, reason = match(data["response"], data["required_parts"], data.get("stale_values", []),
-                              expect_abstention=bool(data.get("expect_abstention")))
+                              expect_abstention=bool(data.get("expect_abstention")),
+                              sensitive=bool(data.get("sensitive")),
+                              candidates=data.get("candidate_values") or [])
         return json.dumps({"label": label, "rationale": f"fake judge (matcher rule): {reason}"})
 
     def _generate(

@@ -13,6 +13,7 @@ from src.backends.base import (
     usage_from_message,
 )
 from src.prompts import render_summary_prompt
+from src.retry import invoke_with_retry
 
 
 class SummaryMemoryBackend(BaseMemoryBackend):
@@ -30,7 +31,7 @@ class SummaryMemoryBackend(BaseMemoryBackend):
 
     def write(self, human_message: str, ai_message: str) -> WriteStats:
         prompt = render_summary_prompt(self._summary, format_exchange(human_message, ai_message))
-        message = self.llm.invoke([HumanMessage(content=prompt)])
+        message, _retries, _ms = invoke_with_retry(self.llm, [HumanMessage(content=prompt)], "summary write")
         self._summary = str(message.content).strip()
         in_tok, out_tok = usage_from_message(message)
         return WriteStats(llm_calls=1, input_tokens=in_tok, output_tokens=out_tok)

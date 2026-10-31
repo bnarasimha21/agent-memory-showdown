@@ -5,7 +5,8 @@ Each exchange is one item in a namespace that belongs to this session
 model; retrieval is the store's semantic `search` with `limit=k`. It runs on
 the same Postgres container as the `pgvector` backend. The store's tables
 (`store`, `store_vectors`) are shared by every session and created on first
-use; teardown deletes this session's items, which empties its namespace.
+use. Setup deletes anything already in this session's namespace and teardown
+deletes this session's items, so the namespace starts and ends empty.
 
 This is what LangGraph's built-in memory does when an agent saves every turn;
 it stores raw turns like `qdrant` and `pgvector` and differs in the storage
@@ -53,17 +54,23 @@ class LangGraphStoreMemoryBackend(BaseMemoryBackend):
             },
         )
         self._store.setup()
+        self._clear()
         self._next = 0
 
+    def _clear(self) -> None:
+        for key, _ in self._items():
+            self._store.delete(self.namespace, key)
+
     def teardown(self) -> None:
-        store = getattr(self, "_store", None)
-        if store is None:
-            return
+        # Setup can fail after the connection opened (the store constructor or
+        # its migrations raising); the connection is closed either way.
+        conn = getattr(self, "_conn", None)
         try:
-            for key, _ in self._items():
-                store.delete(self.namespace, key)
+            if getattr(self, "_store", None) is not None:
+                self._clear()
         finally:
-            self._conn.close()
+            if conn is not None:
+                conn.close()
 
     def retrieve(self, query: str) -> Retrieval:
         hits = self._store.search(self.namespace, query=query, limit=self.k)

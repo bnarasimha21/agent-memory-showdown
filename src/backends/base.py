@@ -28,6 +28,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 
 from src.prompts import render_chat_prompt
+from src.retry import invoke_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -160,9 +161,8 @@ class BaseMemoryBackend(ABC):
         return {"size": fp["size"], "unit": fp["unit"]}
 
     def _call_llm(self, prompt: str) -> tuple[str, int, int, float]:
-        start = time.perf_counter()
-        message = self.llm.invoke([HumanMessage(content=prompt)])
-        llm_ms = (time.perf_counter() - start) * 1000
+        message, _retries, llm_ms = invoke_with_retry(self.llm, [HumanMessage(content=prompt)],
+                                                      f"{self.name} answer")
         input_tokens, output_tokens = usage_from_message(message)
         content = message.content if isinstance(message.content, str) else str(message.content)
         return content, input_tokens, output_tokens, llm_ms

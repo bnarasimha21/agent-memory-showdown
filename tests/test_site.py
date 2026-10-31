@@ -499,3 +499,34 @@ def test_committed_sample_is_labelled_and_builds(tmp_path, no_network):
     page = site_build.build([bundle], tmp_path / "site").read_text()
     assert page.count("Sample run, not a benchmark result") == 1
     assert all(f"<td>{label}</td>" in page for label in bundle.backends)
+
+
+def test_headline_recall_is_the_run_mean_with_its_t_interval(runs, tmp_path):
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    block = export.readme_block([bundle], load_legacy())
+    assert "Recall, run mean [95% t CI]" in block and "Per probe [approx. Wilson]" in block
+    assert "Student t interval over runs" in block
+    for label, data in bundle.backends.items():
+        r = headline_row(data)
+        row = next(line for line in block.splitlines() if line.startswith(f"| {label} |"))
+        cells = [c.strip() for c in row.strip("|").split("|")]
+        assert cells[1] == f"{export.pct(r['run_mean'])} {export.ci(r['run_mean_ci'])}"
+        assert cells[2] == f"{export.pct(r['recall'])} {export.ci(r['recall_ci'])}"
+        assert data["recall_run_mean"]["method"] == "t"
+    summary = export.latest_run_summary(bundle)["backends"][0]
+    first = headline_row(next(iter(bundle.backends.values())))
+    assert summary["recallPct"] == round(first["run_mean"] * 100, 1)
+    assert summary["perProbeRecallPct"] == round(first["recall"] * 100, 1)
+    page = site_build.build([bundle], tmp_path / "site").read_text()
+    assert "Recall (run mean)" in page and "approx. 95% Wilson" in page
+
+
+def test_one_run_shows_no_interval_rather_than_a_point(tmp_path):
+    bundle_path = run_benchmark([AVAILABLE_BACKENDS["buffer"]], num_runs=1, num_turns=10,
+                                checkpoints=[10], composition={"extraction": 1},
+                                results_dir=tmp_path, judge=False)
+    bundle = load_bundle(bundle_path)
+    block = "\n".join(export.v2_markdown(bundle))
+    row = next(line for line in block.splitlines() if line.startswith("| buffer |"))
+    assert row.split("|")[2].strip().endswith("n/a")

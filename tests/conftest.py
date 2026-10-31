@@ -31,7 +31,7 @@ FORCED_ENV = {
 for _key in ("FAKE_LLM_SLEEP_MS", "FAKE_LLM_INPUT_TOKENS", "FAKE_LLM_OUTPUT_TOKENS",
              "CHECKPOINTS", "RECALL_TURNS", "SEED_TURNS", "RETRIEVAL_K", "NUM_RUNS",
              "NUM_TURNS", "BASE_SEED", "RESULTS_DIR", "JUDGE", "JUDGE_MODEL",
-             "PRICING_FILE"):
+             "PRICING_FILE", "LLM_MAX_RETRIES", "LLM_RETRY_BASE_S"):
     os.environ.pop(_key, None)
 os.environ.update(FORCED_ENV)
 

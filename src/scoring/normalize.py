@@ -2,9 +2,15 @@
 
 `tokens(text)` folds case and accents (NFKD), removes possessive 's, splits
 digits from units ("10mg" -> "10 mg"), drops ordinal suffixes ("15th" -> "15"),
-turns small number words into digits, strips punctuation, and replaces dates
-written as "March 15", "15 March" or "15th of March" with one canonical token
+turns number words from zero to ninety-nine into digits ("twenty-one" -> "21"),
+strips punctuation, and replaces dates written as "March 15", "15 March",
+"15th of March", "3/15" or "2027-03-15" with one canonical token
 ("date-03-15"), so "march 15" can only match a date and never "turn 15".
+
+Numeric dates without a month name are read month first ("4/9" is April 9,
+the US order the answering models default to), unless the first number cannot
+be a month ("15/3" is March 15). The dataset writes every date with a month
+name, so this only matters for how a model chooses to answer.
 """
 
 from __future__ import annotations
@@ -24,8 +30,18 @@ NUMBER_WORDS = {
     "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
     "eleven": "11", "twelve": "12", "thirteen": "13", "fourteen": "14",
     "fifteen": "15", "sixteen": "16", "seventeen": "17", "eighteen": "18",
-    "nineteen": "19", "twenty": "20", "thirty": "30",
+    "nineteen": "19",
 }
+TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
+        "eighty": 80, "ninety": 90}
+NUMBER_WORDS.update({w: str(n) for w, n in TENS.items()})
+_UNITS = {w: int(d) for w, d in NUMBER_WORDS.items() if len(d) == 1 and d != "0"}
+
+# After "<day> may", these words mean "may" is the verb ("15 may be late").
+_MAY_VERB_NEXT = {"be", "have", "not", "need", "want", "get", "take", "come", "go", "arrive",
+                  "change", "also", "still", "well", "just", "move", "work", "help"}
+_MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "july", "august",
+                "september", "october", "november", "december"]
 
 _APOSTROPHES = str.maketrans({"’": "'", "‘": "'", "ʼ": "'"})
 
@@ -56,9 +72,9 @@ def _dates(tokens: list[str]) -> list[str]:
         # day month / day of month: "15 march", "15 of march"
         if _day(tok) and nxt is not None:
             after = tokens[i + 2] if i + 2 < len(tokens) else None
-            # "may" is also a verb ("15 may be"), so only read it as a month at
-            # the end of the text or before a year.
-            ambiguous = nxt == "may" and after is not None and not (after.isdigit() and len(after) == 4)
+            # "may" is also a verb ("15 may be late"), so after a number it is
+            # only read as a month unless a verb-like word follows.
+            ambiguous = nxt == "may" and after in _MAY_VERB_NEXT
             if nxt in MONTHS and not ambiguous:
                 out.append(f"date-{MONTHS[nxt]:02d}-{_day(tok):02d}")
                 i += 2
@@ -72,14 +88,47 @@ def _dates(tokens: list[str]) -> list[str]:
     return out
 
 
+def _numeric_date(m: re.Match) -> str:
+    if m["iso_month"]:
+        month, day = int(m["iso_month"]), int(m["iso_day"])
+    else:
+        a, b = int(m["a"]), int(m["b"])
+        month, day = (a, b) if a <= 12 else (b, a)
+    if not (1 <= month <= 12 and 1 <= day <= 31):
+        return m[0]
+    return f" {_MONTH_NAMES[month - 1]} {day} "
+
+
+_NUMERIC_DATE = re.compile(
+    r"\b(?:\d{4}-(?P<iso_month>\d{1,2})-(?P<iso_day>\d{1,2})"
+    r"|(?P<a>\d{1,2})/(?P<b>\d{1,2})(?:/\d{2,4})?)\b"
+)
+
+
+def _join_number_words(words: list[str]) -> list[str]:
+    """"twenty one" (the hyphen is already gone) -> "21"."""
+    out: list[str] = []
+    i = 0
+    while i < len(words):
+        w = words[i]
+        nxt = words[i + 1] if i + 1 < len(words) else None
+        if w in TENS and nxt in _UNITS:
+            out.append(str(TENS[w] + _UNITS[nxt]))
+            i += 2
+            continue
+        out.append(NUMBER_WORDS.get(w, w))
+        i += 1
+    return out
+
+
 def tokens(text: str) -> list[str]:
     t = fold(text)
+    t = _NUMERIC_DATE.sub(_numeric_date, t)
     t = re.sub(r"'s\b", "", t)
     t = re.sub(r"\b(\d+)(st|nd|rd|th)\b", r"\1", t)
     t = re.sub(r"(\d)([a-z])", r"\1 \2", t)
     t = re.sub(r"[^a-z0-9]+", " ", t)
-    words = [NUMBER_WORDS.get(w, w) for w in t.split()]
-    return _dates(words)
+    return _dates(_join_number_words(t.split()))
 
 
 def normalize(text: str) -> str:

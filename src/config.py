@@ -58,6 +58,12 @@ class Config:
         self.JUDGE_MODEL: str = env("JUDGE_MODEL", "anthropic-claude-4.5-sonnet")
         self.JUDGE_ENABLED: bool = env("JUDGE", "1").strip().lower() not in ("0", "false", "no")
 
+        # Retries for model calls on HTTP 429/5xx, connection errors and timeouts
+        # (src/retry.py): up to LLM_MAX_RETRIES retries, waiting
+        # LLM_RETRY_BASE_S * 2**n seconds (plus jitter) before retry n+1.
+        self.LLM_MAX_RETRIES: int = int(env("LLM_MAX_RETRIES", "5"))
+        self.LLM_RETRY_BASE_S: float = float(env("LLM_RETRY_BASE_S", "2"))
+
         # Retrieval depth for vector backends
         self.RETRIEVAL_K: int = int(env("RETRIEVAL_K", "4"))
 

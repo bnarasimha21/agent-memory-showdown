@@ -99,6 +99,7 @@ def headline_row(data: dict) -> dict:
         "run_mean": run_mean.get("mean"),
         "run_mean_ci": run_mean.get("ci95"),
         "runs": data.get("num_valid_runs"),
+        "runs_used": run_mean.get("n"),
         "cost_per_1k": cost.get("per_1k_conversations_usd"),
         "cost_per_correct": cost.get("per_correct_recall_usd"),
         "latency_p50": total.get("p50"),

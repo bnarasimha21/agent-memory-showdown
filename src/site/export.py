@@ -37,7 +37,7 @@ def pct(x: float | None, digits: int = 1) -> str:
 
 
 def ci(pair) -> str:
-    return "" if not pair else f"[{pair[0] * 100:.0f}, {pair[1] * 100:.0f}]"
+    return "n/a" if not pair else f"[{pair[0] * 100:.0f}, {pair[1] * 100:.0f}]"
 
 
 def usd(x: float | None, digits: int = 2) -> str:
@@ -54,6 +54,8 @@ def _round(x, digits: int = 1):
 
 
 def k_text(k) -> str:
+    if k is None:
+        return "n/a"
     return ", ".join(str(v) for v in k) if isinstance(k, list) else str(k)
 
 
@@ -93,10 +95,12 @@ def v2_markdown(bundle: Bundle, headline: bool = True) -> list[str]:
         f"{', '.join(str(c) for c in m.get('checkpoints', []))}, model `{m.get('llm_model')}`, "
         f"embeddings `{m.get('embedding_model')}`, k = {k_text(m.get('k'))}. "
         f"Source: [`manifest.json`]({src}/manifest.json), [`aggregate.json`]({src}/aggregate.json). "
-        f"Recall leaves out the `sensitive` category; intervals are 95% (Wilson over probes, "
-        f"bootstrap over runs). " + agreement_text(bundle),
+        f"Recall leaves out the `abstention` and `sensitive` categories (reported on their own on "
+        f"the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% "
+        f"Student t interval over runs; the per-probe Wilson interval is approximate, since probes "
+        f"in one run are not independent. " + agreement_text(bundle),
         "",
-        "| Backend | Recall [95% CI] | Run mean [95% CI] | Probes in recall | Cost / 1K conv | Cost / correct recall "
+        "| Backend | Recall, run mean [95% t CI] | Per probe [approx. Wilson] | Probes in recall | Cost / 1K conv | Cost / correct recall "
         "| Latency p50 / p95 | Memory at end |",
         "|---------|----------------:|------------------:|-------:|---------------:|----------------------:"
         "|------------------:|--------------:|",
@@ -107,8 +111,8 @@ def v2_markdown(bundle: Bundle, headline: bool = True) -> list[str]:
             lines.append(f"| {label} | failed: {r['error']} | | | | | | |")
             continue
         lines.append(
-            f"| {label} | {pct(r['recall'])} {ci(r['recall_ci'])} | {pct(r['run_mean'])} "
-            f"{ci(r['run_mean_ci'])} | {r['headline_n']} | {usd(r['cost_per_1k'])} | "
+            f"| {label} | {pct(r['run_mean'])} {ci(r['run_mean_ci'])} | {pct(r['recall'])} "
+            f"{ci(r['recall_ci'])} | {r['headline_n']} | {usd(r['cost_per_1k'])} | "
             f"{usd(r['cost_per_correct'], 4)} | {ms(r['latency_p50'])} / {ms(r['latency_p95'])} ms | "
             f"{fmt(r['memory_end'])} {r['memory_unit'] or ''} |"
         )
@@ -123,9 +127,12 @@ def agreement_text(bundle: Bundle) -> str:
     if scoring.get("judge_provider") == "fake":
         return (f"Judge `{scoring['judge_model']}` is the offline fake, which applies the matcher rules, "
                 "so its agreement with the matcher says nothing about a real judge.")
+    same = (" It is also the answering model, so it may favour its own answers (self-preference); "
+            "the matcher figures in `aggregate.json` are the check on that."
+            if scoring.get("judge_is_answering_model") else "")
     return (f"Judge `{scoring['judge_model']}`; matcher/judge agreement: Cohen's kappa "
             f"{fmt(agreement.get('kappa'), '.3f')} over {agreement.get('n', 0)} probes "
-            "(every disagreement is listed in `aggregate.json`).")
+            "(every disagreement is listed in `aggregate.json`)." + same)
 
 
 def v1_markdown(legacy: dict) -> list[str]:
@@ -231,8 +238,14 @@ def latest_run_summary(bundle: Bundle) -> dict:
             continue
         rows.append({
             "label": label,
-            "recallPct": None if r["recall"] is None else round(r["recall"] * 100, 1),
-            "recallCi95Pct": [round(v * 100, 1) for v in r["recall_ci"]] if r["recall_ci"] else None,
+            # Headline: mean of per-run recall, 95% t interval over runs (None for one run).
+            "recallPct": None if r["run_mean"] is None else round(r["run_mean"] * 100, 1),
+            "recallCi95Pct": ([round(v * 100, 1) for v in r["run_mean_ci"]]
+                              if r["run_mean_ci"] else None),
+            "recallRuns": r["runs_used"],
+            # Pooled over probes; the Wilson interval is approximate (probes in a run are not independent).
+            "perProbeRecallPct": None if r["recall"] is None else round(r["recall"] * 100, 1),
+            "perProbeApproxCi95Pct": [round(v * 100, 1) for v in r["recall_ci"]] if r["recall_ci"] else None,
             "recallProbes": r["headline_n"],
             "costPer1kUsd": _round(r["cost_per_1k"], 2),
             "latencyP50Ms": _round(r["latency_p50"], 1),

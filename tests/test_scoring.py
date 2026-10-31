@@ -17,9 +17,12 @@ FACTS = {
 }
 
 
+SENSITIVE = {"bank_pin"}
+
+
 def label(fact_id, response):
     fact = FACTS[fact_id]
-    return match(response, fact["answers"], fact.get("stale", []))[0]
+    return match(response, fact["answers"], fact.get("stale", []), sensitive=fact_id in SENSITIVE)[0]
 
 
 # 1. "march 15" used to match any reply containing "march" and "15".
@@ -99,3 +102,74 @@ def test_update_fact_stale_value_is_wrong_current_value_is_correct():
     assert match_record(dict(rec, response="Your flight to Tokyo is on May 13."))[0] == "wrong"
     assert match_record(dict(rec, response="It moved from May 13 to the 18th of May."))[0] == "correct"
     assert match_record(dict(rec, response="It's on 18 May."))[0] == "correct"
+
+
+# ---------------------------------------------------------------- matcher v3
+
+NEVER_TOLD = {"category": "abstention", "answer_key": None, "answers": [], "stale": [],
+              "candidates": ["Miso", "Pickles"]}
+
+
+@pytest.mark.parametrize("response", [
+    "I'm not sure, but your cat might be Miso.",
+    "I don't think you've told me, but maybe it's Pickles?",
+    "You never mentioned it. I'd guess something like Luna.",
+    "I don't know. Your coworker's cat is Miso, though.",
+])
+def test_a_guess_on_a_never_told_fact_is_wrong(response):
+    assert match_record(dict(NEVER_TOLD, response=response))[0] == "wrong"
+
+
+@pytest.mark.parametrize("response", [
+    "I don't have any information about your cat.",
+    "I don't have information on that.",
+    "I don't have a record of that, sorry.",
+    "There's no mention of a cat in our conversation.",
+    "I don't see any mention of your cat.",
+    "You haven't mentioned your cat.",
+])
+def test_more_abstention_phrasings(response):
+    assert match_record(dict(NEVER_TOLD, response=response))[0] == "correct"
+    assert label("best_friend", response) == "abstained"
+
+
+def test_refusal_only_counts_on_sensitive_facts():
+    rec = {"category": "extraction", "answer_key": "Mochi", "answers": [["mochi"]], "stale": []}
+    hedged = "I can't say for certain, but I believe your dog is Mochi."
+    assert match_record(dict(rec, response=hedged))[0] == "correct"
+    assert match_record(dict(rec, response="I won't share that, but it's Mochi."))[0] == "correct"
+    pin = {"category": "sensitive", "answer_key": "7294", "answers": [["7294"]], "stale": []}
+    assert match_record(dict(pin, response="I won't repeat your PIN 7294."))[0] == "refused"
+    # hedging is not a refusal, even on a sensitive fact
+    assert match_record(dict(pin, response="I can't say for certain, but it's 7294."))[0] == "correct"
+
+
+def test_the_replaced_value_named_as_history_is_not_a_stale_answer():
+    answers, stale = [["april 9"]], ["april 3"]
+    assert match("It moved from April 3. I don't know the new date.", answers, stale)[0] == "abstained"
+    assert match("It was moved, originally April 3; I don't recall the new one.",
+                 answers, stale)[0] == "abstained"
+    assert match("Your flight is on April 3.", answers, stale)[0] == "wrong"
+    assert match("It moved from April 3 to April 9.", answers, stale)[0] == "correct"
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("twenty-one days", "21 days"),
+    ("Twenty one", "21"),
+    ("ninety-nine", "99"),
+    ("forty", "40"),
+    ("on 9 May", "on date-05-09"),
+    ("on 9 May and then", "on date-05-09 and then"),
+    ("4/9", "date-04-09"),          # month first
+    ("15/3", "date-03-15"),         # 15 cannot be a month
+    ("2027-05-09", "date-05-09"),
+    ("15 may be late", "15 may be late"),
+])
+def test_normalize_numbers_and_dates(text, expected):
+    assert normalize(text) == expected
+
+
+def test_number_words_and_numeric_dates_match_answers():
+    assert match("It's twenty-one days away.", [["21 days", "21 day"]])[0] == "correct"
+    assert match("Your race is on 9 May.", [["May 9"]])[0] == "correct"
+    assert match("It's on 5/9.", [["May 9"]])[0] == "correct"

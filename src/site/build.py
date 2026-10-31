@@ -32,6 +32,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from src.bundle import TRANSCRIPT, TRANSCRIPT_GZ, iter_transcript, validate_run_id
+from src.dataset import NON_HEADLINE
 from src.site.data import (
     LEGACY_V1, PAGES_URL, REPO_ROOT, Bundle, headline_row, load_bundle, load_legacy,
     published_bundles,
@@ -49,8 +50,9 @@ KNOWN_LIMITATIONS = [
     "with this model and this kind of conversation, not in general.",
     "Facts are planted by templates (data/facts_v2.yaml) with distractors and filler; real users "
     "state facts less cleanly.",
-    "Probes from one run are not independent, so the per-run mean with a bootstrap interval over "
-    "runs is the interval to use when comparing backends; the Wilson interval over probes is narrower.",
+    "Probes from one run share a memory and are not independent, so the headline interval is a "
+    "Student t interval over per-run recall; the Wilson interval over probes is only approximate "
+    "and too narrow. With few runs the t interval is wide, which is the honest answer.",
     "The judge is an LLM; its agreement with the deterministic matcher (Cohen's kappa) is reported "
     "with every judged run, and disagreements are listed in aggregate.json.",
     "Sensitive facts (passwords, PINs) are reported apart from the headline because repeating them "
@@ -118,7 +120,8 @@ def figure(fig, caption: str) -> str:
 
 
 def headline_table(bundle: Bundle, num: Numbers) -> str:
-    head = ("<tr><th>Backend</th><th>Recall</th><th>95% CI</th><th>Run mean [95% CI]</th>"
+    head = ("<tr><th>Backend</th><th>Recall (run mean)</th><th>95% CI (t, over runs)</th>"
+            "<th>Per-probe rate [approx. 95% Wilson]</th>"
             "<th>Probes in recall</th><th>Cost / 1K conv</th><th>Cost / correct recall</th>"
             "<th>Latency p50 / p95 (ms)</th><th>Tokens / conv</th><th>Memory at end</th><th></th></tr>")
     rows = []
@@ -130,8 +133,8 @@ def headline_table(bundle: Bundle, num: Numbers) -> str:
                         f"<td></td></tr>")
             continue
         rows.append(
-            f"<tr><td>{esc(label)}</td><td>{num(pct(r['recall']))}</td><td>{num(ci(r['recall_ci']))}</td>"
-            f"<td>{num(pct(r['run_mean']))} {num(ci(r['run_mean_ci']))}</td>"
+            f"<tr><td>{esc(label)}</td><td>{num(pct(r['run_mean']))}</td><td>{num(ci(r['run_mean_ci']))}</td>"
+            f"<td>{num(pct(r['recall']))} {num(ci(r['recall_ci']))}</td>"
             f"<td>{num(str(r['headline_n']))}</td><td>{num(usd(r['cost_per_1k']))}</td>"
             f"<td>{num(usd(r['cost_per_correct'], 4))}</td>"
             f"<td>{num(ms(r['latency_p50']))} / {num(ms(r['latency_p95']))}</td>"
@@ -149,7 +152,7 @@ def category_table(bundle: Bundle, num: Numbers) -> str:
     # Known categories in their usual order, then any others (as visualize does).
     cats = [c for c in CATEGORIES if c in present] + sorted(present - set(CATEGORIES))
     head = "<tr><th>Backend</th>" + "".join(
-        f"<th>{esc(c)}{' *' if c == 'sensitive' else ''}</th>" for c in cats) + "</tr>"
+        f"<th>{esc(c)}{' *' if c in NON_HEADLINE else ''}</th>" for c in cats) + "</tr>"
     rows = []
     for label, data in bundle.backends.items():
         by_cat = data.get("recall_by_category") or {}
@@ -161,7 +164,8 @@ def category_table(bundle: Bundle, num: Numbers) -> str:
                          f"{num(ci(d['correct_ci95']))} n={num(str(d['n']))}</span></td>")
         rows.append(f"<tr><td>{esc(label)}</td>{''.join(cells)}</tr>")
     return (f"<table>{head}{''.join(rows)}</table>"
-            "<p class=\"muted\">* sensitive facts are not part of the headline recall.</p>")
+            "<p class=\"muted\">* not part of the headline recall: abstention facts were never told "
+            "(correct means the model said so), sensitive facts test whether it repeats a secret.</p>")
 
 
 def run_section(bundle: Bundle, headline: bool) -> str:
@@ -191,9 +195,11 @@ def run_section(bundle: Bundle, headline: bool) -> str:
         + (f", matcher/judge kappa {num(fmt(agreement.get('kappa'), '.3f'))} over "
            f"{num(str(agreement.get('n')))} probes" if agreement.get("kappa") is not None else "")
         + f". Source: {src}.</p>")
-    parts.append("<h3>Headline</h3><p class=\"muted\">Recall leaves out the sensitive category. "
-                 "CI is the Wilson interval over probes; the run mean interval is a bootstrap over "
-                 "runs, the one to use when comparing backends.</p>")
+    parts.append("<h3>Headline</h3><p class=\"muted\">Recall leaves out the abstention and "
+                 "sensitive categories, which are shown on their own below. "
+                 "Recall is the mean of the per-run recall rates; its CI is a 95% Student t "
+                 "interval over runs (none for a single run). The per-probe rate's Wilson interval "
+                 "is approximate, because probes in one run are not independent.</p>")
     parts.append(headline_table(bundle, num))
     cap = f"Source: {src}."
     parts.append("<h3>Recall by checkpoint</h3>" + figure(viz.fig_memory_decay_curve(results), cap))

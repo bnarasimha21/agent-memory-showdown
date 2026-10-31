@@ -48,6 +48,8 @@ def _do_chat_model(model: str) -> BaseChatModel:
         openai_api_key=config.DO_API_KEY,
         openai_api_base=config.DO_INFERENCE_URL,
         temperature=0.0,
+        # src/retry.py does the retrying, so every attempt is counted once
+        max_retries=0,
     )
 
 

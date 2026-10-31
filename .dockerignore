@@ -1,0 +1,14 @@
+# `COPY . .` in the Dockerfile copies the build context into the image; keep
+# secrets and local state out of it. Settings reach the container through the
+# environment block in docker-compose.yml.
+.env
+.env.*
+!.env.example
+.git
+.github
+.venv
+.cache
+.pytest_cache
+**/__pycache__
+remotion/node_modules
+results/rescored

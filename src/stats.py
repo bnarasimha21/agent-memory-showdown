@@ -44,6 +44,44 @@ def bootstrap_mean(
     return {"mean": mean, "ci95": [float(lo), float(hi)], "n": int(vals.size)}
 
 
+# Two-sided 95% quantiles of Student's t, df 1 to 30 (standard tables).
+_T95 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
+        2.201, 2.179, 2.160, 2.145, 2.131, 2.120, 2.110, 2.101, 2.093, 2.086,
+        2.080, 2.074, 2.069, 2.064, 2.060, 2.056, 2.052, 2.048, 2.045, 2.042]
+
+
+def t95(df: int) -> float:
+    """Two-sided 95% Student t quantile. Table up to df 30, Cornish-Fisher expansion above."""
+    if df < 1:
+        raise ValueError("t95 needs df >= 1")
+    if df <= len(_T95):
+        return _T95[df - 1]
+    z = Z95
+    return (z + (z ** 3 + z) / (4 * df) + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * df ** 2)
+            + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * df ** 3))
+
+
+def t_mean_interval(values: Sequence[float], bounds: tuple[float, float] | None = None) -> dict:
+    """Mean of independent values with a 95% Student t interval.
+
+    This is the interval for few runs: a percentile bootstrap over 3 to 5 values
+    is too narrow (it can only resample the values seen). A single value has no
+    interval (`ci95` None). `bounds` clips the interval, e.g. (0, 1) for rates.
+    """
+    vals = np.asarray(list(values), dtype=float)
+    n = int(vals.size)
+    if n == 0:
+        return {"mean": None, "ci95": None, "n": 0, "method": "t"}
+    mean = float(vals.mean())
+    if n == 1:
+        return {"mean": mean, "ci95": None, "n": 1, "method": "t"}
+    half = t95(n - 1) * float(vals.std(ddof=1)) / math.sqrt(n)
+    low, high = mean - half, mean + half
+    if bounds is not None:
+        low, high = max(bounds[0], low), min(bounds[1], high)
+    return {"mean": mean, "ci95": [low, high], "n": n, "method": "t"}
+
+
 def cohen_kappa(a: Sequence[str], b: Sequence[str]) -> float | None:
     """Cohen's kappa for two label sequences; None when undefined (no items)."""
     if len(a) != len(b):

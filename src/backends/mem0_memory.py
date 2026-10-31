@@ -34,9 +34,11 @@ from urllib.parse import urlparse
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
+from qdrant_client import QdrantClient
 
 from src.backends.base import BaseMemoryBackend, Retrieval, WriteStats, fingerprint, usage_from_message
 from src.config import config
+from src.retry import invoke_with_retry
 
 # mem0 reads these when it is first imported: keep its telemetry off unless the
 # user opts in, and keep its state directory inside the repo (gitignored).
@@ -85,7 +87,11 @@ def _llm_adapter_class():
             model = self.chat_model
             if tools:
                 model = model.bind_tools(tools=tools, tool_choice=tool_choice)
-            response = model.invoke(lc_messages)
+            elif response_format:
+                # mem0 asks for {"type": "json_object"} on its extraction and
+                # update calls; dropping it lets the model answer in prose.
+                model = model.bind(response_format=response_format)
+            response, _retries, _ms = invoke_with_retry(model, lc_messages, "mem0 write")
             in_tok, out_tok = usage_from_message(response)
             self.usage.calls += 1
             self.usage.input_tokens += in_tok
@@ -175,16 +181,21 @@ class Mem0MemoryBackend(BaseMemoryBackend):
         self._client = self._memory.vector_store.client
 
     def teardown(self) -> None:
-        memory = getattr(self, "_memory", None)
-        if memory is None:
+        collection = getattr(self, "_collection", None)
+        if collection is None:
             return
+        memory = getattr(self, "_memory", None)
+        # mem0 creates the collection while it initialises, so a setup that
+        # failed part way can leave it behind with no Memory to clean it up.
+        client = self._client if memory is not None else QdrantClient(url=config.QDRANT_URL)
         try:
-            for name in (self._collection, f"{self._collection}_entities"):
-                if self._client.collection_exists(name):
-                    self._client.delete_collection(name)
+            for name in (collection, f"{collection}_entities"):
+                if client.collection_exists(name):
+                    client.delete_collection(name)
         finally:
-            memory.close()
-            self._client.close()
+            if memory is not None:
+                memory.close()
+            client.close()
 
     def retrieve(self, query: str) -> Retrieval:
         before = self._usage.snapshot()

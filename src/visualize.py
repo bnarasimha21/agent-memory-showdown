@@ -10,6 +10,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
+from src.dataset import NON_HEADLINE
+
 
 BACKEND_COLORS = {
     "buffer": "#4C72B0",
@@ -37,11 +39,17 @@ def backend_color(label: str) -> str:
     return f"#{r:02X}{g:02X}{b:02X}"
 
 
-def _write_plotly(fig: go.Figure | None, output_path: Path) -> None:
-    """Interactive HTML, plus a PNG when kaleido can render one."""
+def _write_plotly(fig: go.Figure | None, output_path: Path, png: bool = False) -> None:
+    """Interactive HTML, plus (with `png`) a PNG when kaleido can render one.
+
+    Charts that also have a matplotlib version leave `png` off: both would be
+    written to the same `<name>.png` and whichever ran last would win.
+    """
     if fig is None:
         return
     fig.write_html(str(output_path.with_suffix(".html")))
+    if not png:
+        return
     try:
         fig.write_image(str(output_path.with_suffix(".png")))
     except Exception:
@@ -135,8 +143,8 @@ def _category_rows(results: dict) -> tuple[list[str], list[str], dict]:
 
 
 def plot_recall_by_category_matplotlib(results: dict, output_path: Path) -> None:
-    """Grouped bars: correct rate per category per backend, with Wilson intervals.
-    `sensitive` is drawn too but is not part of the headline number."""
+    """Grouped bars: correct rate per category per backend, with approximate Wilson intervals.
+    `abstention` and `sensitive` are drawn too but are not part of the headline number."""
     backends, categories, data = _category_rows(results)
     if not backends:
         return
@@ -156,7 +164,7 @@ def plot_recall_by_category_matplotlib(results: dict, output_path: Path) -> None
         ax.bar(xs, ys, width, yerr=[lo, hi], capsize=3, label=backend,
                color=backend_color(backend))
     ax.set_xticks(range(len(categories)))
-    ax.set_xticklabels([c + (" *" if c == "sensitive" else "") for c in categories])
+    ax.set_xticklabels([c + (" *" if c in NON_HEADLINE else "") for c in categories])
     ax.set_ylabel("Correct (%)")
     ax.set_ylim(0, 105)
     ax.set_title("Recall by fact category (* not in the headline number)")
@@ -177,7 +185,7 @@ def fig_recall_by_category(results: dict) -> go.Figure | None:
         fig.add_trace(go.Bar(name=backend, x=categories, y=ys,
                              marker_color=backend_color(backend)))
     fig.update_layout(
-        barmode="group", title="Recall by fact category (sensitive is not in the headline number)",
+        barmode="group", title="Recall by fact category (abstention and sensitive are not in the headline number)",
         yaxis_title="Correct (%)", yaxis=dict(range=[0, 105]), template="plotly_white",
         width=900, height=450,
     )
@@ -247,7 +255,7 @@ def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None
             label=backend,
         )
 
-    ax.set_title("Memory Decay Curve: Recall by Checkpoint (95% Wilson interval)")
+    ax.set_title("Memory Decay Curve: Recall by Checkpoint (approx. 95% Wilson interval over probes)")
     ax.set_xlabel("Checkpoint (after turn N)")
     ax.set_ylabel("Recall Accuracy (%)")
     ax.set_ylim(0, 105)
@@ -361,7 +369,7 @@ def plot_latency_by_turn_plotly(results: dict, output_path: Path) -> None:
 def fig_cost_vs_recall(results: dict) -> go.Figure | None:
     """One point per backend (and per k in a sweep): cost per conversation vs headline recall.
 
-    Error bars are the 95% Wilson interval on recall; points of one backend
+    Error bars are the approximate 95% Wilson interval on per-probe recall; points of one backend
     share its color, so a k sweep shows how depth trades recall for tokens.
     """
     # A backend without a recall rate (no headline probes) or a price has no point to plot.
@@ -433,7 +441,7 @@ def generate_all(results_path: str | Path, out_dir: str | Path) -> None:
     plot_latency_bar_matplotlib(results, out_dir / "latency_bar.png")
     plot_latency_by_turn_plotly(results, out_dir / "latency_by_turn")
     plot_latency_by_turn_matplotlib(results, out_dir / "latency_by_turn.png")
-    _write_plotly(fig_cost_vs_recall(results), out_dir / "cost_vs_recall")
+    _write_plotly(fig_cost_vs_recall(results), out_dir / "cost_vs_recall", png=True)
 
     cost_table = build_cost_table(results)
     (out_dir / "cost_table.md").write_text(cost_table)

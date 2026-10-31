@@ -37,3 +37,23 @@ def test_wilson_bounds_contain_the_estimate_exactly_at_the_extremes():
         for k in range(n + 1):
             low, high = wilson(k, n)
             assert low <= k / n <= high
+
+
+def test_t_quantiles_match_tables():
+    from src.stats import t95
+
+    assert t95(1) == 12.706 and t95(4) == 2.776 and t95(30) == 2.042
+    assert abs(t95(40) - 2.021) < 1e-3 and abs(t95(120) - 1.980) < 1e-3
+    assert t95(10 ** 6) == pytest.approx(1.96, abs=1e-3)
+
+
+def test_t_interval_is_wider_than_the_bootstrap_for_few_runs():
+    from src.stats import t_mean_interval
+
+    vals = [0.6, 0.7, 0.8]
+    t = t_mean_interval(vals)
+    b = bootstrap_mean(vals)
+    assert t["mean"] == pytest.approx(0.7)
+    assert t["ci95"][0] < b["ci95"][0] and t["ci95"][1] > b["ci95"][1]
+    assert t_mean_interval([1.0, 1.0, 0.9], bounds=(0, 1))["ci95"][1] == 1.0
+    assert t_mean_interval([0.5])["ci95"] is None and t_mean_interval([])["mean"] is None

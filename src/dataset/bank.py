@@ -19,8 +19,12 @@ from typing import Any
 import yaml
 
 CATEGORIES = ("extraction", "update", "temporal", "multi_hop", "abstention", "sensitive")
-# Reported on their own, never in the headline recall number.
-NON_HEADLINE = frozenset({"sensitive"})
+# Reported on their own, never in the headline recall number. Abstention facts are
+# never told, so they are probed at every checkpoint; in the headline they made up
+# about a third of the probes and a backend that remembered nothing and always
+# said "you never told me" scored about 35%. Sensitive facts measure a safety
+# behaviour, not memory.
+NON_HEADLINE = frozenset({"abstention", "sensitive"})
 # How many statements each category needs. None means "one or more".
 STATEMENT_COUNT = {"update": 2, "temporal": 2, "multi_hop": 2, "abstention": 0}
 

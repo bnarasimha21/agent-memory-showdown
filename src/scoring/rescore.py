@@ -102,7 +102,8 @@ def rescore(bundle: str | Path, out_dir: str | Path | None = None, use_judge: bo
             judge=None) -> tuple[Path, dict]:
     bundle = Path(bundle)
     transcript_path(bundle)  # raises FileNotFoundError when there is none
-    run_id = load_manifest(bundle).get("run_id", bundle.name)
+    manifest = load_manifest(bundle)
+    run_id = manifest.get("run_id", bundle.name)
     if out_dir is None:
         out_dir = bundle.parent.parent / "rescored" / f"{run_id}-{new_run_id()}"
     out_dir = Path(out_dir)
@@ -111,7 +112,7 @@ def rescore(bundle: str | Path, out_dir: str | Path | None = None, use_judge: bo
     if use_judge and judge is None:
         from src.scoring.judge import get_judge
 
-        judge = get_judge()
+        judge = get_judge(answering_model=manifest.get("llm_model"))
     aggregate = score_into(bundle, out_dir, judge if use_judge else None)
     return out_dir, aggregate
 

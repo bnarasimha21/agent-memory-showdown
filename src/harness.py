@@ -99,6 +99,9 @@ def _run_checkpoint(backend, dataset, checkpoint, writer, base, facts_by_id) -> 
              "fact_id": fact.id, "category": fact.category, "headline": fact.headline,
              "planted_at": fact.turn if fact.statements else None, "question": fact.probe,
              "answer_key": fact.answer_key, "answers": fact.answers, "stale": fact.stale,
+             # Never-told facts: values a model might wrongly offer (the tempting
+             # distractor among them); naming one makes the answer wrong.
+             "candidates": sorted({str(v) for v in fact.values.values()}) if fact.expect_abstention else [],
              **exchange.to_dict()}
         )
     after = backend.memory_fingerprint()
@@ -123,7 +126,8 @@ def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints
         "embedding_provider": config.EMBEDDING_PROVIDER,
         "embedding_model": embedding_model_id(),
         "embedding_dimension": config.EMBEDDING_DIMENSION,
-        # An int, or the list of k values when the run is a k sweep.
+        # An int, the list of k values when the run is a k sweep, or None when
+        # no backend in the run retrieves top-k.
         "k": k,
         "backends": list(backend_names),
         "num_runs": num_runs,
@@ -173,8 +177,12 @@ def run_benchmark(
 
     use_judge = config.JUDGE_ENABLED if judge is None else judge
 
-    num_runs = num_runs or config.NUM_RUNS
-    num_turns = num_turns or config.NUM_TURNS
+    num_runs = config.NUM_RUNS if num_runs is None else num_runs
+    num_turns = config.NUM_TURNS if num_turns is None else num_turns
+    if num_runs < 1:
+        raise ValueError(f"runs must be at least 1, got {num_runs}")
+    if num_turns < 1:
+        raise ValueError(f"turns must be at least 1, got {num_turns}")
     composition = composition if composition is not None else config.FACTS_PER_CATEGORY
     distractors = config.DISTRACTORS if distractors is None else distractors
     checkpoints = checkpoints if checkpoints is not None else config.CHECKPOINTS
@@ -185,7 +193,10 @@ def run_benchmark(
             raise ValueError(f"k values must be positive, got {ks}")
         if len(ks) == 1:
             backend_kwargs["k"] = ks[0]
-    sweep = bool(ks) and len(ks) > 1
+    # A sweep only happens when some backend uses k; otherwise every backend
+    # runs once and the manifest must not claim several k values were run.
+    any_k = any(cls.uses_k for cls in backend_classes)
+    sweep = bool(ks) and len(ks) > 1 and any_k
     k = backend_kwargs.get("k", config.RETRIEVAL_K)
     plan = []  # (label, backend class, kwargs)
     for cls in backend_classes:
@@ -199,6 +210,22 @@ def run_benchmark(
                          composition=composition, distractors=distractors, bank=bank)
         for i in range(num_runs)
     ]
+    headline_probes = sum(n for d in datasets for c, n in d.expected_probe_counts().items()
+                          if c not in NON_HEADLINE)
+    if headline_probes == 0:
+        raise ValueError(
+            "this configuration asks no headline probe (no non-abstention, non-sensitive fact is "
+            f"ready by a checkpoint: composition {dict(composition)}, checkpoints {checkpoints}, "
+            f"{num_turns} turns), so there would be no recall to report")
+
+    # Resolve the judge before any paid work, so a bad judge setting fails now
+    # rather than after every conversation has been paid for.
+    judge_obj = None
+    if use_judge:
+        from src.scoring.judge import get_judge
+
+        judge_obj = get_judge()
+
     dataset_info = {
         "bank": str(Path(bank.path).relative_to(Path(__file__).resolve().parents[1])),
         "bank_version": bank.version,
@@ -209,7 +236,7 @@ def run_benchmark(
     }
     manifest = build_manifest(
         [label for label, _, _ in plan], num_runs, num_turns, dataset_info,
-        datasets[0].checkpoints if datasets else checkpoints, ks if sweep else k,
+        datasets[0].checkpoints if datasets else checkpoints, (ks if sweep else k) if any_k else None,
     )
     writer = BundleWriter(runs_root, new_run_id(run_label), manifest)
     writer.write_dataset({str(i): d.to_dict() for i, d in enumerate(datasets)})
@@ -222,11 +249,6 @@ def run_benchmark(
             run_single(backend_cls, dataset, run_idx, writer, kwargs, sweep)
 
     duration = time.perf_counter() - started
-    judge_obj = None
-    if use_judge:
-        from src.scoring.judge import get_judge
-
-        judge_obj = get_judge()
     writer.close_transcript()
     scores = score_probes(read_transcript(writer.path), judge_obj)
     info = scoring_info(judge_obj)
