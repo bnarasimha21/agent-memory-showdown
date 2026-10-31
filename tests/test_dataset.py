@@ -196,18 +196,17 @@ def test_no_two_facts_share_a_list_value_over_1000_seeds():
     # flight_date and deadline_before_trip both draw a city; on about 3% of seeds
     # they used to draw the same one, so "my flight to Tokyo" and "my trip to
     # Tokyo" had two different right dates.
-    from src.dataset.generate import list_values
+    from src.dataset.generate import slot_values
 
     bank = load_bank()
     everything = {c: len(bank.by_category(c)) for c in CATEGORIES}
-    templates = {t.id: t for c in CATEGORIES for t in bank.by_category(c)}
     both = 0
     for seed in range(1000):
         d = generate_dataset(num_turns=120, checkpoints=[120], random_seed=seed,
                              composition=everything, bank=bank)
         seen: set[str] = set()
         for fact in d.facts:
-            mine = list_values(templates[fact.id], fact.values)
+            mine = slot_values(fact.values)
             assert not mine & seen, (seed, fact.id, mine & seen)
             seen |= mine
         by_id = {f.id: f for f in d.facts}
@@ -216,6 +215,33 @@ def test_no_two_facts_share_a_list_value_over_1000_seeds():
             assert by_id["flight_date"].values["city"] != by_id["deadline_before_trip"].values["city"]
             assert by_id["flight_date"].values["other_city"] != by_id["deadline_before_trip"].values["city"]
     assert both == 1000
+
+
+SAMPLE_COMPOSITION = {"extraction": 2, "update": 1, "temporal": 1, "multi_hop": 1,
+                      "abstention": 1, "sensitive": 1}
+
+
+@pytest.mark.parametrize("composition", [None, SAMPLE_COMPOSITION], ids=["default", "sample"])
+def test_no_two_facts_share_any_value_over_2000_seeds(composition):
+    """Dates, digits and day counts too, compared as the matcher compares them."""
+    from src.scoring.normalize import normalize
+
+    bank = load_bank()
+    for seed in range(2000):
+        d = generate_dataset(num_turns=50, checkpoints=[25, 50], random_seed=seed,
+                             composition=composition, bank=bank)
+        owner: dict[str, str] = {}
+        for fact in d.facts:
+            for key, value in fact.values.items():
+                v = normalize(value)
+                assert owner.setdefault(v, fact.id) == fact.id, (seed, v, owner[v], fact.id, key)
+
+
+def test_seed_1958_no_longer_gives_a_flight_and_a_race_the_same_day():
+    d = generate_dataset(num_turns=50, checkpoints=[25, 50], random_seed=1958)
+    dates = [v for f in d.facts for k, v in f.values.items()
+             if f.id in ("flight_date", "race_after_birthday")]
+    assert len(dates) == len(set(dates))
 
 
 def test_default_composition_still_varies_cities_over_seeds():

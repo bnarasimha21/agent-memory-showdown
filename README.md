@@ -107,7 +107,7 @@ Notes on the newer backends:
 
 ## Benchmark Design
 
-- **Dataset v2: one generated conversation per run seed** (`src/dataset/`, facts in [`data/facts_v2.yaml`](data/facts_v2.yaml)). The fact bank is data, not code: each template has slots, and every run seed samples which templates are used, their values, the turns their statements land on, a distractor turn per fact and varied filler. Two facts in one conversation never draw the same value (two templates that both pick a city get different cities, distractor values included), so no probe has two right answers. The same seed reproduces the same conversation; the full realized dataset of every run is saved in the bundle as `dataset.json`, and the bank's version and sha256 are in the manifest.
+- **Dataset v2: one generated conversation per run seed** (`src/dataset/`, facts in [`data/facts_v2.yaml`](data/facts_v2.yaml)). The fact bank is data, not code: each template has slots, and every run seed samples which templates are used, their values, the turns their statements land on, a distractor turn per fact and varied filler. Two facts in one conversation never draw the same value of any kind (cities, dates, digit strings and day counts, distractor values included, compared after normalization), so no probe has two right answers; a test checks this over 2000 seeds of both the default and the sample composition. The same seed reproduces the same conversation; the full realized dataset of every run is saved in the bundle as `dataset.json`, and the bank's version and sha256 are in the manifest.
 - **Fact categories** (default counts per run, set with `--facts` or `FACTS_PER_CATEGORY`):
 
   | Category | Default | What it tests |

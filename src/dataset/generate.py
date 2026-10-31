@@ -118,10 +118,13 @@ class ConversationDataset:
 MAX_VALUE_DRAWS = 200
 
 
-def list_values(template, values: dict[str, str]) -> set[str]:
-    """Case-folded values a fact drew for its list slots, and for their `other_` (distractor) values."""
-    names = [n for n, spec in template.slots.items() if isinstance(spec, list)]
-    return {values[key].casefold() for n in names for key in (n, f"other_{n}")}
+def slot_values(values: dict[str, str]) -> set[str]:
+    """Every value a fact drew (list, digits, date and day-count slots, and their
+    `other_` distractor values), normalized the way the matcher compares them,
+    so "May 16" and "16 May" are the same value."""
+    from src.scoring.normalize import normalize
+
+    return {normalize(v) for v in values.values()} - {""}
 
 
 def generate_dataset(
@@ -151,9 +154,11 @@ def generate_dataset(
     dataset.checkpoints = sorted({c for c in checkpoints if 1 <= c <= num_turns})
 
     # 1. Which templates, with which values. Two facts may not draw the same
-    # list value (flight_date and deadline_before_trip both pick a city: "my
-    # flight to Tokyo" and "my trip to Tokyo" would have two right dates), and
-    # that includes the values their distractors use.
+    # value of any kind, distractor values included: flight_date and
+    # deadline_before_trip both pick a city ("my flight to Tokyo" and "my trip
+    # to Tokyo" would have two right dates), and two date slots can land on
+    # the same day (seed 1958 gave a flight and a race both May 16), which
+    # makes one fact's value a right-looking answer to another's probe.
     chosen = []
     used: set[str] = set()
     for category in CATEGORIES:
@@ -164,7 +169,7 @@ def generate_dataset(
         for template in rng.sample(pool, count):
             for _ in range(MAX_VALUE_DRAWS):
                 values = realize_slots(template.slots, rng)
-                mine = list_values(template, values)
+                mine = slot_values(values)
                 if not mine & used:
                     break
             else:
