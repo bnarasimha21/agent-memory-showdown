@@ -31,10 +31,12 @@ class SummaryMemoryBackend(BaseMemoryBackend):
 
     def write(self, human_message: str, ai_message: str) -> WriteStats:
         prompt = render_summary_prompt(self._summary, format_exchange(human_message, ai_message))
-        message, _retries, _ms = invoke_with_retry(self.llm, [HumanMessage(content=prompt)], "summary write")
+        message, retries, _ms, waited_ms = invoke_with_retry(
+            self.llm, [HumanMessage(content=prompt)], "summary write")
         self._summary = str(message.content).strip()
         in_tok, out_tok = usage_from_message(message)
-        return WriteStats(llm_calls=1, input_tokens=in_tok, output_tokens=out_tok)
+        return WriteStats(llm_calls=1, input_tokens=in_tok, output_tokens=out_tok,
+                          retries=retries, retry_wait_ms=waited_ms)
 
     def memory_fingerprint(self) -> dict:
         return fingerprint(len(self._summary), "summary_chars", [self._summary])

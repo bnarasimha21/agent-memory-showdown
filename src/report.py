@@ -56,6 +56,14 @@ def format_summary(aggregate: dict) -> str:
             f"{lat['retrieve_ms']['p95']:.1f}  llm {lat['llm_ms']['p50']:.1f}/{lat['llm_ms']['p95']:.1f}"
             f"  write {lat['write_ms']['p50']:.1f}/{lat['write_ms']['p95']:.1f}"
         )
+        retries = data.get("retries") or {}
+        retried = {k: retries[k] for k in ("answer", "write", "probe", "judge") if retries.get(k)}
+        if retried:
+            lines.append(
+                f"{'':12s}  retried attempts: "
+                + " ".join(f"{k} {v}" for k, v in retried.items())
+                + f", {retries.get('wait_s', 0.0):.1f}s waiting (not in latency)"
+            )
         tok = data["tokens"]
         cost = data.get("cost")
         cost_txt = "unpriced model"

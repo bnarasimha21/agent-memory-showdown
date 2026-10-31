@@ -98,11 +98,11 @@ class Judge:
 
     def judge(self, record: dict) -> dict:
         try:
-            message, _retries, _ms = invoke_with_retry(
+            message, retries, _ms, waited_ms = invoke_with_retry(
                 self.llm, [HumanMessage(content=render(record, self.template))], "judge")
         except Exception as exc:  # one failed call should not lose the whole rescore
             return {"label": "error", "rationale": f"{type(exc).__name__}: {exc}",
-                    "input_tokens": 0, "output_tokens": 0}
+                    "input_tokens": 0, "output_tokens": 0, "retries": 0, "retry_wait_ms": 0.0}
         text = message.content if isinstance(message.content, str) else str(message.content)
         label, rationale = parse_verdict(text)
         if label == "abstained" and expects_abstention(record):
@@ -111,7 +111,8 @@ class Judge:
             label, rationale = "correct", f"(abstained, which is correct here) {rationale}"
         in_tok, out_tok = usage_from_message(message)
         return {"label": label, "rationale": rationale,
-                "input_tokens": in_tok, "output_tokens": out_tok}
+                "input_tokens": in_tok, "output_tokens": out_tok,
+                "retries": retries, "retry_wait_ms": waited_ms}
 
 
 def get_judge(answering_model: str | None = None) -> Judge:

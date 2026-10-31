@@ -6,7 +6,10 @@ gives the same numbers the run printed.
 
 Latency is split into retrieve_ms (memory lookup), llm_ms (the answering call)
 and write_ms (storing the exchange, including any summarizer call), each with
-p50/p95 over conversation turns; probes are timed separately. Cost uses the
+p50/p95 over conversation turns; probes are timed separately. Backoff sleeps
+after a rate limit or server error are not latency: they are left out of
+llm_ms and write_ms, and `retries` counts the retried attempts (answer, write,
+probe, judge) and the time spent waiting. Cost uses the
 recorded input and output tokens and the model's prices in pricing.yaml.
 Conversation cost covers the answering calls and memory maintenance (the
 summarizer); probe calls are reported separately and only enter cost per
@@ -111,6 +114,23 @@ def _agreement(pairs: list[tuple[str, str]]) -> dict:
         "observed": (sum(m == j for m, j in pairs) / n) if n else None,
         "kappa": cohen_kappa(matcher, judge),
         "disagreements": sum(m != j for m, j in pairs),
+    }
+
+
+def _retries(turns: list[dict], probes: list[dict], scores: list[dict]) -> dict:
+    """Retried attempts and backoff slept, summed over the runs used.
+
+    Old bundles without the fields count as zero."""
+    def total(rows, key):
+        return sum(r.get(key) or 0 for r in rows)
+    wait_ms = (total(turns, "llm_retry_wait_ms") + total(turns, "write_retry_wait_ms")
+               + total(probes, "llm_retry_wait_ms"))
+    return {
+        "answer": total(turns, "llm_retries"),
+        "write": total(turns, "write_retries"),
+        "probe": total(probes, "llm_retries"),
+        "judge": total(scores, "judge_retries"),
+        "wait_s": wait_ms / 1000,
     }
 
 
@@ -240,10 +260,12 @@ def aggregate_records(
         judge_errors = judge_ok = 0
         judge_in = judge_out = 0
         headline_probe_in = headline_probe_out = 0
+        probe_scores = []
         for p in probes:
             score = score_by_key.get(score_key(p))
             if score is None:  # a probe without a score: score it with the matcher now
                 score = score_probes([p])[0]
+            probe_scores.append(score)
             label = _primary(score, judged)
             category = probe_category(p)
             headline = category not in NON_HEADLINE
@@ -318,6 +340,9 @@ def aggregate_records(
             "runs_used": sorted(valid),
             # Every judge call failing leaves the matcher label on every probe.
             "scorer": "judge" if judged and judge_ok else "matcher",
+            # Backoff sleeps are not in the latency figures; this says how many
+            # attempts were retried and how long was spent waiting.
+            "retries": _retries(turns, probes, probe_scores),
             "latency": _latency(turns),
             "probe_latency": _latency(probes),
             "latency_by_turn": latency_by_turn,

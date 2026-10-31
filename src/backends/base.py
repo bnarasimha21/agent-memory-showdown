@@ -59,6 +59,10 @@ class WriteStats:
     llm_calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    # Transient failures retried during the write, and the time slept between
+    # attempts; the sleep is not write latency and is subtracted from write_ms.
+    retries: int = 0
+    retry_wait_ms: float = 0.0
 
 
 @dataclass
@@ -77,6 +81,12 @@ class Exchange:
     write_llm_calls: int = 0
     write_input_tokens: int = 0
     write_output_tokens: int = 0
+    # Retries of the answering call and of the write, and the backoff slept for
+    # each (excluded from llm_ms and write_ms, which time the work only).
+    llm_retries: int = 0
+    llm_retry_wait_ms: float = 0.0
+    write_retries: int = 0
+    write_retry_wait_ms: float = 0.0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -160,19 +170,20 @@ class BaseMemoryBackend(ABC):
         fp = self.memory_fingerprint()
         return {"size": fp["size"], "unit": fp["unit"]}
 
-    def _call_llm(self, prompt: str) -> tuple[str, int, int, float]:
-        message, _retries, llm_ms = invoke_with_retry(self.llm, [HumanMessage(content=prompt)],
-                                                      f"{self.name} answer")
+    def _call_llm(self, prompt: str) -> tuple[str, int, int, float, int, float]:
+        """(content, input tokens, output tokens, ms, retries, ms slept between attempts)."""
+        message, retries, llm_ms, waited_ms = invoke_with_retry(
+            self.llm, [HumanMessage(content=prompt)], f"{self.name} answer")
         input_tokens, output_tokens = usage_from_message(message)
         content = message.content if isinstance(message.content, str) else str(message.content)
-        return content, input_tokens, output_tokens, llm_ms
+        return content, input_tokens, output_tokens, llm_ms, retries, waited_ms
 
     def _answer(self, message: str) -> Exchange:
         start = time.perf_counter()
         retrieval = self.retrieve(message)
         retrieve_ms = (time.perf_counter() - start) * 1000
         prompt = render_chat_prompt(retrieval.text, message)
-        response, in_tok, out_tok, llm_ms = self._call_llm(prompt)
+        response, in_tok, out_tok, llm_ms, retries, waited_ms = self._call_llm(prompt)
         return Exchange(
             input=message,
             context=retrieval.text,
@@ -182,6 +193,8 @@ class BaseMemoryBackend(ABC):
             output_tokens=out_tok,
             retrieve_ms=retrieve_ms,
             llm_ms=llm_ms,
+            llm_retries=retries,
+            llm_retry_wait_ms=waited_ms,
         )
 
     def chat(self, human_message: str) -> Exchange:
@@ -189,7 +202,11 @@ class BaseMemoryBackend(ABC):
         exchange = self._answer(human_message)
         start = time.perf_counter()
         stats = self.write(human_message, exchange.response)
-        exchange.write_ms = (time.perf_counter() - start) * 1000
+        elapsed = (time.perf_counter() - start) * 1000
+        # Backoff sleeps are waiting, not the cost of writing.
+        exchange.write_ms = max(0.0, elapsed - stats.retry_wait_ms)
+        exchange.write_retries = stats.retries
+        exchange.write_retry_wait_ms = stats.retry_wait_ms
         exchange.write_llm_calls = stats.llm_calls
         exchange.write_input_tokens = stats.input_tokens
         exchange.write_output_tokens = stats.output_tokens

@@ -39,12 +39,15 @@ def is_transient(exc: BaseException) -> bool:
 
 def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: int | None = None,
                     base_delay: float | None = None, sleep: Callable[[float], None] | None = None,
-                    ) -> tuple[Any, int, float]:
-    """(result, retries, ms of the successful attempt). Backoff: base * 2**n, plus up to 25% jitter.
+                    ) -> tuple[Any, int, float, float]:
+    """(result, retries, ms of the successful attempt, ms spent sleeping between attempts).
 
-    The returned time covers the attempt that succeeded only, so waiting out a
-    rate limit does not show up as model latency; the retry count is recorded
-    separately.
+    Backoff: base * 2**n, plus up to 25% jitter. The attempt time covers the
+    attempt that succeeded only, so waiting out a rate limit does not show up
+    as model latency. Callers put the retry count and the sleep time in the
+    transcript (`llm_retries`, `write_retries`, `*_retry_wait_ms` on every turn
+    and probe, `judge_retries` on every score) and the aggregate sums them per
+    backend (`retries`), so a run that hit rate limits says so.
     """
     from src.config import config
 
@@ -52,6 +55,7 @@ def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: 
     base_delay = config.LLM_RETRY_BASE_S if base_delay is None else base_delay
     sleep = sleep or time.sleep
     attempt = 0
+    waited_ms = 0.0
     while True:
         start = time.perf_counter()
         try:
@@ -63,12 +67,14 @@ def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: 
             delay += random.uniform(0, delay * 0.25)
             logger.warning("%s failed (%s: %s); retry %d of %d in %.1fs", what, type(exc).__name__,
                            exc, attempt + 1, max_retries, delay)
+            slept = time.perf_counter()
             sleep(delay)
+            waited_ms += (time.perf_counter() - slept) * 1000
             attempt += 1
             continue
-        return result, attempt, (time.perf_counter() - start) * 1000
+        return result, attempt, (time.perf_counter() - start) * 1000, waited_ms
 
 
 def invoke_with_retry(model, messages, what: str = "LLM call"):
-    """`model.invoke(messages)` with retries. Returns (message, retries, ms of the successful attempt)."""
+    """`model.invoke(messages)` with retries. Returns what `call_with_retry` returns."""
     return call_with_retry(lambda: model.invoke(messages), what)

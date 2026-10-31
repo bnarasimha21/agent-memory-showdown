@@ -40,6 +40,7 @@ def score_probes(records: Iterable[dict], judge=None) -> list[dict]:
         score.update(
             matcher_label=label, matcher_reason=reason, judge_label=None,
             judge_rationale=None, judge_input_tokens=0, judge_output_tokens=0,
+            judge_retries=0,
         )
         if judge is not None:
             verdict = judge.judge(rec)
@@ -47,6 +48,7 @@ def score_probes(records: Iterable[dict], judge=None) -> list[dict]:
                 judge_label=verdict["label"], judge_rationale=verdict["rationale"],
                 judge_input_tokens=verdict["input_tokens"],
                 judge_output_tokens=verdict["output_tokens"],
+                judge_retries=verdict.get("retries", 0),
             )
         scores.append(score)
     return scores

@@ -25,6 +25,7 @@ with mem0's factories, because mem0's own LangChain adapters import the
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -38,12 +39,14 @@ from qdrant_client import QdrantClient
 
 from src.backends.base import BaseMemoryBackend, Retrieval, WriteStats, fingerprint, usage_from_message
 from src.config import config
-from src.retry import invoke_with_retry
+from src.retry import invoke_with_retry, status_of
 
 # mem0 reads these when it is first imported: keep its telemetry off unless the
 # user opts in, and keep its state directory inside the repo (gitignored).
 os.environ.setdefault("MEM0_TELEMETRY", "False")
 os.environ.setdefault("MEM0_DIR", str(Path(__file__).resolve().parents[2] / ".cache" / "mem0"))
+
+logger = logging.getLogger(__name__)
 
 COLLECTION_PREFIX = "mem_bench_mem0_"
 PROVIDER = "ams"
@@ -58,6 +61,13 @@ class UsageCounter:
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
+        # Retried attempts (transient errors, and a request repeated without
+        # response_format after the provider rejected it) and backoff slept.
+        self.retries = 0
+        self.retry_wait_ms = 0.0
+        # Set once the provider has rejected response_format with a 400, so
+        # later calls do not pay for the rejected attempt again.
+        self.response_format_rejected = False
 
     def snapshot(self) -> tuple[int, int, int]:
         return self.calls, self.input_tokens, self.output_tokens
@@ -87,11 +97,33 @@ def _llm_adapter_class():
             model = self.chat_model
             if tools:
                 model = model.bind_tools(tools=tools, tool_choice=tool_choice)
-            elif response_format:
+            elif response_format and not self.usage.response_format_rejected:
                 # mem0 asks for {"type": "json_object"} on its extraction and
                 # update calls; dropping it lets the model answer in prose.
-                model = model.bind(response_format=response_format)
-            response, _retries, _ms = invoke_with_retry(model, lc_messages, "mem0 write")
+                try:
+                    return self._finish(self._invoke(model.bind(response_format=response_format),
+                                                     lc_messages), tools)
+                except Exception as exc:
+                    if status_of(exc) != 400:
+                        raise
+                    # An OpenAI-compatible endpoint may not support
+                    # response_format; mem0's prompt asks for JSON anyway.
+                    logger.warning("The provider rejected the request with response_format (%s); "
+                                   "retrying once without it", exc)
+                    self.usage.retries += 1
+                    response = self._invoke(model, lc_messages)  # a second 400 is raised
+                    # It worked without the format: skip it for the rest of the session.
+                    self.usage.response_format_rejected = True
+                    return self._finish(response, tools)
+            return self._finish(self._invoke(model, lc_messages), tools)
+
+        def _invoke(self, model, lc_messages):
+            response, retries, _ms, waited_ms = invoke_with_retry(model, lc_messages, "mem0 write")
+            self.usage.retries += retries
+            self.usage.retry_wait_ms += waited_ms
+            return response
+
+        def _finish(self, response, tools):
             in_tok, out_tok = usage_from_message(response)
             self.usage.calls += 1
             self.usage.input_tokens += in_tok
@@ -209,13 +241,16 @@ class Mem0MemoryBackend(BaseMemoryBackend):
 
     def write(self, human_message: str, ai_message: str) -> WriteStats:
         calls, in_tok, out_tok = self._usage.snapshot()
+        retries, waited = self._usage.retries, self._usage.retry_wait_ms
         self._memory.add(
             [{"role": "user", "content": human_message},
              {"role": "assistant", "content": ai_message}],
             user_id=self.session_id,
         )
         c2, i2, o2 = self._usage.snapshot()
-        return WriteStats(llm_calls=c2 - calls, input_tokens=i2 - in_tok, output_tokens=o2 - out_tok)
+        return WriteStats(llm_calls=c2 - calls, input_tokens=i2 - in_tok, output_tokens=o2 - out_tok,
+                          retries=self._usage.retries - retries,
+                          retry_wait_ms=self._usage.retry_wait_ms - waited)
 
     def _points(self) -> list[tuple[str, str]]:
         points, offset = [], None
