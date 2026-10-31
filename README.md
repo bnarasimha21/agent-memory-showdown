@@ -17,24 +17,26 @@ Interactive results, with every probe's transcript: <https://bnarasimha21.github
 
 **No real v2 benchmark is published yet.** The headline bundle below is a sample made offline; see *Setup* to make a real run (it needs `DO_API_KEY`) and *Results site and publishing* to publish it.
 
-### Latest v2 run: `20261031T133258550763Z-sample-fake`
+### Latest v2 run: `20261031T135234525464Z-sample-fake`
 
 > **Sample run, not a benchmark result.** At least one of the chat model, the judge and the embeddings was fake (`LLM_PROVIDER=fake`, `JUDGE_PROVIDER=fake`, `EMBEDDING_PROVIDER=fake`). It shows the bundle format, the site and the charts. The numbers describe the harness, not any model or memory backend; costs are what the recorded token counts would cost at the listed price.
 
-2 runs x 20 turns, checkpoints 10, 20, model `fake-memory-v1`, embeddings `fake-hashing-384`, k = 2, 4. Source: [`manifest.json`](results/runs/20261031T133258550763Z-sample-fake/manifest.json), [`aggregate.json`](results/runs/20261031T133258550763Z-sample-fake/aggregate.json). Recall leaves out the `abstention` and `sensitive` categories (reported on their own on the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% Student t interval over runs; the per-probe Wilson interval is approximate, since probes in one run are not independent. Judge `fake-judge-v1` is the offline fake, which applies the matcher rules, so its agreement with the matcher says nothing about a real judge.
+2 runs x 20 turns, checkpoints 10, 20, model `fake-memory-v1`, embeddings `fake-hashing-384`, k = 2, 4. Source: [`manifest.json`](results/runs/20261031T135234525464Z-sample-fake/manifest.json), [`aggregate.json`](results/runs/20261031T135234525464Z-sample-fake/aggregate.json). Recall leaves out the `abstention` and `sensitive` categories (reported on their own on the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% Student t interval over runs (when every run scores the same, which would make it zero width, the Wilson interval over the pooled probes, marked as such); the per-probe Wilson interval is approximate, since probes in one run are not independent. Judge `fake-judge-v1` is the offline fake, which applies the matcher rules, so its agreement with the matcher says nothing about a real judge.
+
+Seeds paired: every backend is scored on runs 0 (seed 42), 1 (seed 43).
 
 | Backend | Recall, run mean [95% t CI] | Per probe [approx. Wilson] | Probes in recall | Cost / 1K conv | Cost / correct recall | Latency p50 / p95 | Memory at end |
 |---------|----------------:|------------------:|-------:|---------------:|----------------------:|------------------:|--------------:|
-| buffer | 79.5% [0, 100] | 80.0% [55, 93] | 15 | $17.32 | $0.0045 | 0.1 / 0.1 ms | 40 messages |
-| summary | 47.3% [0, 100] | 46.7% [25, 70] | 15 | $33.75 | $0.0107 | 0.1 / 0.1 ms | 385 summary_chars |
-| qdrant@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.15 | $0.0020 | 2.4 / 4.2 ms | 20 points |
-| qdrant@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.21 | $0.0025 | 2.7 / 4.0 ms | 20 points |
-| pgvector@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.16 | $0.0020 | 2.8 / 4.0 ms | 20 rows |
-| pgvector@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.27 | $0.0025 | 2.8 / 3.6 ms | 20 rows |
-| langgraph_store@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.18 | $0.0020 | 1.6 / 2.3 ms | 20 items |
-| langgraph_store@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.33 | $0.0026 | 1.5 / 2.1 ms | 20 items |
-| mem0@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $326.30 | $0.0598 | 4.0 / 6.6 ms | 16 memories |
-| mem0@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $327.09 | $0.0600 | 3.9 / 7.1 ms | 16 memories |
+| buffer | 79.5% [0, 100] | 80.0% [55, 93] | 15 | $17.32 | $0.0045 | 0.2 / 0.5 ms | 40 messages |
+| summary | 47.3% [0, 100] | 46.7% [25, 70] | 15 | $33.75 | $0.0107 | 0.3 / 0.4 ms | 385 summary_chars |
+| qdrant@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.15 | $0.0020 | 3.3 / 6.2 ms | 20 points |
+| qdrant@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.21 | $0.0025 | 5.1 / 7.1 ms | 20 points |
+| pgvector@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.16 | $0.0020 | 6.3 / 9.7 ms | 20 rows |
+| pgvector@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.27 | $0.0025 | 6.4 / 7.8 ms | 20 rows |
+| langgraph_store@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.18 | $0.0020 | 3.9 / 4.8 ms | 20 items |
+| langgraph_store@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.33 | $0.0026 | 2.6 / 3.7 ms | 20 items |
+| mem0@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $326.30 | $0.0598 | 6.8 / 7.9 ms | 16 memories |
+| mem0@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $327.09 | $0.0600 | 6.2 / 9.1 ms | 16 memories |
 
 ### v1 published numbers (v1 methodology, known limits)
 
