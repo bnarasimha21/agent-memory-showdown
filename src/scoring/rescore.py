@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-from src.bundle import load_manifest, new_run_id, read_transcript, utc_now
+from src.bundle import load_manifest, new_run_id, read_transcript, transcript_path, utc_now
 from src.scoring.matcher import MATCHER_VERSION, match_record
 
 logger = logging.getLogger(__name__)
@@ -101,8 +101,7 @@ def score_into(bundle: str | Path, out_dir: str | Path, judge=None) -> dict:
 def rescore(bundle: str | Path, out_dir: str | Path | None = None, use_judge: bool = True,
             judge=None) -> tuple[Path, dict]:
     bundle = Path(bundle)
-    if not (bundle / "transcript.jsonl").exists():
-        raise FileNotFoundError(f"{bundle} has no transcript.jsonl")
+    transcript_path(bundle)  # raises FileNotFoundError when there is none
     run_id = load_manifest(bundle).get("run_id", bundle.name)
     if out_dir is None:
         out_dir = bundle.parent.parent / "rescored" / f"{run_id}-{new_run_id()}"

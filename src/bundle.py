@@ -13,11 +13,14 @@ Layout of `results/runs/<run_id>/`:
 - `aggregate.json`    metrics computed from the transcript and scores
 
 The transcript is written line by line as the run progresses, so a crashed
-run still leaves an inspectable partial bundle.
+run still leaves an inspectable partial bundle. A published bundle may carry
+`transcript.jsonl.gz` instead (see `python -m src.site.publish`); every reader
+goes through `iter_transcript`, which accepts either.
 """
 
 from __future__ import annotations
 
+import gzip
 import json
 import platform
 import subprocess
@@ -131,8 +134,23 @@ def load_dataset(bundle: str | Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
+TRANSCRIPT = "transcript.jsonl"
+TRANSCRIPT_GZ = "transcript.jsonl.gz"
+
+
+def transcript_path(bundle: str | Path) -> Path:
+    """The bundle's transcript, plain or gzipped. Raises if it has neither."""
+    bundle = Path(bundle)
+    for name in (TRANSCRIPT, TRANSCRIPT_GZ):
+        if (bundle / name).exists():
+            return bundle / name
+    raise FileNotFoundError(f"{bundle} has no {TRANSCRIPT} or {TRANSCRIPT_GZ}")
+
+
 def iter_transcript(bundle: str | Path) -> Iterator[dict]:
-    with open(Path(bundle) / "transcript.jsonl", encoding="utf-8") as fh:
+    path = transcript_path(bundle)
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rt", encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if line:

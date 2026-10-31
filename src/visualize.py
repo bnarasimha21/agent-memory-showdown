@@ -37,6 +37,17 @@ def backend_color(label: str) -> str:
     return f"#{r:02X}{g:02X}{b:02X}"
 
 
+def _write_plotly(fig: go.Figure | None, output_path: Path) -> None:
+    """Interactive HTML, plus a PNG when kaleido can render one."""
+    if fig is None:
+        return
+    fig.write_html(str(output_path.with_suffix(".html")))
+    try:
+        fig.write_image(str(output_path.with_suffix(".png")))
+    except Exception:
+        pass
+
+
 def load_results(results_path: str | Path) -> dict:
     """Per-backend metrics from an aggregate.json written by src/aggregate.py."""
     with open(results_path) as f:
@@ -78,7 +89,7 @@ def _label_breakdown(results: dict) -> tuple[list[str], dict[str, list[float]]]:
     return backends, rates
 
 
-def plot_label_breakdown_plotly(results: dict, output_path: Path) -> None:
+def fig_label_breakdown(results: dict) -> go.Figure | None:
     backends, rates = _label_breakdown(results)
     fig = go.Figure()
     for label, values in rates.items():
@@ -89,11 +100,11 @@ def plot_label_breakdown_plotly(results: dict, output_path: Path) -> None:
         xaxis_title="Memory Backend", yaxis_title="Share of probes (%)",
         yaxis=dict(range=[0, 100]), template="plotly_white", width=800, height=450,
     )
-    fig.write_html(str(output_path.with_suffix(".html")))
-    try:
-        fig.write_image(str(output_path.with_suffix(".png")))
-    except Exception:
-        pass
+    return fig
+
+
+def plot_label_breakdown_plotly(results: dict, output_path: Path) -> None:
+    _write_plotly(fig_label_breakdown(results), output_path)
 
 
 def plot_label_breakdown_matplotlib(results: dict, output_path: Path) -> None:
@@ -155,10 +166,10 @@ def plot_recall_by_category_matplotlib(results: dict, output_path: Path) -> None
     plt.close()
 
 
-def plot_recall_by_category_plotly(results: dict, output_path: Path) -> None:
+def fig_recall_by_category(results: dict) -> go.Figure | None:
     backends, categories, data = _category_rows(results)
     if not backends:
-        return
+        return None
     fig = go.Figure()
     for backend in backends:
         ys = [data[backend][c]["correct_rate"] * 100 if c in data[backend] else None
@@ -170,14 +181,14 @@ def plot_recall_by_category_plotly(results: dict, output_path: Path) -> None:
         yaxis_title="Correct (%)", yaxis=dict(range=[0, 105]), template="plotly_white",
         width=900, height=450,
     )
-    fig.write_html(str(output_path.with_suffix(".html")))
-    try:
-        fig.write_image(str(output_path.with_suffix(".png")))
-    except Exception:
-        pass
+    return fig
 
 
-def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
+def plot_recall_by_category_plotly(results: dict, output_path: Path) -> None:
+    _write_plotly(fig_recall_by_category(results), output_path)
+
+
+def fig_memory_decay_curve(results: dict) -> go.Figure | None:
     curves = _get_recall_curve_data(results)
     fig = go.Figure()
 
@@ -209,11 +220,11 @@ def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
         width=900,
         height=500,
     )
-    fig.write_html(str(output_path.with_suffix(".html")))
-    try:
-        fig.write_image(str(output_path.with_suffix(".png")))
-    except Exception:
-        pass
+    return fig
+
+
+def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
+    _write_plotly(fig_memory_decay_curve(results), output_path)
 
 
 def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None:
@@ -261,7 +272,7 @@ def _latency_rows(results: dict) -> tuple[list[str], dict[str, dict[str, list[fl
     return backends, rows
 
 
-def plot_latency_bar_plotly(results: dict, output_path: Path) -> None:
+def fig_latency_bar(results: dict) -> go.Figure | None:
     """p50 per component, stacked; the p95 of the total is drawn as a marker."""
     backends, rows = _latency_rows(results)
     fig = go.Figure()
@@ -277,11 +288,11 @@ def plot_latency_bar_plotly(results: dict, output_path: Path) -> None:
         xaxis_title="Memory Backend", yaxis_title="Latency (ms)",
         template="plotly_white", width=800, height=450,
     )
-    fig.write_html(str(output_path.with_suffix(".html")))
-    try:
-        fig.write_image(str(output_path.with_suffix(".png")))
-    except Exception:
-        pass
+    return fig
+
+
+def plot_latency_bar_plotly(results: dict, output_path: Path) -> None:
+    _write_plotly(fig_latency_bar(results), output_path)
 
 
 def plot_latency_bar_matplotlib(results: dict, output_path: Path) -> None:
@@ -323,7 +334,7 @@ def plot_latency_by_turn_matplotlib(results: dict, output_path: Path) -> None:
     plt.close()
 
 
-def plot_latency_by_turn_plotly(results: dict, output_path: Path) -> None:
+def fig_latency_by_turn(results: dict) -> go.Figure | None:
     from plotly.subplots import make_subplots
 
     backends = [b for b, d in results.items() if "error" not in d]
@@ -340,17 +351,45 @@ def plot_latency_by_turn_plotly(results: dict, output_path: Path) -> None:
             ), row=1, col=col)
     fig.update_layout(title="Latency by turn, per component (mean ms)", template="plotly_white",
                       width=1200, height=420)
-    fig.write_html(str(output_path.with_suffix(".html")))
-    try:
-        fig.write_image(str(output_path.with_suffix(".png")))
-    except Exception:
-        pass
+    return fig
+
+
+def plot_latency_by_turn_plotly(results: dict, output_path: Path) -> None:
+    _write_plotly(fig_latency_by_turn(results), output_path)
+
+
+def fig_cost_vs_recall(results: dict) -> go.Figure | None:
+    """One point per backend (and per k in a sweep): cost per conversation vs headline recall.
+
+    Error bars are the 95% Wilson interval on recall; points of one backend
+    share its color, so a k sweep shows how depth trades recall for tokens.
+    """
+    rows = [(b, d) for b, d in results.items() if "error" not in d and d.get("cost")]
+    if not rows:
+        return None
+    fig = go.Figure()
+    for backend, data in rows:
+        rate = data["recall_overall"]["correct_rate"] * 100
+        lo, hi = (v * 100 for v in data["recall_overall"]["correct_ci95"])
+        fig.add_trace(go.Scatter(
+            x=[data["cost"]["per_1k_conversations_usd"]], y=[rate], mode="markers+text",
+            name=backend, text=[backend], textposition="top center",
+            error_y=dict(type="data", symmetric=False, array=[hi - rate], arrayminus=[rate - lo]),
+            marker=dict(size=12, color=backend_color(backend)),
+        ))
+    fig.update_layout(
+        title="Cost vs recall (one point per backend and k)",
+        xaxis_title="Cost per 1K conversations (USD)", yaxis_title="Headline recall (%)",
+        yaxis=dict(range=[0, 105]), template="plotly_white", width=900, height=500,
+        showlegend=False,
+    )
+    return fig
 
 
 def build_cost_table(results: dict) -> str:
     """Markdown cost table computed from recorded tokens and pricing.yaml."""
     lines = [
-        "| Backend | Input tok/conv | Output tok/conv | Summarizer calls/conv | Cost/conv (USD) "
+        "| Backend | Input tok/conv | Output tok/conv | Memory LLM calls/conv | Cost/conv (USD) "
         "| Cost/1K conv (USD) | Cost/correct recall (USD) |",
         "|---------|---------------:|----------------:|----------------------:|----------------:"
         "|-------------------:|--------------------------:|",
@@ -391,6 +430,7 @@ def generate_all(results_path: str | Path, out_dir: str | Path) -> None:
     plot_latency_bar_matplotlib(results, out_dir / "latency_bar.png")
     plot_latency_by_turn_plotly(results, out_dir / "latency_by_turn")
     plot_latency_by_turn_matplotlib(results, out_dir / "latency_by_turn.png")
+    _write_plotly(fig_cost_vs_recall(results), out_dir / "cost_vs_recall")
 
     cost_table = build_cost_table(results)
     (out_dir / "cost_table.md").write_text(cost_table)

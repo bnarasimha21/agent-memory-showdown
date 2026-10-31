@@ -4,18 +4,15 @@
 
 A benchmark that runs six agent memory backends (a full buffer, a rolling LLM summary, Qdrant, pgvector, the LangGraph store and Mem0) through the same seeded synthetic conversations and measures recall accuracy, latency and token cost.
 
-## Key Results (v1 methodology)
+## Results
 
-These numbers come from the April 2026 run of the **v1 harness**, which had four backends on LangChain 0.2. v1 had known flaws (listed under *Methodology notes and limitations* below): probes were written back into memory, buffer/summary and the vector backends used different prompts, and two of the four recall turns were silently dropped. Treat them as indicative, not as a clean measurement. The harness has since been rebuilt (v2); no v2 numbers have been published yet.
+Results live in run bundles under `results/runs/<run_id>/` and are published to the results site,
+which has the charts, the methodology and every probe's transcript. The block below is generated
+from the bundles listed in `results/latest.json` and from the v1 numbers in
+`results/legacy/v1_published.json`; CI fails if it drifts from them.
 
-| Backend | Recall @ Turn 50 | Avg Latency/Turn | Cost / 1K Convos | Tokens/Run |
-|---------|:-----------------:|:----------------:|:-----------------:|:----------:|
-| **buffer** | 90% | 10.3s | $4,303 | 717K |
-| **summary** | 42% | 36.0s | $2,256 | 376K |
-| **qdrant** | 82% | 7.0s | $418 | 70K |
-| **pgvector** | 82% | 7.0s | $416 | 69K |
-
-**Winner:** Vector backends (qdrant/pgvector) — 82% recall at 1/10th the cost of buffer, with flat latency regardless of conversation length. Summary memory is the worst performer: slowest, lossy, and still expensive.
+<!-- BEGIN GENERATED RESULTS: python -m src.site.export, do not edit by hand -->
+<!-- END GENERATED RESULTS -->
 
 ## Architecture
 
@@ -131,26 +128,13 @@ Notes on the newer backends:
 
 v1 reported a single "retrieval latency" that actually wrapped retrieval, generation and the memory write, and priced every token at a 75/25 input/output blend; the v1 table at the top of this page uses those definitions.
 
-## Results
+## v1 observations
 
-Full results are in [`results/full_benchmark_results.md`](results/full_benchmark_results.md).
+These come from the v1 run and carry its limits (see *Methodology notes and limitations*).
+Full v1 write-up: [`results/full_benchmark_results.md`](results/full_benchmark_results.md).
 
-### Memory Decay Curve
-
-All backends achieve 100% recall at turn 15. By turn 50:
-
-| Backend | Turn 15 | Turn 50 | Drop |
-|---------|:-------:|:-------:|:----:|
-| buffer | 100% | 90% | -10% |
-| summary | 100% | 42% | **-58%** |
-| qdrant | 100% | 82% | -18% |
-| pgvector | 100% | 82% | -18% |
-
-Summary collapses after turn 12 — the summarizer aggressively compresses away specific details. Facts from turns 18–45 are essentially lost.
-
-### Notable Finding
-
-The Wi-Fi password (turn 30) and bank PIN (turn 45) were scored as missed by **all** backends, including buffer, which had the data in its prompt. The likely explanation is the model declining to repeat sensitive data rather than a memory failure, but v1 did not save model responses, so this was never verified. v2 saves every probe response in the run transcript, labels refusals as `refused`, and keeps sensitive facts out of the headline. `python scripts/test_sensitive_recall.py --seeds 5` asks only the sensitive probes, with the whole conversation in context, and prints how many were answered, refused or missed (it calls the configured LLM; `LLM_PROVIDER=fake` runs it offline).
+- **Summary decay.** Every backend recalled everything at turn 15. By turn 50 summary had fallen to 42%: the summarizer compressed away specific details after about turn 12, and facts planted between turns 18 and 45 were mostly lost.
+- **Sensitive facts.** The Wi-Fi password (turn 30) and bank PIN (turn 45) were scored as missed by **all** backends, including buffer, which had the data in its prompt. The likely explanation is the model declining to repeat sensitive data rather than a memory failure, but v1 did not save model responses, so this was never verified. v2 saves every probe response in the run transcript, labels refusals as `refused`, and keeps sensitive facts out of the headline. `python scripts/test_sensitive_recall.py --seeds 5` asks only the sensitive probes, with the whole conversation in context, and prints how many were answered, refused or missed (it calls the configured LLM; `LLM_PROVIDER=fake` runs it offline).
 
 ## Setup
 
@@ -224,6 +208,41 @@ Integration tests run every backend through the real harness against real Qdrant
 
 A free offline run of the full pipeline (services must be up) is `make run-fake`. Its output is marked as a sample run and is not a benchmark result.
 
+## Results site and publishing
+
+The results site is a static page built from committed bundles, with no server and no network:
+
+```bash
+make site              # python -m src.site.build: writes site/index.html (open it in a browser)
+```
+
+It shows, per published run, the headline table with intervals, recall by checkpoint and by
+category, cost against recall (one point per backend and k in a sweep), latency by component and
+the probe outcome mix; then the v1 numbers and a methodology section (answering prompt, judge
+prompt and its hash, pricing and the date it was checked, dataset, known limitations). Every number
+links to the bundle page of the run it came from, and each backend has a probe page with every
+probe's question, retrieved context, response and labels. CI (`.github/workflows/site.yml`) builds
+it on every push and deploys `main` to GitHub Pages.
+
+To publish a run:
+
+```bash
+python -m src.site.publish results/runs/<run_id>         # make it the headline run
+python -m src.site.publish results/runs/<run_id> --add   # list it after the current ones
+git add results/runs/<run_id> results/latest.json README.md remotion/src/data/benchmarkData.ts
+```
+
+`publish` gzips the bundle's transcript (bundles read `transcript.jsonl` or `transcript.jsonl.gz`),
+records the run in `results/latest.json` and regenerates the README block above and
+`remotion/src/data/benchmarkData.ts`. `make export` regenerates those two files alone and
+`make site-check` fails if they are stale. `benchmarkData.ts` keeps the v1 constants the video
+narrates, read from `results/legacy/v1_published.json`, and adds `LATEST_RUN`, a summary of the
+headline v2 bundle.
+
+The bundle published now is a **sample**: 2 runs x 20 turns with the fake chat model and hashing
+embeddings, made offline to show the format and the site. No real v2 benchmark has been published
+yet. To make one, see *Setup* (it needs `DO_API_KEY`), then publish its bundle as above.
+
 ## Remotion Video
 
 An animated explainer video of the benchmark results is built with [Remotion](https://www.remotion.dev/) (React + TypeScript). 10 scenes, 1920x1080 @ 30fps, dark techy theme.
@@ -253,6 +272,9 @@ agent-memory-showdown/
 │   ├── harness.py            # benchmark runner + aggregator
 │   ├── llm_factory.py        # Claude + local embeddings
 │   ├── visualize.py          # Plotly + Matplotlib charts
+│   ├── bundle.py             # run bundle files: manifest, transcript, scores
+│   ├── scoring/              # matcher, LLM judge, judge_prompt.md, rescore
+│   ├── site/                 # results site: build.py, publish.py, export.py
 │   └── backends/
 │       ├── base.py           # BaseMemoryBackend: the shared agent loop
 │       ├── registry.py       # name -> backend class
@@ -270,11 +292,16 @@ agent-memory-showdown/
 │   │   ├── Root.tsx          # Main composition (all 10 scenes)
 │   │   ├── scenes/           # Scene1_Hook.tsx ... Scene10_Closing.tsx
 │   │   ├── components/       # AnimatedLineChart, GlassCard, ChatBubble, etc.
-│   │   ├── data/             # benchmarkData.ts (hardcoded results)
+│   │   ├── data/             # benchmarkData.ts (generated: v1 constants + LATEST_RUN)
 │   │   └── styles/           # theme.ts (colors, fonts)
 │   └── package.json
+├── .github/workflows/site.yml     # tests, export check, site build, Pages deploy
 └── results/
-    ├── full_benchmark_results.md   # Detailed analysis
+    ├── latest.json                 # published run ids, headline first
+    ├── runs/<run_id>/              # committed run bundles
+    ├── legacy/v1_published.json    # the v1 published numbers (no v1 bundle exists)
+    ├── benchmark_example.json      # v1 output format example (v1 harness, not v2)
+    ├── full_benchmark_results.md   # v1 analysis
     ├── smoke_test_results.md       # Quick test results
     ├── video_script.md             # Video narration script
     ├── video_script_simple.md      # Simplified video script
@@ -295,4 +322,6 @@ agent-memory-showdown/
 
 ## Status
 
-**Complete** — Benchmark run finished April 17, 2026. Full results and animated video available.
+The v1 benchmark ran on April 17, 2026 and its numbers are above, labelled as v1. The v2 harness
+(six backends, read-only probes, matcher plus judge scoring, run bundles, results site) is complete;
+the published v2 bundle is a fake-LLM sample until a real run is made.

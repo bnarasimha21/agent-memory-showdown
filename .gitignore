@@ -30,3 +30,6 @@ ToDo.txt
 
 # mem0 state directory (MEM0_DIR) and other local caches
 .cache/
+
+# Results site build output (make site; built and deployed by CI)
+/site/

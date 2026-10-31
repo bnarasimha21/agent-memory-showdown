@@ -60,7 +60,7 @@ def format_summary(aggregate: dict) -> str:
                 f"{'n/a' if per_correct is None else f'${per_correct:.4f}'}"
             )
         mem = tok["memory"]
-        extra = (f", summarizer {mem['calls']:.0f} calls / {mem['input_tokens'] + mem['output_tokens']:.0f} tok"
+        extra = (f", memory writes {mem['calls']:.0f} calls / {mem['input_tokens'] + mem['output_tokens']:.0f} tok"
                  if mem["calls"] else "")
         lines.append(
             f"{'':12s}  tokens/conversation in={tok['input_tokens']:.0f} out={tok['output_tokens']:.0f}"

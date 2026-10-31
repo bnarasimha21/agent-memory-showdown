@@ -1,4 +1,4 @@
-.PHONY: run build up down clean run-local run-quick run-fake venv test test-unit test-integration test-services-up test-services-down
+.PHONY: run build up down clean run-local run-quick run-fake venv test test-unit test-integration test-services-up test-services-down site export site-check
 
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
@@ -65,3 +65,15 @@ test-services-down:
 test-integration: test-services-up
 	$(TEST_ENV) AMS_REQUIRE_SERVICES=1 $(PYTHON) -m pytest -m integration; \
 	status=$$?; $(TEST_SERVICES) down; exit $$status
+
+# Results site from the bundles in results/latest.json (no network, no API key)
+site:
+	$(PYTHON) -m src.site.build
+
+# Regenerate the README results block and remotion/src/data/benchmarkData.ts
+export:
+	$(PYTHON) -m src.site.export
+
+# Fail if the README block or benchmarkData.ts no longer match the published bundles
+site-check:
+	$(PYTHON) -m src.site.export --check
