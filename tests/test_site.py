@@ -29,6 +29,15 @@ from src.site.data import (
 NODE = shutil.which("node")
 
 
+def _node_strips_types() -> bool:
+    """--experimental-strip-types arrived in node 22.6."""
+    if NODE is None:
+        return False
+    out = subprocess.run([NODE, "--version"], capture_output=True, text=True).stdout.strip()
+    match = re.match(r"v(\d+)\.(\d+)", out)
+    return bool(match) and (int(match[1]), int(match[2])) >= (22, 6)
+
+
 @pytest.fixture(scope="module")
 def made_bundle(tmp_path_factory) -> Path:
     out = tmp_path_factory.mktemp("results")
@@ -78,22 +87,67 @@ def test_gzip_transcript_round_trips_and_is_reproducible(runs):
         transcript_path(bundle)
 
 
-def test_publish_sets_latest_and_add_appends(runs, made_bundle):
+def _copy_run(made_bundle: Path, runs_dir: Path, run_id: str, real: bool = False) -> Path:
+    """Another bundle under runs_dir; `real` marks it as a non-sample run."""
+    dest = runs_dir / run_id
+    shutil.copytree(made_bundle, dest)
+    manifest = json.loads((dest / "manifest.json").read_text())
+    manifest["run_id"] = run_id
+    if real:
+        manifest["is_sample"] = False
+        aggregate = json.loads((dest / "aggregate.json").read_text())
+        aggregate["is_sample"] = False
+        (dest / "aggregate.json").write_text(json.dumps(aggregate))
+    (dest / "manifest.json").write_text(json.dumps(manifest))
+    return dest
+
+
+def test_publish_sets_latest_and_add_makes_the_new_run_the_headline(runs, made_bundle):
     runs_dir, latest, bundle = runs
     assert publish.publish(bundle, latest=latest, runs_dir=runs_dir, regenerate=False) == [bundle.name]
     assert json.loads(latest.read_text()) == {"runs": [bundle.name]}
     assert (bundle / TRANSCRIPT_GZ).exists()
 
-    other = runs_dir / "20990101T000000000000Z-other"
-    shutil.copytree(made_bundle, other)
-    manifest = json.loads((other / "manifest.json").read_text())
-    manifest["run_id"] = other.name
-    (other / "manifest.json").write_text(json.dumps(manifest))
+    other = _copy_run(made_bundle, runs_dir, "20990101T000000000000Z-other")
     assert publish.publish(other, add=True, latest=latest, runs_dir=runs_dir,
-                           regenerate=False) == [bundle.name, other.name]
-    assert [b.run_id for b in published_bundles(latest, runs_dir)] == [bundle.name, other.name]
+                           regenerate=False) == [other.name, bundle.name]
+    assert [b.run_id for b in published_bundles(latest, runs_dir)] == [other.name, bundle.name]
     # republishing without --add makes it the only (headline) run
     assert publish.publish(other, latest=latest, runs_dir=runs_dir, regenerate=False) == [other.name]
+
+
+def test_a_sample_never_displaces_a_real_headline(runs, made_bundle, capsys):
+    runs_dir, latest, sample = runs
+    real = _copy_run(made_bundle, runs_dir, "20990101T000000000000Z-real", real=True)
+    publish.publish(real, latest=latest, runs_dir=runs_dir, regenerate=False)
+    assert publish.publish(sample, add=True, latest=latest, runs_dir=runs_dir,
+                           regenerate=False) == [real.name, sample.name]
+    assert "stays the headline" in capsys.readouterr().err
+    assert publish.publish(sample, latest=latest, runs_dir=runs_dir, regenerate=False) == [sample.name]
+    assert "replaces the real run" in capsys.readouterr().err
+
+
+def test_publish_drops_missing_and_duplicate_ids_and_validates_before_writing(
+        runs, made_bundle, monkeypatch, capsys):
+    runs_dir, latest, bundle = runs
+    latest.write_text(json.dumps({"runs": ["gone-run", bundle.name, bundle.name]}))
+    other = _copy_run(made_bundle, runs_dir, "20990101T000000000000Z-other")
+    assert publish.publish(other, add=True, latest=latest, runs_dir=runs_dir,
+                           regenerate=False) == [other.name, bundle.name]
+    assert "dropped gone-run" in capsys.readouterr().err
+
+    # A failure while rendering the README leaves latest.json and the transcript alone.
+    before = latest.read_text()
+    third = _copy_run(made_bundle, runs_dir, "20990101T000000000001Z-third")
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("render failed")
+
+    monkeypatch.setattr(export, "outputs_for", broken)
+    with pytest.raises(RuntimeError, match="render failed"):
+        publish.publish(third, add=True, latest=latest, runs_dir=runs_dir)
+    assert latest.read_text() == before
+    assert (third / TRANSCRIPT).exists() and not (third / TRANSCRIPT_GZ).exists()
 
 
 def test_publish_refuses_bundles_it_cannot_link(runs, tmp_path, made_bundle):
@@ -145,6 +199,22 @@ def test_readme_block_carries_every_backend_with_intervals(runs):
         assert f"{legacy['constants']['RECALL_AT_TURN_50'][b]}%" in block
 
 
+def test_readme_block_labels_only_the_headline_latest_and_states_sample_status(runs, made_bundle):
+    runs_dir, _, bundle_path = runs
+    sample = load_bundle(bundle_path)
+    real = load_bundle(_copy_run(made_bundle, runs_dir, "20990101T000000000000Z-real", real=True))
+    legacy = load_legacy()
+    block = export.readme_block([real, sample], legacy)
+    assert block.count("### Latest v2 run") == 1
+    assert f"### Latest v2 run: `{real.run_id}`" in block
+    assert f"### Earlier v2 run: `{sample.run_id}`" in block
+    assert "No real v2 benchmark" not in block
+    only_sample = export.readme_block([sample], legacy)
+    assert "No real v2 benchmark is published yet" in only_sample
+    assert "offline fake" in only_sample  # the fake judge's agreement is called meaningless
+    assert "republish the real run" in export.readme_block([sample, real], legacy)
+
+
 def test_render_readme_replaces_only_the_block_and_detects_drift(tmp_path):
     text = f"intro\n{export.BEGIN}\nold\n{export.END}\noutro\n"
     once = export.render_readme(text, "NEW")
@@ -181,7 +251,7 @@ def test_benchmark_data_ts_has_v1_constants_and_latest_run(runs):
     assert f'runId: "{bundle.run_id}"' in ts and "isSample: true" in ts
 
 
-@pytest.mark.skipif(NODE is None, reason="node is not installed")
+@pytest.mark.skipif(not _node_strips_types(), reason="needs node 22.6+ (type stripping)")
 def test_benchmark_data_ts_evaluates_to_the_legacy_values(runs, tmp_path):
     _, _, bundle_path = runs
     bundle = load_bundle(bundle_path)
@@ -299,6 +369,98 @@ def test_site_build_only_clears_its_own_output(runs, tmp_path):
         site_build.build([bundle, bundle], out)
 
 
+def test_site_build_validates_before_clearing_the_old_site(runs, tmp_path, made_bundle):
+    runs_dir, _, bundle_path = runs
+    out = tmp_path / "site"
+    site_build.build([load_bundle(bundle_path)], out)
+    kept = (out / "index.html").read_text()
+
+    renamed = runs_dir / "20990101T000000000000Z-renamed"
+    shutil.copytree(made_bundle, renamed)  # manifest still says the old run id
+    with pytest.raises(ValueError, match="does not match the bundle directory"):
+        site_build.build([load_bundle(renamed)], out)
+
+    bad = _copy_run(made_bundle, runs_dir, "20990101T000000000000Z-bad")
+    manifest = json.loads((bad / "manifest.json").read_text())
+    manifest["run_id"] = "../escape"
+    (bad / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="invalid run id"):
+        site_build.build([load_bundle(bad)], out)
+
+    clash = _copy_run(made_bundle, runs_dir, "20990101T000000000000Z-clash")
+    aggregate = json.loads((clash / "aggregate.json").read_text())
+    data = next(iter(aggregate["backends"].values()))
+    aggregate["backends"] = {"a b": data, "a/b": data}
+    (clash / "aggregate.json").write_text(json.dumps(aggregate))
+    with pytest.raises(ValueError, match="would share the page probes-a-b.html"):
+        site_build.build([load_bundle(clash)], out)
+
+    with pytest.raises(ValueError, match="no bundles"):
+        site_build.build([], out)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("render failed")
+
+    good = load_bundle(bundle_path)
+    original = site_build.index_html
+    site_build.index_html = broken
+    try:
+        with pytest.raises(RuntimeError):
+            site_build.build([good], out)
+    finally:
+        site_build.index_html = original
+    assert (out / "index.html").read_text() == kept  # nothing was cleared
+
+
+def test_unscored_probes_get_a_filter_option(runs, tmp_path):
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    label = next(iter(bundle.backends))
+    probes = [{"backend": label, "run_index": 0, "checkpoint": 5, "fact_id": "f", "category": "extraction",
+               "question": "q?", "response": "r", "label": None}]
+    html = site_build.probes_html(bundle, label, probes)
+    assert '<option value="unscored">unscored</option>' in html
+    assert 'data-lab="unscored"' in html
+    assert '<option value=""></option>' not in html
+
+
+def test_unknown_categories_are_shown_after_the_known_ones(runs):
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    for data in bundle.backends.values():
+        data["recall_by_category"]["zz_custom"] = {"n": 2, "correct_rate": 0.5, "correct_ci95": [0.1, 0.9]}
+    html = site_build.category_table(bundle, site_build.Numbers(bundle))
+    assert "<th>zz_custom</th>" in html
+    assert html.index("<th>extraction</th>") < html.index("<th>zz_custom</th>")
+
+
+def test_missing_numbers_render_as_n_a(runs, tmp_path):
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    # What an aggregate holds when a backend had no headline probes or no token counts.
+    for data in bundle.backends.values():
+        data["recall_overall"].update(correct_rate=None, correct_ci95=None)
+        data["recall_run_mean"].update(mean=None, ci95=None)
+        data["tokens"]["total_tokens"] = None
+        data["memory_size_end"]["mean"] = None
+        data["cost"].update(per_1k_conversations_usd=None, per_correct_recall_usd=None)
+    row = headline_row(next(iter(bundle.backends.values())))
+    assert row["recall"] is None and row["tokens"] is None
+    assert headline_row({})["headline_n"] == 0  # a missing block is not a crash either
+    text = "\n".join(export.v2_markdown(bundle))
+    assert "n/a" in text
+    assert export.latest_run_summary(bundle)["backends"][0]["recallPct"] is None
+    # The site's tables and charts cope with missing tokens, memory, cost and run means.
+    site_bundle = load_bundle(bundle_path)
+    for data in site_bundle.backends.values():
+        data["recall_run_mean"].update(mean=None, ci95=None)
+        data["tokens"]["total_tokens"] = None
+        data["memory_size_end"]["mean"] = None
+        data["cost"].update(per_1k_conversations_usd=None, per_correct_recall_usd=None)
+    page = site_build.build([site_bundle], tmp_path / "site").read_text()
+    assert "n/a" in page
+
+
 def test_site_build_cli_takes_bundle_dirs(runs, tmp_path, no_network):
     _, _, bundle_path = runs
     out = tmp_path / "cli-site"
@@ -307,6 +469,21 @@ def test_site_build_cli_takes_bundle_dirs(runs, tmp_path, no_network):
 
 
 # --------------------------------------------------------- the committed outputs
+
+
+def test_sources_parse_on_python_311(tmp_path):
+    """CI runs 3.11 too; this catches 3.12-only syntax (nested same-quote f-strings) locally."""
+    py311 = shutil.which("python3.11")
+    if py311 is None:
+        pytest.skip("python3.11 is not installed")
+    root = Path(__file__).resolve().parents[1]
+    files = [str(f) for d in ("src", "tests", "scripts") for f in (root / d).rglob("*.py")]
+    files.append(str(root / "run_benchmark.py"))
+    code = ("import ast, sys\n"
+            "for f in sys.argv[1:]:\n"
+            "    ast.parse(open(f, encoding='utf-8').read(), f)\n")
+    result = subprocess.run([py311, "-c", code, *files], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
 
 
 def test_committed_readme_and_ts_match_the_published_bundles():

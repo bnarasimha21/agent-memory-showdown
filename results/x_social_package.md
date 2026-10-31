@@ -1,5 +1,8 @@
 # Agent Memory Showdown — X (Twitter) Short-Form Package
 
+> **v1 numbers, read before posting.** Every figure in this file comes from the v1 benchmark (April 2026), whose methodology has known limits: recall probes were written back into memory, buffer and summary used a different prompt from the vector backends, two recall turns were never probed, and scoring was a substring check. See *v1 observations* and *Methodology notes and limitations* in the README. Do not post these numbers without that caveat. The numbers below are left as they were published.
+
+
 **Draft for review:** Jakub Lukaszczyk, Ari Sigal
 **Posting from:** DigitalOcean brand account · **Owner:** Narsi Badrinath
 **Status:** DRAFT — copy + storyboard pending approval; video render pending sign-off on the beat sheet.

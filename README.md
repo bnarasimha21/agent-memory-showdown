@@ -15,11 +15,13 @@ from the bundles listed in `results/latest.json` and from the v1 numbers in
 
 Interactive results, with every probe's transcript: <https://bnarasimha21.github.io/agent-memory-showdown/>
 
+**No real v2 benchmark is published yet.** The headline bundle below is a sample made offline; see *Setup* to make a real run (it needs `DO_API_KEY`) and *Results site and publishing* to publish it.
+
 ### Latest v2 run: `20261031T025710495845Z-sample-fake`
 
-> **Sample run, not a benchmark result.** It was produced offline with the fake chat model and hashing embeddings (`LLM_PROVIDER=fake`, `EMBEDDING_PROVIDER=fake`) to show the bundle format, the site and the charts. The numbers describe the harness, not any model or memory backend; costs are what the recorded token counts would cost at the listed price.
+> **Sample run, not a benchmark result.** At least one of the chat model, the judge and the embeddings was fake (`LLM_PROVIDER=fake`, `JUDGE_PROVIDER=fake`, `EMBEDDING_PROVIDER=fake`). It shows the bundle format, the site and the charts. The numbers describe the harness, not any model or memory backend; costs are what the recorded token counts would cost at the listed price.
 
-2 runs x 20 turns, checkpoints 10, 20, model `fake-memory-v1`, embeddings `fake-hashing-384`, k = 2, 4. Source: [`manifest.json`](results/runs/20261031T025710495845Z-sample-fake/manifest.json), [`aggregate.json`](results/runs/20261031T025710495845Z-sample-fake/aggregate.json). Recall leaves out the `sensitive` category; intervals are 95% (Wilson over probes, bootstrap over runs).
+2 runs x 20 turns, checkpoints 10, 20, model `fake-memory-v1`, embeddings `fake-hashing-384`, k = 2, 4. Source: [`manifest.json`](results/runs/20261031T025710495845Z-sample-fake/manifest.json), [`aggregate.json`](results/runs/20261031T025710495845Z-sample-fake/aggregate.json). Recall leaves out the `sensitive` category; intervals are 95% (Wilson over probes, bootstrap over runs). Judge `fake-judge-v1` is the offline fake, which applies the matcher rules, so its agreement with the matcher says nothing about a real judge.
 
 | Backend | Recall [95% CI] | Run mean [95% CI] | Probes in recall | Cost / 1K conv | Cost / correct recall | Latency p50 / p95 | Memory at end |
 |---------|----------------:|------------------:|-------:|---------------:|----------------------:|------------------:|--------------:|
@@ -65,11 +67,11 @@ flowchart TD
     B3 & B6 --> QD[(Qdrant\nDocker)]
     B4 & B5 --> PG[(PostgreSQL 16\npgvector)]
     B3 & B4 & B5 & B6 --> EMB[Local Embeddings\nall-MiniLM-L6-v2]
-    HN --> RS[results/benchmark_*.json]
-    RS --> VIZ[visualize.py]
-    VIZ --> C1[memory_decay_curve.png]
-    VIZ --> C2[latency_bar.png]
-    VIZ --> C3[cost_table.md]
+    HN --> RB[results/runs/run_id/\nmanifest, dataset, transcript]
+    RB --> SC[scoring: matcher + judge\nscores.jsonl]
+    SC --> AG[aggregate.py\naggregate.json]
+    AG --> VIZ[visualize.py\nruns/run_id/charts/]
+    AG --> SITE[src/site\nREADME block, results site]
 ```
 
 ## Infrastructure
@@ -126,7 +128,7 @@ Notes on the newer backends:
   - a deterministic **matcher** (`src/scoring/matcher.py`): accents, punctuation, ordinals, number words and dates are normalized (`src/scoring/normalize.py`), each answer is a list of required parts with accepted aliases (melatonin needs the drug *and* the 10 mg dose), aliases match on token boundaries only, and refusal language is labelled `refused` even when the value is present;
   - an **LLM judge** (`src/scoring/judge.py`) with a fixed rubric in [`src/scoring/judge_prompt.md`](src/scoring/judge_prompt.md). The judge model is `JUDGE_MODEL` (default `anthropic-claude-4.5-sonnet` via DO Serverless Inference, temperature 0); the model and the prompt's sha256 are written to the run manifest and `scoring.json`.
   - Headline recall uses the judge label (the matcher label where the judge output could not be parsed). Matcher figures, Cohen's kappa between the two scorers, and every disagreement are written to `aggregate.json` for spot checks.
-  - **Observed agreement:** none yet. The only judged bundles so far use the fake judge, which applies the matcher rules by construction (kappa 1.0 is meaningless there). The first paid run will report the real figure.
+  - **Observed agreement:** reported for each published run in *Results* (that sentence is generated from the bundle). A run scored with the offline fake judge says so there, because the fake judge applies the matcher rules and its agreement is meaningless.
 - **Intervals:** every recall rate carries a 95% Wilson interval over probes. Probes in one run share a memory, so they are not independent; the per-run recall mean with a bootstrap interval over runs is reported too and is the better basis for comparing backends.
 - **Re-scoring** never re-runs the conversation: `python -m src.scoring.rescore results/runs/<run_id>` writes new scores and an aggregate to `results/rescored/` and leaves the bundle untouched (`--no-judge` for matcher only).
 - **5 runs per backend** for statistical reliability
@@ -138,11 +140,11 @@ Notes on the newer backends:
 - **Probe reinforcement (v1).** v1 sent recall probes as ordinary chat turns, so each probe and its answer were written into memory and the turn-50 probe could retrieve the turn-15 question and answer. That flattered the turn-50 scores, especially for early facts. v2 probes are read-only and the harness checks it.
 - **Different prompts per backend family (v1).** v1 `buffer` and `summary` used LangChain's default `ConversationChain` prompt while `qdrant` and `pgvector` used a custom one, so part of the gap may have been prompt wording. v2 uses one shared prompt.
 - **Dropped recall turns (v1).** In v1 a recall turn that collided with a seed turn (25 and 35) was silently never probed. v2 checkpoints are separate from turns.
+- **Substring scoring (v1).** v1 checked that each word of the answer key appeared anywhere in the reply, so "march 15" matched "turn 15", "Godel Escher Bach" failed against the accented key, the melatonin dose was never checked, and "I won't repeat your PIN 7294" scored correct. v2 replaces it with the matcher and judge above.
 
 **Still true in v2:**
 
 - **Probe tokens are reported separately.** Probes are not part of the conversation, so their tokens and latency are recorded per probe in the transcript and kept out of the per-conversation totals.
-- **Substring scoring (v1).** v1 checked that each word of the answer key appeared anywhere in the reply, so "march 15" matched "turn 15", "Godel Escher Bach" failed against the accented key, the melatonin dose was never checked, and "I won't repeat your PIN 7294" scored correct. v2 replaces it with the matcher and judge above.
 - **Embeddings are local.** `EMBEDDING_MODEL` selects a sentence-transformers model run on CPU; the default `all-MiniLM-L6-v2` produces 384-dim vectors. `EMBEDDING_DIMENSION` (vector size for every vector backend) must be changed together with it. The pgvector, LangGraph store and mem0 backends create their own tables and collections, so the `memory_embeddings` table in `scripts/init_pgvector.sql` is not used.
 
 ## Metrics
@@ -156,7 +158,7 @@ Notes on the newer backends:
 | Latency p50 / p95 | Percentiles of each component and of their sum over every conversation turn of every valid run. Probes are timed the same way and reported separately (`probe_latency`). |
 | Input / output tokens | Provider-reported tokens per call, summed per conversation. Answering calls (`chat`) and memory maintenance calls (`memory`: the summarizer, mem0's extraction) are reported separately; probe tokens are reported separately and excluded from conversation totals. |
 | Cost per conversation | input tokens x input price + output tokens x output price, prices from [`pricing.yaml`](pricing.yaml) (each entry has a source URL and a checked-on date). Also shown per 1K conversations. |
-| Cost per correct recall | (conversation spend + probe spend) / number of correct probes, across all valid runs. |
+| Cost per correct recall | (conversation spend + spend on headline probes) / number of correct headline probes, across all valid runs. Sensitive probes are left out of both, as they are from headline recall. |
 | Memory size at end | What the backend holds after the last turn: messages (buffer), summary characters (summary), points (Qdrant), rows (pgvector), items (LangGraph store), extracted memories (mem0). |
 
 v1 reported a single "retrieval latency" that actually wrapped retrieval, generation and the memory write, and priced every token at a 75/25 input/output blend; the v1 table at the top of this page uses those definitions.
@@ -187,8 +189,8 @@ cp .env.example .env
 # 2. Run the full benchmark (starts Qdrant + Postgres automatically)
 make run
 
-# Results written to results/
-# Charts written to results/charts/
+# Each run writes a bundle to results/runs/<run_id>/
+# with its charts in results/runs/<run_id>/charts/
 ```
 
 ### Local Run
@@ -272,9 +274,10 @@ records the run in `results/latest.json` and regenerates the README block above 
 narrates, read from `results/legacy/v1_published.json`, and adds `LATEST_RUN`, a summary of the
 headline v2 bundle.
 
-The bundle published now is a **sample**: 2 runs x 20 turns with the fake chat model and hashing
-embeddings, made offline to show the format and the site. No real v2 benchmark has been published
-yet. To make one, see *Setup* (it needs `DO_API_KEY`), then publish its bundle as above.
+`--add` keeps the runs already published and makes the new one the headline, except that a sample
+run is listed after any real run instead of replacing it as the headline. Whether the headline
+bundle is a real run or a sample is stated at the top of *Results*; that note is generated from the
+bundle, so `make site-check` catches it going stale.
 
 ## Remotion Video
 
@@ -302,7 +305,8 @@ agent-memory-showdown/
 ├── src/
 │   ├── config.py             # env-driven config (DO API key, DB URIs)
 │   ├── dataset/              # dataset v2: bank.py (loads the fact bank), generate.py
-│   ├── harness.py            # benchmark runner + aggregator
+│   ├── harness.py            # benchmark runner: conversations, checkpoints, read-only probes
+│   ├── aggregate.py          # bundle -> aggregate.json: recall, intervals, cost, latency
 │   ├── llm_factory.py        # Claude + local embeddings
 │   ├── visualize.py          # Plotly + Matplotlib charts
 │   ├── bundle.py             # run bundle files: manifest, transcript, scores
@@ -357,4 +361,4 @@ agent-memory-showdown/
 
 The v1 benchmark ran on April 17, 2026 and its numbers are above, labelled as v1. The v2 harness
 (six backends, read-only probes, matcher plus judge scoring, run bundles, results site) is complete;
-the published v2 bundle is a fake-LLM sample until a real run is made.
+*Results* says whether the published v2 headline bundle is a real run or a sample.

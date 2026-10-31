@@ -31,12 +31,12 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from src.bundle import TRANSCRIPT, TRANSCRIPT_GZ, iter_transcript
+from src.bundle import TRANSCRIPT, TRANSCRIPT_GZ, iter_transcript, validate_run_id
 from src.site.data import (
     LEGACY_V1, PAGES_URL, REPO_ROOT, Bundle, headline_row, load_bundle, load_legacy,
     published_bundles,
 )
-from src.site.export import ci, k_text, ms, pct, usd
+from src.site.export import ci, fmt, k_text, ms, pct, usd
 
 SITE_DIR = REPO_ROOT / "site"
 MARKER = ".ams-site"  # build only ever clears a directory it created
@@ -135,8 +135,8 @@ def headline_table(bundle: Bundle, num: Numbers) -> str:
             f"<td>{num(str(r['headline_n']))}</td><td>{num(usd(r['cost_per_1k']))}</td>"
             f"<td>{num(usd(r['cost_per_correct'], 4))}</td>"
             f"<td>{num(ms(r['latency_p50']))} / {num(ms(r['latency_p95']))}</td>"
-            f"<td>{num(f'{r['tokens']:,.0f}')}</td>"
-            f"<td>{num(f'{r['memory_end']:,.0f}')} {esc(r['memory_unit'])}</td>"
+            f"<td>{num(fmt(r['tokens']))}</td>"
+            f"<td>{num(fmt(r['memory_end']))} {esc(r['memory_unit'])}</td>"
             f'<td><a href="{probes}">probes</a></td></tr>'
         )
     return f"<table>{head}{''.join(rows)}</table>"
@@ -145,13 +145,14 @@ def headline_table(bundle: Bundle, num: Numbers) -> str:
 def category_table(bundle: Bundle, num: Numbers) -> str:
     from src.dataset import CATEGORIES
 
-    cats = [c for c in CATEGORIES
-            if any(c in d.get("recall_by_category", {}) for d in bundle.backends.values())]
+    present = {c for d in bundle.backends.values() for c in (d.get("recall_by_category") or {})}
+    # Known categories in their usual order, then any others (as visualize does).
+    cats = [c for c in CATEGORIES if c in present] + sorted(present - set(CATEGORIES))
     head = "<tr><th>Backend</th>" + "".join(
         f"<th>{esc(c)}{' *' if c == 'sensitive' else ''}</th>" for c in cats) + "</tr>"
     rows = []
     for label, data in bundle.backends.items():
-        by_cat = data.get("recall_by_category", {})
+        by_cat = data.get("recall_by_category") or {}
         cells = []
         for c in cats:
             d = by_cat.get(c)
@@ -187,8 +188,8 @@ def run_section(bundle: Bundle, headline: bool) -> str:
         f"</code>, embeddings <code>{esc(m.get('embedding_model'))}</code>, k = {num(k_text(m.get('k')))}. "
         f"Scored by <code>{esc(bundle.aggregate.get('scoring', {}).get('judge_model') or 'matcher only')}"
         f"</code>"
-        + (f", matcher/judge kappa {num(f'{agreement['kappa']:.3f}')} over {num(str(agreement['n']))} probes"
-           if agreement.get("kappa") is not None else "")
+        + (f", matcher/judge kappa {num(fmt(agreement.get('kappa'), '.3f'))} over "
+           f"{num(str(agreement.get('n')))} probes" if agreement.get("kappa") is not None else "")
         + f". Source: {src}.</p>")
     parts.append("<h3>Headline</h3><p class=\"muted\">Recall leaves out the sensitive category. "
                  "CI is the Wilson interval over probes; the run mean interval is a bootstrap over "
@@ -213,12 +214,17 @@ def legacy_section(legacy: dict) -> str:
     def num(text: str) -> str:
         return f'<a class="num" href="{href}" title="{title}">{esc(text)}</a>'
 
-    rows = "".join(
-        f"<tr><td>{esc(b)}</td><td>{num(f'{c['RECALL_AT_TURN_15'][b]}%')}</td>"
-        f"<td>{num(f'{c['RECALL_AT_TURN_50'][b]}%')}</td>"
-        f"<td>{num(f'{c['AVG_LATENCY_MS'][b] / 1000:.1f}s')}</td><td>{num(f'${c['COST_PER_1K'][b]:,}')}</td>"
-        f"<td>{num(f'{c['AVG_TOKENS'][b] / 1000:.0f}K')}</td></tr>"
-        for b in c["BACKENDS"])
+    rows = []
+    for b in c["BACKENDS"]:
+        cells = [
+            fmt(c["RECALL_AT_TURN_15"][b], "", "%"),
+            fmt(c["RECALL_AT_TURN_50"][b], "", "%"),
+            fmt(c["AVG_LATENCY_MS"][b] / 1000, ".1f", "s"),
+            "$" + fmt(c["COST_PER_1K"][b], ","),
+            fmt(c["AVG_TOKENS"][b] / 1000, ".0f", "K"),
+        ]
+        rows.append(f"<tr><td>{esc(b)}</td>" + "".join(f"<td>{num(x)}</td>" for x in cells) + "</tr>")
+    rows = "".join(rows)
     limits = "".join(f"<li>{esc(x)}</li>" for x in legacy["limitations"])
     return (
         "<h2>v1 published numbers (v1 methodology, known limits)</h2>"
@@ -342,12 +348,12 @@ def probes_html(bundle: Bundle, label: str, probes: list[dict]) -> str:
     def options(field: str, values) -> str:
         return "".join(f'<option value="{esc(v)}">{esc(v)}</option>' for v in values)
 
-    cats = sorted({p.get("category", "") for p in probes})
-    labs = sorted({p.get("label", "") for p in probes})
+    cats = sorted({p.get("category") or "" for p in probes})
+    labs = sorted({p.get("label") or "unscored" for p in probes})
     cps = sorted({p["checkpoint"] for p in probes})
     items = []
     for p in sorted(probes, key=lambda p: (p["run_index"], p["checkpoint"], p.get("order", 0))):
-        lab = p.get("label", "unscored")
+        lab = p.get("label") or "unscored"
         pid = f"r{p['run_index']}-c{p['checkpoint']}-{p['fact_id']}"
         answers = " | ".join(" + ".join(group) for group in p.get("answers") or []) or p.get("answer_key")
         items.append(
@@ -362,7 +368,7 @@ def probes_html(bundle: Bundle, label: str, probes: list[dict]) -> str:
             f"<p class=\"muted\">matcher {esc(p.get('matcher_label'))}, judge {esc(p.get('judge_label'))}"
             + (f": {esc(p.get('judge_rationale'))}" if p.get("judge_rationale") else "")
             + f"; fact planted at turn {esc(p.get('planted_at'))}; retrieve "
-            f"{esc(round(p.get('retrieve_ms', 0), 1))} ms, {esc(p.get('input_tokens'))} input tokens</p>"
+            f"{esc(round(p.get('retrieve_ms') or 0, 1))} ms, {esc(p.get('input_tokens'))} input tokens</p>"
             f"<p><b>Retrieved memory context</b></p><pre>{esc(p.get('context'))}</pre></details>"
         )
     body = (
@@ -384,6 +390,8 @@ def probes_html(bundle: Bundle, label: str, probes: list[dict]) -> str:
 
 
 def prepare_out(out: Path) -> None:
+    if out.is_symlink():
+        raise FileExistsError(f"{out} is a symlink; refusing to build into it")
     if out.exists():
         if not (out / MARKER).exists() and any(out.iterdir()):
             raise FileExistsError(f"{out} exists and was not made by this builder; refusing to clear it")
@@ -392,32 +400,59 @@ def prepare_out(out: Path) -> None:
     (out / MARKER).write_text("built by python -m src.site.build\n", encoding="utf-8")
 
 
+def validate(bundles: list[Bundle]) -> None:
+    """Everything that would make a link wrong or a page overwrite another, checked up front."""
+    if not bundles:
+        raise ValueError("no bundles to build from")
+    seen = set()
+    for bundle in bundles:
+        validate_run_id(bundle.run_id)
+        if bundle.run_id != bundle.path.name:
+            raise ValueError(f"manifest run_id {bundle.run_id!r} does not match the bundle "
+                             f"directory {bundle.path.name!r}")
+        if bundle.run_id in seen:
+            raise ValueError(f"run {bundle.run_id} listed twice")
+        seen.add(bundle.run_id)
+        slugs: dict[str, str] = {}
+        for label in bundle.backends:
+            other = slugs.setdefault(slug(label), label)
+            if other != label:
+                raise ValueError(f"backends {other!r} and {label!r} in run {bundle.run_id} would share "
+                                 f"the page probes-{slug(label)}.html")
+
+
+def render(bundles: list[Bundle], legacy: dict) -> dict[str, str]:
+    """Every generated page by its path in the site, rendered before anything is written."""
+    pages = {}
+    for bundle in bundles:
+        files = [f for f in BUNDLE_FILES if (bundle.path / f).exists()]
+        pages[f"runs/{bundle.run_id}/index.html"] = bundle_index_html(bundle, files)
+        records = probe_records(bundle)
+        for label in bundle.backends:
+            pages[f"runs/{bundle.run_id}/probes-{slug(label)}.html"] = probes_html(
+                bundle, label, records.get(label, []))
+    pages["index.html"] = index_html(bundles, legacy)
+    return pages
+
+
 def build(bundles: list[Bundle], out: Path = SITE_DIR, legacy: dict | None = None) -> Path:
     from plotly.offline import get_plotlyjs
 
-    if not bundles:
-        raise ValueError("no bundles to build from")
+    validate(bundles)
     legacy = legacy if legacy is not None else load_legacy()
+    pages = render(bundles, legacy)  # a bad bundle fails here, before the old site is removed
     prepare_out(out)
     (out / "plotly.min.js").write_text(get_plotlyjs(), encoding="utf-8")
     (out / "legacy").mkdir()
     shutil.copy2(LEGACY_V1, out / "legacy" / LEGACY_V1.name)
-    seen = set()
     for bundle in bundles:
-        if bundle.run_id in seen:
-            raise ValueError(f"run {bundle.run_id} listed twice")
-        seen.add(bundle.run_id)
         dest = out / "runs" / bundle.run_id
         dest.mkdir(parents=True)
-        files = [f for f in BUNDLE_FILES if (bundle.path / f).exists()]
-        for f in files:
-            shutil.copy2(bundle.path / f, dest / f)
-        (dest / "index.html").write_text(bundle_index_html(bundle, files), encoding="utf-8")
-        records = probe_records(bundle)
-        for label in bundle.backends:
-            (dest / f"probes-{slug(label)}.html").write_text(
-                probes_html(bundle, label, records.get(label, [])), encoding="utf-8")
-    (out / "index.html").write_text(index_html(bundles, legacy), encoding="utf-8")
+        for f in BUNDLE_FILES:
+            if (bundle.path / f).exists():
+                shutil.copy2(bundle.path / f, dest / f)
+    for rel, text in pages.items():
+        (out / rel).write_text(text, encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
     return out / "index.html"
 

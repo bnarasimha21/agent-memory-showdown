@@ -33,3 +33,4 @@ ToDo.txt
 
 # Results site build output (make site; built and deployed by CI)
 /site/
+/results/rescored/

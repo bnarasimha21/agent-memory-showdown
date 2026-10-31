@@ -1,5 +1,8 @@
 # Agent Memory video — Suggested copy & images (for review)
 
+> **v1 numbers, read before posting.** Every figure in this file comes from the v1 benchmark (April 2026), whose methodology has known limits: recall probes were written back into memory, buffer and summary used a different prompt from the vector backends, two recall turns were never probed, and scoring was a substring check. See *v1 observations* and *Methodology notes and limitations* in the README. Do not post these numbers without that caveat. The numbers below are left as they were published.
+
+
 ---
 
 ## 1. Main post copy (X / LinkedIn) — Options

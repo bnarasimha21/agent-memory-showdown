@@ -364,13 +364,16 @@ def fig_cost_vs_recall(results: dict) -> go.Figure | None:
     Error bars are the 95% Wilson interval on recall; points of one backend
     share its color, so a k sweep shows how depth trades recall for tokens.
     """
-    rows = [(b, d) for b, d in results.items() if "error" not in d and d.get("cost")]
+    # A backend without a recall rate (no headline probes) or a price has no point to plot.
+    rows = [(b, d) for b, d in results.items()
+            if "error" not in d and (d.get("cost") or {}).get("per_1k_conversations_usd") is not None
+            and (d.get("recall_overall") or {}).get("correct_rate") is not None]
     if not rows:
         return None
     fig = go.Figure()
     for backend, data in rows:
         rate = data["recall_overall"]["correct_rate"] * 100
-        lo, hi = (v * 100 for v in data["recall_overall"]["correct_ci95"])
+        lo, hi = (v * 100 for v in data["recall_overall"].get("correct_ci95") or (rate / 100, rate / 100))
         fig.add_trace(go.Scatter(
             x=[data["cost"]["per_1k_conversations_usd"]], y=[rate], mode="markers+text",
             name=backend, text=[backend], textposition="top center",

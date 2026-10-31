@@ -14,7 +14,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.bundle import load_manifest
+from src.bundle import load_manifest, validate_run_id
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = REPO_ROOT / "results"
@@ -69,8 +69,10 @@ def published_bundles(latest: Path = LATEST, runs_dir: Path = RUNS_DIR) -> list[
     """The bundles listed in latest.json, headline first."""
     bundles = []
     for run_id in read_latest(latest):
-        if "/" in run_id or "\\" in run_id or run_id in (".", ".."):
-            raise ValueError(f"invalid run id in {latest}: {run_id!r}")
+        try:
+            validate_run_id(run_id)
+        except ValueError as exc:
+            raise ValueError(f"invalid run id in {latest}: {run_id!r}") from exc
         bundles.append(load_bundle(runs_dir / run_id))
     return bundles
 
@@ -83,24 +85,25 @@ def headline_row(data: dict) -> dict:
     """The few numbers every summary shows for one backend label of an aggregate."""
     if "error" in data:
         return {"error": data["error"]}
-    overall = data["recall_overall"]
+    overall = data.get("recall_overall") or {}
     run_mean = data.get("recall_run_mean") or {}
     cost = data.get("cost") or {}
-    total = data["latency"]["total_ms"]
+    total = (data.get("latency") or {}).get("total_ms") or {}
+    memory = data.get("memory_size_end") or {}
     return {
         "error": None,
-        "recall": overall["correct_rate"],
-        "recall_ci": overall["correct_ci95"],
-        "headline_n": overall["n"],
-        "probes_all": sum(d["n"] for d in data.get("recall_by_category", {}).values()) or overall["n"],
+        "recall": overall.get("correct_rate"),
+        "recall_ci": overall.get("correct_ci95"),
+        "headline_n": overall.get("n", 0),
+        "probes_all": sum(d["n"] for d in (data.get("recall_by_category") or {}).values()),
         "run_mean": run_mean.get("mean"),
         "run_mean_ci": run_mean.get("ci95"),
         "runs": data.get("num_valid_runs"),
         "cost_per_1k": cost.get("per_1k_conversations_usd"),
         "cost_per_correct": cost.get("per_correct_recall_usd"),
-        "latency_p50": total["p50"],
-        "latency_p95": total["p95"],
-        "tokens": data["tokens"]["total_tokens"],
-        "memory_end": data["memory_size_end"]["mean"],
-        "memory_unit": data["memory_size_end"]["unit"],
+        "latency_p50": total.get("p50"),
+        "latency_p95": total.get("p95"),
+        "tokens": (data.get("tokens") or {}).get("total_tokens"),
+        "memory_end": memory.get("mean"),
+        "memory_unit": memory.get("unit"),
     }

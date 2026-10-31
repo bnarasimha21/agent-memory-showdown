@@ -44,6 +44,15 @@ def usd(x: float | None, digits: int = 2) -> str:
     return "n/a" if x is None else f"${x:,.{digits}f}"
 
 
+def fmt(x, spec: str = ",.0f", suffix: str = "") -> str:
+    """A number with a format spec, or "n/a" when the aggregate has none."""
+    return "n/a" if x is None else format(x, spec) + suffix
+
+
+def _round(x, digits: int = 1):
+    return None if x is None else round(x, digits)
+
+
 def k_text(k) -> str:
     return ", ".join(str(v) for v in k) if isinstance(k, list) else str(k)
 
@@ -64,17 +73,19 @@ def _rel(path: Path) -> str:
 # --------------------------------------------------------------------- README
 
 
-def v2_markdown(bundle: Bundle) -> list[str]:
+def v2_markdown(bundle: Bundle, headline: bool = True) -> list[str]:
     m = bundle.manifest
     src = _rel(bundle.path)
-    lines = [f"### Latest v2 run: `{bundle.run_id}`", ""]
+    title = "Latest v2 run" if headline else "Earlier v2 run"
+    lines = [f"### {title}: `{bundle.run_id}`", ""]
     if bundle.is_sample:
         lines += [
-            "> **Sample run, not a benchmark result.** It was produced offline with the fake chat "
-            "model and hashing embeddings (`LLM_PROVIDER=fake`, `EMBEDDING_PROVIDER=fake`) to show "
-            "the bundle format, the site and the charts. The numbers describe the harness, not any "
-            "model or memory backend; costs are what the recorded token counts would cost at the "
-            "listed price.",
+            "> **Sample run, not a benchmark result.** At least one of the chat model, the judge and "
+            f"the embeddings was fake (`LLM_PROVIDER={m.get('llm_provider')}`, "
+            f"`JUDGE_PROVIDER={(bundle.aggregate.get('scoring') or {}).get('judge_provider') or 'none'}`, "
+            f"`EMBEDDING_PROVIDER={m.get('embedding_provider')}`). It shows the bundle format, the site "
+            "and the charts. The numbers describe the harness, not any model or memory backend; costs "
+            "are what the recorded token counts would cost at the listed price.",
             "",
         ]
     lines += [
@@ -83,7 +94,7 @@ def v2_markdown(bundle: Bundle) -> list[str]:
         f"embeddings `{m.get('embedding_model')}`, k = {k_text(m.get('k'))}. "
         f"Source: [`manifest.json`]({src}/manifest.json), [`aggregate.json`]({src}/aggregate.json). "
         f"Recall leaves out the `sensitive` category; intervals are 95% (Wilson over probes, "
-        f"bootstrap over runs).",
+        f"bootstrap over runs). " + agreement_text(bundle),
         "",
         "| Backend | Recall [95% CI] | Run mean [95% CI] | Probes in recall | Cost / 1K conv | Cost / correct recall "
         "| Latency p50 / p95 | Memory at end |",
@@ -99,9 +110,22 @@ def v2_markdown(bundle: Bundle) -> list[str]:
             f"| {label} | {pct(r['recall'])} {ci(r['recall_ci'])} | {pct(r['run_mean'])} "
             f"{ci(r['run_mean_ci'])} | {r['headline_n']} | {usd(r['cost_per_1k'])} | "
             f"{usd(r['cost_per_correct'], 4)} | {ms(r['latency_p50'])} / {ms(r['latency_p95'])} ms | "
-            f"{r['memory_end']:,.0f} {r['memory_unit']} |"
+            f"{fmt(r['memory_end'])} {r['memory_unit'] or ''} |"
         )
     return lines
+
+
+def agreement_text(bundle: Bundle) -> str:
+    scoring = bundle.aggregate.get("scoring") or {}
+    agreement = bundle.aggregate.get("agreement") or {}
+    if not scoring.get("judge_model"):
+        return "Scored by the deterministic matcher only (no judge)."
+    if scoring.get("judge_provider") == "fake":
+        return (f"Judge `{scoring['judge_model']}` is the offline fake, which applies the matcher rules, "
+                "so its agreement with the matcher says nothing about a real judge.")
+    return (f"Judge `{scoring['judge_model']}`; matcher/judge agreement: Cohen's kappa "
+            f"{fmt(agreement.get('kappa'), '.3f')} over {agreement.get('n', 0)} probes "
+            "(every disagreement is listed in `aggregate.json`).")
 
 
 def v1_markdown(legacy: dict) -> list[str]:
@@ -128,8 +152,15 @@ def v1_markdown(legacy: dict) -> list[str]:
 
 def readme_block(bundles: list[Bundle], legacy: dict) -> str:
     lines = [f"Interactive results, with every probe's transcript: <{PAGES_URL}>", ""]
-    for bundle in bundles:
-        lines += v2_markdown(bundle) + [""]
+    if bundles[0].is_sample:
+        real = [b.run_id for b in bundles if not b.is_sample]
+        lines += [("**No real v2 benchmark is published yet.** The headline bundle below is a sample "
+                   "made offline; see *Setup* to make a real run (it needs `DO_API_KEY`) and "
+                   "*Results site and publishing* to publish it.") if not real else
+                  (f"**The headline bundle is a sample** although a real run is published "
+                   f"(`{real[0]}`); republish the real run to make it the headline."), ""]
+    for i, bundle in enumerate(bundles):
+        lines += v2_markdown(bundle, headline=i == 0) + [""]
     lines += v1_markdown(legacy)
     return "\n".join(lines)
 
@@ -200,12 +231,12 @@ def latest_run_summary(bundle: Bundle) -> dict:
             continue
         rows.append({
             "label": label,
-            "recallPct": round(r["recall"] * 100, 1),
-            "recallCi95Pct": [round(v * 100, 1) for v in r["recall_ci"]],
+            "recallPct": None if r["recall"] is None else round(r["recall"] * 100, 1),
+            "recallCi95Pct": [round(v * 100, 1) for v in r["recall_ci"]] if r["recall_ci"] else None,
             "recallProbes": r["headline_n"],
-            "costPer1kUsd": None if r["cost_per_1k"] is None else round(r["cost_per_1k"], 2),
-            "latencyP50Ms": round(r["latency_p50"], 1),
-            "tokensPerConversation": round(r["tokens"]),
+            "costPer1kUsd": _round(r["cost_per_1k"], 2),
+            "latencyP50Ms": _round(r["latency_p50"], 1),
+            "tokensPerConversation": _round(r["tokens"], None),
         })
     m = bundle.manifest
     return {
@@ -249,13 +280,27 @@ def render_benchmark_data_ts(legacy: dict, headline: Bundle) -> str:
 # ----------------------------------------------------------------------- main
 
 
-def outputs(latest: Path = LATEST, runs_dir: Path = RUNS_DIR) -> dict[Path, str]:
-    bundles = published_bundles(latest, runs_dir)
+def outputs_for(bundles: list[Bundle], readme_text: str | None = None) -> dict[Path, str]:
+    """README and benchmarkData.ts as they should be for these bundles (headline first)."""
     legacy = load_legacy()
+    text = README.read_text(encoding="utf-8") if readme_text is None else readme_text
     return {
-        README: render_readme(README.read_text(encoding="utf-8"), readme_block(bundles, legacy)),
+        README: render_readme(text, readme_block(bundles, legacy)),
         BENCHMARK_DATA_TS: render_benchmark_data_ts(legacy, bundles[0]),
     }
+
+
+def outputs(latest: Path = LATEST, runs_dir: Path = RUNS_DIR) -> dict[Path, str]:
+    return outputs_for(published_bundles(latest, runs_dir))
+
+
+def write_outputs(generated: dict[Path, str]) -> list[Path]:
+    written = []
+    for path, text in generated.items():
+        if not path.exists() or path.read_text(encoding="utf-8") != text:
+            path.write_text(text, encoding="utf-8")
+            written.append(path)
+    return written
 
 
 def stale(generated: dict[Path, str]) -> list[str]:
@@ -271,12 +316,7 @@ def stale(generated: dict[Path, str]) -> list[str]:
 
 
 def write_all(latest: Path = LATEST, runs_dir: Path = RUNS_DIR) -> list[Path]:
-    written = []
-    for path, text in outputs(latest, runs_dir).items():
-        if not path.exists() or path.read_text(encoding="utf-8") != text:
-            path.write_text(text, encoding="utf-8")
-            written.append(path)
-    return written
+    return write_outputs(outputs(latest, runs_dir))
 
 
 def main(argv=None) -> int:
