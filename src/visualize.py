@@ -104,7 +104,7 @@ def fig_label_breakdown(results: dict) -> go.Figure | None:
         fig.add_trace(go.Bar(name=label, x=backends, y=values,
                              marker_color=LABEL_COLORS.get(label, "#888")))
     fig.update_layout(
-        barmode="stack", title="Probe outcomes per backend (refusals separate from misses)",
+        barmode="stack", title="Probe outcomes per backend, per probe (refusals separate from misses)",
         xaxis_title="Memory Backend", yaxis_title="Share of probes (%)",
         yaxis=dict(range=[0, 100]), template="plotly_white", width=800, height=450,
     )
@@ -123,7 +123,7 @@ def plot_label_breakdown_matplotlib(results: dict, output_path: Path) -> None:
         ax.bar(backends, values, bottom=bottom, label=label,
                color=LABEL_COLORS.get(label, "#888"))
         bottom = [b + v for b, v in zip(bottom, values)]
-    ax.set_title("Probe outcomes per backend (refusals separate from misses)")
+    ax.set_title("Probe outcomes per backend, per probe (refusals separate from misses)")
     ax.set_ylabel("Share of probes (%)")
     ax.set_ylim(0, 100)
     ax.legend(loc="lower right", fontsize=8)
@@ -167,7 +167,7 @@ def plot_recall_by_category_matplotlib(results: dict, output_path: Path) -> None
     ax.set_xticklabels([c + (" *" if c in NON_HEADLINE else "") for c in categories])
     ax.set_ylabel("Correct (%)")
     ax.set_ylim(0, 105)
-    ax.set_title("Recall by fact category (* not in the headline number)")
+    ax.set_title("Recall by fact category, per probe (* not in the headline number)")
     ax.legend(fontsize=8)
     plt.tight_layout()
     plt.savefig(str(output_path), dpi=150)
@@ -185,7 +185,7 @@ def fig_recall_by_category(results: dict) -> go.Figure | None:
         fig.add_trace(go.Bar(name=backend, x=categories, y=ys,
                              marker_color=backend_color(backend)))
     fig.update_layout(
-        barmode="group", title="Recall by fact category (abstention and sensitive are not in the headline number)",
+        barmode="group", title="Recall by fact category, per probe (abstention and sensitive are not in the headline number)",
         yaxis_title="Correct (%)", yaxis=dict(range=[0, 105]), template="plotly_white",
         width=900, height=450,
     )
@@ -219,7 +219,7 @@ def fig_memory_decay_curve(results: dict) -> go.Figure | None:
         )
 
     fig.update_layout(
-        title="Memory Decay Curve: Recall Accuracy by Checkpoint",
+        title="Memory Decay Curve: Recall by Checkpoint (per probe, pooled over runs)",
         xaxis_title="Checkpoint (after turn N)",
         yaxis_title="Recall Accuracy (%)",
         yaxis=dict(range=[0, 105]),
@@ -255,7 +255,7 @@ def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None
             label=backend,
         )
 
-    ax.set_title("Memory Decay Curve: Recall by Checkpoint (approx. 95% Wilson interval over probes)")
+    ax.set_title("Memory Decay Curve: Recall by Checkpoint (per probe, pooled over runs;\napprox. 95% Wilson interval)")
     ax.set_xlabel("Checkpoint (after turn N)")
     ax.set_ylabel("Recall Accuracy (%)")
     ax.set_ylim(0, 105)
@@ -369,28 +369,33 @@ def plot_latency_by_turn_plotly(results: dict, output_path: Path) -> None:
 def fig_cost_vs_recall(results: dict) -> go.Figure | None:
     """One point per backend (and per k in a sweep): cost per conversation vs headline recall.
 
-    Error bars are the approximate 95% Wilson interval on per-probe recall; points of one backend
-    share its color, so a k sweep shows how depth trades recall for tokens.
+    The y value is the same headline the tables print: the mean of per-run recall, with its 95%
+    interval (Student t over runs, or the pooled Wilson interval when every run scored the same).
+    A single run has no interval and gets no error bar. Points of one backend share its color, so
+    a k sweep shows how depth trades recall for tokens.
     """
     # A backend without a recall rate (no headline probes) or a price has no point to plot.
     rows = [(b, d) for b, d in results.items()
             if "error" not in d and (d.get("cost") or {}).get("per_1k_conversations_usd") is not None
-            and (d.get("recall_overall") or {}).get("correct_rate") is not None]
+            and (d.get("recall_run_mean") or {}).get("mean") is not None]
     if not rows:
         return None
     fig = go.Figure()
     for backend, data in rows:
-        rate = data["recall_overall"]["correct_rate"] * 100
-        lo, hi = (v * 100 for v in data["recall_overall"].get("correct_ci95") or (rate / 100, rate / 100))
+        run_mean = data["recall_run_mean"]
+        rate = run_mean["mean"] * 100
+        error_y = None
+        if run_mean.get("ci95") is not None:
+            lo, hi = (v * 100 for v in run_mean["ci95"])
+            error_y = dict(type="data", symmetric=False, array=[hi - rate], arrayminus=[rate - lo])
         fig.add_trace(go.Scatter(
             x=[data["cost"]["per_1k_conversations_usd"]], y=[rate], mode="markers+text",
-            name=backend, text=[backend], textposition="top center",
-            error_y=dict(type="data", symmetric=False, array=[hi - rate], arrayminus=[rate - lo]),
+            name=backend, text=[backend], textposition="top center", error_y=error_y,
             marker=dict(size=12, color=backend_color(backend)),
         ))
     fig.update_layout(
         title="Cost vs recall (one point per backend and k)",
-        xaxis_title="Cost per 1K conversations (USD)", yaxis_title="Headline recall (%)",
+        xaxis_title="Cost per 1K conversations (USD)", yaxis_title="Headline recall, run mean (%)",
         yaxis=dict(range=[0, 105]), template="plotly_white", width=900, height=500,
         showlegend=False,
     )

@@ -388,3 +388,41 @@ def test_rescoring_a_real_bundle_with_a_fake_judge_is_marked_a_sample(tmp_path):
     assert json.loads((out / "aggregate.json").read_text())["is_sample"] is True
     _, agg = rescore(bundle, tmp_path / "matcher-only", use_judge=False)
     assert agg["is_sample"] is False
+
+
+def test_cost_vs_recall_plots_the_same_run_mean_recall_as_the_tables():
+    # Per probe the backend got 3 of 4 right (75%), but the run mean is
+    # (1/1 + 2/3) / 2 = 83.3%: the chart must show the tables' headline.
+    from src import visualize
+
+    results = {"a": {
+        "cost": {"per_1k_conversations_usd": 5.0},
+        "recall_overall": {"correct_rate": 0.75, "correct_ci95": [0.3, 0.95]},
+        "recall_run_mean": {"mean": 5 / 6, "ci95": [0.6, 1.0], "n": 2, "method": "t"},
+    }, "one_run": {
+        "cost": {"per_1k_conversations_usd": 6.0},
+        "recall_overall": {"correct_rate": 0.5, "correct_ci95": [0.1, 0.9]},
+        "recall_run_mean": {"mean": 0.5, "ci95": None, "n": 1, "method": "t"},
+    }}
+    fig = visualize.fig_cost_vs_recall(results)
+    a, one = fig.data
+    assert a.y[0] == pytest.approx(500 / 6)
+    assert a.error_y.array[0] == pytest.approx(100 - 500 / 6)
+    assert a.error_y.arrayminus[0] == pytest.approx(500 / 6 - 60)
+    assert one.y[0] == 50 and one.error_y.array is None  # one run: no interval to draw
+    assert "run mean" in fig.layout.yaxis.title.text
+
+
+def test_per_probe_charts_say_they_are_per_probe():
+    from src import visualize
+    from src.scoring import LABELS
+
+    results = {"a": {
+        "recall_overall": {f"{lab}_rate": 1 / len(LABELS) for lab in LABELS},
+        "recall_by_category": {"extraction": {"correct_rate": 0.5}},
+        "recall_by_checkpoint": {"10": {"correct_rate": 0.5, "correct_ci95": [0.2, 0.8]}},
+    }}
+    assert "per probe" in visualize.fig_label_breakdown(results).layout.title.text
+    assert "per probe" in visualize.fig_recall_by_category(results).layout.title.text
+    decay = visualize.fig_memory_decay_curve(results)
+    assert "per probe" in decay.layout.title.text
