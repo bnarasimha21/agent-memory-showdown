@@ -1,0 +1,665 @@
+{
+  "0": {
+    "seed": 42,
+    "turns": [
+      {
+        "turn_number": 1,
+        "human_message": "My coworkers were arguing about gardening advice at lunch today. Where do you land?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 2,
+        "human_message": "I ran into Femi Tanaka from my old school yesterday.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 3,
+        "human_message": "I'm flying to Lisbon on May 4.",
+        "fact_id": "deadline_before_trip",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 4,
+        "human_message": "My flight to Lima is on April 6.",
+        "fact_id": "flight_date",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 5,
+        "human_message": "Something worth remembering: My younger sister is called Noor.",
+        "fact_id": "sister_city",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 6,
+        "human_message": "My cousin Hana lives in Cape Town.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 7,
+        "human_message": "My neighbour just adopted a dog called Hazel.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 8,
+        "human_message": "I keep meaning to look into differences between Python and JavaScript. Where should I start?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 9,
+        "human_message": "The deadline for the grant report is April 17.",
+        "fact_id": "deadline_before_trip",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 10,
+        "human_message": "Quick note so you have it: My home Wi-Fi password is 'sunkist-mango-69'.",
+        "fact_id": "wifi_password",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 11,
+        "human_message": "Noor just moved to Kyoto for a new job.",
+        "fact_id": "sister_city",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 12,
+        "human_message": "My coworkers were arguing about learning to draw at lunch today. Where do you land?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 13,
+        "human_message": "Change of plans: my flight to Lima moved to April 8.",
+        "fact_id": "flight_date",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 14,
+        "human_message": "My friend's deadline for the conference talk is May 20.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 15,
+        "human_message": "Quick note so you have it: My childhood best friend's name is Priya Novak.",
+        "fact_id": "best_friend",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 16,
+        "human_message": "I've been reading a bit about financial budgeting tips lately. Any thoughts?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 17,
+        "human_message": "Can you give me a quick tip on a recent movie I watched?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 18,
+        "human_message": "Something worth remembering: My dog's name is Mochi.",
+        "fact_id": "dog_name",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 19,
+        "human_message": "My brother found out at the blood drive that he is O positive.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 20,
+        "human_message": "My manager flies to Seoul on May 18.",
+        "fact_id": null,
+        "kind": "distractor"
+      }
+    ],
+    "facts": [
+      {
+        "id": "blood_type",
+        "category": "abstention",
+        "turn": 0,
+        "probe": "What is my blood type?",
+        "answer_key": null,
+        "answers": [],
+        "stale": [],
+        "statements": [],
+        "headline": true,
+        "values": {
+          "type": "B negative",
+          "other_type": "O positive"
+        }
+      },
+      {
+        "id": "deadline_before_trip",
+        "category": "temporal",
+        "turn": 9,
+        "probe": "How many days before my trip to Lisbon is the deadline for the grant report?",
+        "answer_key": "17 days",
+        "answers": [
+          [
+            "17 days",
+            "17 day"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 3,
+            "text": "I'm flying to Lisbon on May 4."
+          },
+          {
+            "turn": 9,
+            "text": "The deadline for the grant report is April 17."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "city": "Lisbon",
+          "report": "the grant report",
+          "trip": "May 4",
+          "deadline": "April 17",
+          "gap": "17",
+          "other_city": "Lima",
+          "other_report": "the conference talk",
+          "other_trip": "June 23",
+          "other_deadline": "May 20",
+          "other_gap": "19"
+        }
+      },
+      {
+        "id": "wifi_password",
+        "category": "sensitive",
+        "turn": 10,
+        "probe": "What is my home Wi-Fi password?",
+        "answer_key": "sunkist-mango-69",
+        "answers": [
+          [
+            "sunkist-mango-69"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 10,
+            "text": "My home Wi-Fi password is 'sunkist-mango-69'."
+          }
+        ],
+        "headline": false,
+        "values": {
+          "w1": "sunkist",
+          "w2": "mango",
+          "n": "69",
+          "other_w1": "harbor",
+          "other_w2": "pebble",
+          "other_n": "50"
+        }
+      },
+      {
+        "id": "sister_city",
+        "category": "multi_hop",
+        "turn": 11,
+        "probe": "Which city does my younger sister live in now?",
+        "answer_key": "Kyoto",
+        "answers": [
+          [
+            "Kyoto"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 5,
+            "text": "My younger sister is called Noor."
+          },
+          {
+            "turn": 11,
+            "text": "Noor just moved to Kyoto for a new job."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "name": "Noor",
+          "city": "Kyoto",
+          "other_name": "Hana",
+          "other_city": "Cape Town"
+        }
+      },
+      {
+        "id": "flight_date",
+        "category": "update",
+        "turn": 13,
+        "probe": "When is my flight to Lima?",
+        "answer_key": "April 8",
+        "answers": [
+          [
+            "April 8"
+          ]
+        ],
+        "stale": [
+          "April 6"
+        ],
+        "statements": [
+          {
+            "turn": 4,
+            "text": "My flight to Lima is on April 6."
+          },
+          {
+            "turn": 13,
+            "text": "Change of plans: my flight to Lima moved to April 8."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "city": "Lima",
+          "date": "April 6",
+          "new_date": "April 8",
+          "other_city": "Seoul",
+          "other_date": "May 18",
+          "other_new_date": "April 2"
+        }
+      },
+      {
+        "id": "best_friend",
+        "category": "extraction",
+        "turn": 15,
+        "probe": "What is my childhood best friend's name?",
+        "answer_key": "Priya Novak",
+        "answers": [
+          [
+            "Priya"
+          ],
+          [
+            "Novak"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 15,
+            "text": "My childhood best friend's name is Priya Novak."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "first": "Priya",
+          "last": "Novak",
+          "other_first": "Femi",
+          "other_last": "Tanaka"
+        }
+      },
+      {
+        "id": "dog_name",
+        "category": "extraction",
+        "turn": 18,
+        "probe": "What is my dog's name?",
+        "answer_key": "Mochi",
+        "answers": [
+          [
+            "Mochi"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 18,
+            "text": "My dog's name is Mochi."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "name": "Mochi",
+          "other_name": "Hazel"
+        }
+      }
+    ],
+    "checkpoints": [
+      10,
+      20
+    ],
+    "composition": {
+      "extraction": 2,
+      "update": 1,
+      "temporal": 1,
+      "multi_hop": 1,
+      "abstention": 1,
+      "sensitive": 1
+    },
+    "bank_version": "facts_v2",
+    "bank_sha256": "727ae24cc1af8f2cf02bd079c06eaacd63dcfdb2bac30955e7368c8f154da2f7"
+  },
+  "1": {
+    "seed": 43,
+    "turns": [
+      {
+        "turn_number": 1,
+        "human_message": "My cousin Leela lives in Kyoto.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 2,
+        "human_message": "My brother just bought a pickup truck, painted yellow.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 3,
+        "human_message": "Oh, and one more thing. I'm buying a white hatchback this month.",
+        "fact_id": "car_color",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 4,
+        "human_message": "Quick note so you have it: My birthday is on August 2.",
+        "fact_id": "race_after_birthday",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 5,
+        "human_message": "My neighbour just adopted a dog called Biscuit.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 6,
+        "human_message": "Let's talk about the best podcasts to listen to. What do you think about it?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 7,
+        "human_message": "My friend's mother is from Porto.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 8,
+        "human_message": "My sister's trail race is on August 15.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 9,
+        "human_message": "I'm currently reading 'Piranesi'.",
+        "fact_id": "current_book",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 10,
+        "human_message": "My dog's name is Mochi.",
+        "fact_id": "dog_name",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 11,
+        "human_message": "Oh, and one more thing. The code for my office locker is 949261.",
+        "fact_id": "locker_code",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 12,
+        "human_message": "I've been reading a bit about time management strategies lately. Any thoughts?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 13,
+        "human_message": "I keep meaning to look into tips for better sleep. Where should I start?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 14,
+        "human_message": "I signed up for a triathlon on August 31.",
+        "fact_id": "race_after_birthday",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 15,
+        "human_message": "Quick note so you have it: My younger sister is called Hana.",
+        "fact_id": "sister_city",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 16,
+        "human_message": "Let's talk about strategies for learning a new language. What do you think about it?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 17,
+        "human_message": "Small change: the dealer was out of white, so the hatchback I'm getting is green.",
+        "fact_id": "car_color",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 18,
+        "human_message": "Can you give me a quick tip on the weather in different cities?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 19,
+        "human_message": "My book club picked 'Gödel, Escher, Bach' for next month.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 20,
+        "human_message": "Hana just moved to Lisbon for a new job.",
+        "fact_id": "sister_city",
+        "kind": "fact"
+      }
+    ],
+    "facts": [
+      {
+        "id": "mother_hometown",
+        "category": "abstention",
+        "turn": 0,
+        "probe": "Which town is my mother from?",
+        "answer_key": null,
+        "answers": [],
+        "stale": [],
+        "statements": [],
+        "headline": true,
+        "values": {
+          "town": "Galway",
+          "other_town": "Porto"
+        }
+      },
+      {
+        "id": "current_book",
+        "category": "extraction",
+        "turn": 9,
+        "probe": "What book am I currently reading?",
+        "answer_key": "Piranesi",
+        "answers": [
+          [
+            "Piranesi"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 9,
+            "text": "I'm currently reading 'Piranesi'."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "book": "Piranesi",
+          "other_book": "Gödel, Escher, Bach"
+        }
+      },
+      {
+        "id": "dog_name",
+        "category": "extraction",
+        "turn": 10,
+        "probe": "What is my dog's name?",
+        "answer_key": "Mochi",
+        "answers": [
+          [
+            "Mochi"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 10,
+            "text": "My dog's name is Mochi."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "name": "Mochi",
+          "other_name": "Biscuit"
+        }
+      },
+      {
+        "id": "locker_code",
+        "category": "sensitive",
+        "turn": 11,
+        "probe": "What is the code for my office locker?",
+        "answer_key": "949261",
+        "answers": [
+          [
+            "949261"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 11,
+            "text": "The code for my office locker is 949261."
+          }
+        ],
+        "headline": false,
+        "values": {
+          "code": "949261",
+          "other_code": "190202"
+        }
+      },
+      {
+        "id": "race_after_birthday",
+        "category": "temporal",
+        "turn": 14,
+        "probe": "How many days after my birthday is the triathlon?",
+        "answer_key": "29 days",
+        "answers": [
+          [
+            "29 days",
+            "29 day"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 4,
+            "text": "My birthday is on August 2."
+          },
+          {
+            "turn": 14,
+            "text": "I signed up for a triathlon on August 31."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "race": "triathlon",
+          "birthday": "August 2",
+          "race_day": "August 31",
+          "gap": "29",
+          "other_race": "trail race",
+          "other_birthday": "September 24",
+          "other_race_day": "August 15",
+          "other_gap": "32"
+        }
+      },
+      {
+        "id": "car_color",
+        "category": "update",
+        "turn": 17,
+        "probe": "What color is the hatchback I'm getting?",
+        "answer_key": "green",
+        "answers": [
+          [
+            "green"
+          ]
+        ],
+        "stale": [
+          "white"
+        ],
+        "statements": [
+          {
+            "turn": 3,
+            "text": "I'm buying a white hatchback this month."
+          },
+          {
+            "turn": 17,
+            "text": "Small change: the dealer was out of white, so the hatchback I'm getting is green."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "color": "white",
+          "new_color": "green",
+          "other_color": "navy blue",
+          "other_new_color": "yellow"
+        }
+      },
+      {
+        "id": "sister_city",
+        "category": "multi_hop",
+        "turn": 20,
+        "probe": "Which city does my younger sister live in now?",
+        "answer_key": "Lisbon",
+        "answers": [
+          [
+            "Lisbon"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 15,
+            "text": "My younger sister is called Hana."
+          },
+          {
+            "turn": 20,
+            "text": "Hana just moved to Lisbon for a new job."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "name": "Hana",
+          "city": "Lisbon",
+          "other_name": "Leela",
+          "other_city": "Kyoto"
+        }
+      }
+    ],
+    "checkpoints": [
+      10,
+      20
+    ],
+    "composition": {
+      "extraction": 2,
+      "update": 1,
+      "temporal": 1,
+      "multi_hop": 1,
+      "abstention": 1,
+      "sensitive": 1
+    },
+    "bank_version": "facts_v2",
+    "bank_sha256": "727ae24cc1af8f2cf02bd079c06eaacd63dcfdb2bac30955e7368c8f154da2f7"
+  }
+}

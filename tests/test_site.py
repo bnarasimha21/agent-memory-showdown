@@ -301,3 +301,21 @@ def test_site_build_cli_takes_bundle_dirs(runs, tmp_path, no_network):
     out = tmp_path / "cli-site"
     assert site_build.main(["--bundle", str(bundle_path), "--out", str(out)]) == 0
     assert (out / "index.html").exists()
+
+
+# --------------------------------------------------------- the committed outputs
+
+
+def test_committed_readme_and_ts_match_the_published_bundles():
+    """What CI checks with `python -m src.site.export --check`."""
+    assert export.stale(export.outputs()) == []
+
+
+def test_committed_sample_is_labelled_and_builds(tmp_path, no_network):
+    (bundle,) = published_bundles()
+    assert bundle.is_sample and bundle.manifest["llm_provider"] == "fake"
+    assert (bundle.path / TRANSCRIPT_GZ).exists() and not (bundle.path / TRANSCRIPT).exists()
+    assert not bundle.manifest["git"]["dirty"]
+    page = site_build.build([bundle], tmp_path / "site").read_text()
+    assert page.count("Sample run, not a benchmark result") == 1
+    assert all(f"<td>{label}</td>" in page for label in bundle.backends)

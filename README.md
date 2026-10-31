@@ -12,6 +12,39 @@ from the bundles listed in `results/latest.json` and from the v1 numbers in
 `results/legacy/v1_published.json`; CI fails if it drifts from them.
 
 <!-- BEGIN GENERATED RESULTS: python -m src.site.export, do not edit by hand -->
+
+Interactive results, with every probe's transcript: <https://bnarasimha21.github.io/agent-memory-showdown/>
+
+### Latest v2 run: `20261031T025710495845Z-sample-fake`
+
+> **Sample run, not a benchmark result.** It was produced offline with the fake chat model and hashing embeddings (`LLM_PROVIDER=fake`, `EMBEDDING_PROVIDER=fake`) to show the bundle format, the site and the charts. The numbers describe the harness, not any model or memory backend; costs are what the recorded token counts would cost at the listed price.
+
+2 runs x 20 turns, checkpoints 10, 20, model `fake-memory-v1`, embeddings `fake-hashing-384`, k = 2, 4. Source: [`manifest.json`](results/runs/20261031T025710495845Z-sample-fake/manifest.json), [`aggregate.json`](results/runs/20261031T025710495845Z-sample-fake/aggregate.json). Recall leaves out the `sensitive` category; intervals are 95% (Wilson over probes, bootstrap over runs).
+
+| Backend | Recall [95% CI] | Run mean [95% CI] | Probes in recall | Cost / 1K conv | Cost / correct recall | Latency p50 / p95 | Memory at end |
+|---------|----------------:|------------------:|-------:|---------------:|----------------------:|------------------:|--------------:|
+| buffer | 52.9% [31, 74] | 52.8% [50, 56] | 17 | $17.56 | $0.0051 | 0.2 / 0.2 ms | 40 messages |
+| summary | 52.9% [31, 74] | 52.8% [50, 56] | 17 | $35.27 | $0.0073 | 0.2 / 0.2 ms | 386 summary_chars |
+| qdrant@k2 | 52.9% [31, 74] | 52.8% [50, 56] | 17 | $8.27 | $0.0020 | 5.0 / 6.6 ms | 20 points |
+| qdrant@k4 | 52.9% [31, 74] | 52.8% [50, 56] | 17 | $10.18 | $0.0025 | 4.5 / 5.5 ms | 20 points |
+| pgvector@k2 | 47.1% [26, 69] | 46.5% [38, 56] | 17 | $8.28 | $0.0022 | 12 / 14 ms | 20 rows |
+| pgvector@k4 | 52.9% [31, 74] | 52.8% [50, 56] | 17 | $10.30 | $0.0026 | 12 / 13 ms | 20 rows |
+| langgraph_store@k2 | 47.1% [26, 69] | 46.5% [38, 56] | 17 | $8.29 | $0.0022 | 2.4 / 3.6 ms | 20 items |
+| langgraph_store@k4 | 52.9% [31, 74] | 52.8% [50, 56] | 17 | $10.32 | $0.0026 | 2.2 / 3.1 ms | 20 items |
+| mem0@k2 | 52.9% [31, 74] | 52.8% [50, 56] | 17 | $327.09 | $0.0551 | 7.0 / 9.6 ms | 16 memories |
+| mem0@k4 | 52.9% [31, 74] | 52.8% [50, 56] | 17 | $327.92 | $0.0553 | 7.3 / 8.8 ms | 16 memories |
+
+### v1 published numbers (v1 methodology, known limits)
+
+From the 2026-04-17 run of the v1 harness (source: [`v1_published.json`](results/legacy/v1_published.json)). v1 had known flaws: Probes were sent as ordinary chat turns, so each probe and answer was written back into memory (flatters later checkpoints). buffer and summary used LangChain's ConversationChain prompt; qdrant and pgvector used a custom prompt. Recall turns that collided with seed turns (25 and 35) were silently never probed. Scoring was substring matching of answer-key words, which both over- and under-counted. Latency wrapped retrieval, generation and the memory write together; cost used a 75/25 blended token price. Model responses were not saved, so refusals (Wi-Fi password, bank PIN) could not be told apart from misses. Treat these as indicative, not as a clean measurement, and not as comparable with v2.
+
+| Backend | Recall @ turn 15 | Recall @ turn 50 | Avg latency / turn | Cost / 1K convos | Tokens / run |
+|---------|:----------------:|:----------------:|:------------------:|:----------------:|:------------:|
+| buffer | 100% | 90% | 10.3s | $4,303 | 717K |
+| summary | 100% | 42% | 36.0s | $2,256 | 376K |
+| qdrant | 100% | 82% | 7.0s | $418 | 70K |
+| pgvector | 100% | 82% | 7.0s | $416 | 69K |
+
 <!-- END GENERATED RESULTS -->
 
 ## Architecture
