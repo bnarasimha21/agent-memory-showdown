@@ -36,7 +36,11 @@ class Bundle:
 
     @property
     def is_sample(self) -> bool:
-        return bool(self.manifest.get("is_sample") or self.aggregate.get("is_sample"))
+        # The aggregate decides from the scoring actually in effect (a rescore
+        # with a fake judge is a sample); older aggregates fall back to the manifest.
+        if "is_sample" in self.aggregate:
+            return bool(self.aggregate["is_sample"])
+        return bool(self.manifest.get("is_sample"))
 
     @property
     def backends(self) -> dict:

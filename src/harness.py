@@ -116,7 +116,8 @@ def _run_checkpoint(backend, dataset, checkpoint, writer, base, facts_by_id) -> 
         )
 
 
-def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints, k) -> dict:
+def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints, k,
+                   judge: bool = True) -> dict:
     return {
         "methodology": "v2",
         "created_at": utc_now(),
@@ -139,13 +140,16 @@ def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints
         "prompt_template": CHAT_TEMPLATE,
         "packages": package_versions(),
         "environment": environment_info(),
-        # Any fake component (chat model, judge or embeddings) makes the numbers a sample.
-        "is_sample": is_sample_config(),
+        # Any fake component that took part (chat model, embeddings, or the
+        # judge when judging is on) makes the numbers a sample.
+        "is_sample": is_sample_config(judge),
     }
 
 
-def is_sample_config() -> bool:
-    return "fake" in (config.LLM_PROVIDER, config.JUDGE_PROVIDER, config.EMBEDDING_PROVIDER)
+def is_sample_config(judge: bool = True) -> bool:
+    """A fake JUDGE_PROVIDER only matters when the judge runs (not under --no-judge)."""
+    providers = [config.LLM_PROVIDER, config.EMBEDDING_PROVIDER] + ([config.JUDGE_PROVIDER] if judge else [])
+    return "fake" in providers
 
 
 def run_benchmark(
@@ -237,6 +241,7 @@ def run_benchmark(
     manifest = build_manifest(
         [label for label, _, _ in plan], num_runs, num_turns, dataset_info,
         datasets[0].checkpoints if datasets else checkpoints, (ks if sweep else k) if any_k else None,
+        judge=bool(use_judge),
     )
     writer = BundleWriter(runs_root, new_run_id(run_label), manifest)
     writer.write_dataset({str(i): d.to_dict() for i, d in enumerate(datasets)})

@@ -14,7 +14,8 @@ def _ci(ci: list[float] | None) -> str:
 def format_summary(aggregate: dict) -> str:
     lines = ["", "=== BENCHMARK SUMMARY ===", ""]
     if aggregate.get("is_sample"):
-        lines.append("SAMPLE RUN (fake LLM): numbers below are not benchmark results.")
+        lines.append("SAMPLE RUN (a fake chat model, embedder or judge): numbers below are not "
+                     "benchmark results.")
         lines.append("")
     scoring = aggregate.get("scoring") or {}
     if scoring.get("judge_model"):

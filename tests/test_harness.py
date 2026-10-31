@@ -326,3 +326,52 @@ def test_docker_image_leaves_out_secrets_and_compose_passes_judge_settings():
     env = yaml.safe_load((root / "docker-compose.yml").read_text())["services"]["benchmark"]["environment"]
     names = {e.split("=", 1)[0] for e in env}
     assert {"JUDGE_PROVIDER", "JUDGE_MODEL", "JUDGE", "DO_INFERENCE_URL", "LLM_MAX_RETRIES"} <= names
+
+
+def test_a_fake_judge_provider_does_not_make_a_no_judge_run_a_sample(monkeypatch, fresh_config):
+    from src.harness import build_manifest, is_sample_config
+
+    monkeypatch.setenv("LLM_PROVIDER", "do")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "local")
+    monkeypatch.setenv("JUDGE_PROVIDER", "fake")
+    fresh_config()
+    assert is_sample_config(judge=False) is False
+    assert build_manifest(["buffer"], 1, 10, {}, [10], 4, judge=False)["is_sample"] is False
+    assert build_manifest(["buffer"], 1, 10, {}, [10], 4, judge=True)["is_sample"] is True
+
+
+def _real_manifest(**extra):
+    return {"run_id": "r", "llm_provider": "do", "embedding_provider": "local",
+            "llm_model": "anthropic-claude-4.5-sonnet", "is_sample": False, **extra}
+
+
+def test_aggregate_sample_flag_follows_the_scoring_in_effect():
+    recs = [_end("a", 0), _run_probe("a", 0, "f", "Baxter")]
+    fake = {"judge_provider": "fake", "judge_model": "fake-judge-v1"}
+    real = {"judge_provider": "do", "judge_model": "some-judge"}
+    assert aggregate_records(recs, _real_manifest(), scoring={"judge_provider": None})["is_sample"] is False
+    assert aggregate_records(recs, _real_manifest(), scoring=fake)["is_sample"] is True
+    assert aggregate_records(recs, _real_manifest(), scoring=real)["is_sample"] is False
+    # A fake chat model or embedder is a sample whatever the judge.
+    assert aggregate_records(recs, _real_manifest(llm_provider="fake"), scoring=real)["is_sample"] is True
+    # Manifests without providers keep their own flag.
+    assert aggregate_records(recs, {"is_sample": True})["is_sample"] is True
+
+
+def test_rescoring_a_real_bundle_with_a_fake_judge_is_marked_a_sample(tmp_path):
+    from src.fakes import FakeMemoryChatModel
+    from src.scoring.judge import Judge
+    from src.scoring.rescore import rescore
+
+    bundle = run_benchmark([AVAILABLE_BACKENDS["buffer"]], num_runs=1, num_turns=10, checkpoints=[10],
+                           composition={"extraction": 1}, results_dir=tmp_path / "res", judge=False)
+    # Pretend the conversations came from real providers.
+    manifest = json.loads((bundle / "manifest.json").read_text())
+    manifest.update(llm_provider="do", embedding_provider="local", is_sample=False)
+    (bundle / "manifest.json").write_text(json.dumps(manifest))
+    out, agg = rescore(bundle, tmp_path / "rescored",
+                       judge=Judge(FakeMemoryChatModel(), "fake", "fake-judge-v1"))
+    assert agg["is_sample"] is True
+    assert json.loads((out / "aggregate.json").read_text())["is_sample"] is True
+    _, agg = rescore(bundle, tmp_path / "matcher-only", use_judge=False)
+    assert agg["is_sample"] is False

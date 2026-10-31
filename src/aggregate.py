@@ -117,6 +117,22 @@ def _agreement(pairs: list[tuple[str, str]]) -> dict:
     }
 
 
+def is_sample(manifest: dict | None, scoring: dict | None) -> bool:
+    """True if any component that produced these numbers was fake.
+
+    Decided from the manifest's chat and embedding providers and the judge of
+    the scoring in effect, so rescoring a bundle with a fake judge marks the
+    output as a sample, and a bundle run under --no-judge is not one just
+    because JUDGE_PROVIDER was fake. A manifest without providers keeps its
+    own flag.
+    """
+    manifest = manifest or {}
+    if "llm_provider" not in manifest and "embedding_provider" not in manifest:
+        return bool(manifest.get("is_sample")) or (scoring or {}).get("judge_provider") == "fake"
+    return "fake" in (manifest.get("llm_provider"), manifest.get("embedding_provider"),
+                      (scoring or {}).get("judge_provider"))
+
+
 def _retries(turns: list[dict], probes: list[dict], scores: list[dict]) -> dict:
     """Retried attempts and backoff slept, summed over the runs used.
 
@@ -368,10 +384,11 @@ def aggregate_records(
             "std_tokens_per_run": _std(token_counts),
         }
 
+    scoring = scoring or (manifest or {}).get("scoring")
     return {
         "run_id": (manifest or {}).get("run_id"),
-        "is_sample": bool((manifest or {}).get("is_sample")),
-        "scoring": scoring or (manifest or {}).get("scoring"),
+        "is_sample": is_sample(manifest, scoring),
+        "scoring": scoring,
         "pricing": (
             {**price.to_dict(), "formula": "input_tokens * input_per_mtok / 1e6 + "
                                            "output_tokens * output_per_mtok / 1e6"}
