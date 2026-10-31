@@ -247,6 +247,9 @@ def methodology_section(bundle: Bundle) -> str:
     ds = m.get("dataset", {})
     packages = ", ".join(f"{esc(k)} {esc(v)}" for k, v in m.get("packages", {}).items())
     limits = "".join(f"<li>{esc(x)}</li>" for x in KNOWN_LIMITATIONS)
+    num = Numbers(bundle)
+    composition = ", ".join(f"{esc(c)} {num(str(n))}" for c, n in (ds.get("composition") or {}).items())
+    seeds = ", ".join(num(str(s)) for s in m.get("seeds") or [])
     return f"""
 <h2>Methodology</h2>
 <p>Each run plays a seeded synthetic conversation into a memory backend, then asks read-only probe
@@ -259,13 +262,13 @@ an LLM judge.</p>
 <h3>Judge prompt</h3><p class="muted">{judge_note} Judge: {esc(scoring.get('judge_provider'))}
 <code>{esc(scoring.get('judge_model'))}</code>, matcher {esc(scoring.get('matcher'))}.</p>
 <details><summary>Show the judge prompt</summary><pre>{esc(judge_text)}</pre></details>
-<h3>Pricing</h3><p>Model <code>{esc(pricing.get('model'))}</code>: ${esc(pricing.get('input_per_mtok'))} per
-million input tokens, ${esc(pricing.get('output_per_mtok'))} per million output tokens
+<h3>Pricing</h3><p>Model <code>{esc(pricing.get('model'))}</code>: {num(f"${pricing.get('input_per_mtok')}")} per
+million input tokens, {num(f"${pricing.get('output_per_mtok')}")} per million output tokens
 ({esc(pricing.get('currency'))}), source {esc(pricing.get('source'))}, checked on
-{esc(pricing.get('checked_on'))}. Cost = {esc(pricing.get('formula'))}.</p>
+{num(str(pricing.get('checked_on')))}. Cost = {esc(pricing.get('formula'))}.</p>
 <h3>Dataset</h3><p>Fact bank <code>{esc(ds.get('bank'))}</code> ({esc(ds.get('bank_version'))}, sha256
-{esc((ds.get('bank_sha256') or '')[:12])}), facts per category {esc(json.dumps(ds.get('composition')))},
-distractors {esc(ds.get('distractors'))}, seeds {esc(m.get('seeds'))}. Headline excludes
+{esc((ds.get('bank_sha256') or '')[:12])}), facts per category {composition},
+distractors {esc(ds.get('distractors'))}, seeds {seeds}. Headline excludes
 {esc(', '.join(ds.get('headline_excludes', [])))}.</p>
 <h3>Software</h3><p class="muted">git {esc((m.get('git') or {}).get('sha'))}
 {'(uncommitted changes)' if (m.get('git') or {}).get('dirty') else ''}; {packages}.</p>

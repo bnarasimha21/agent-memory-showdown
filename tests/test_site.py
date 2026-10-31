@@ -243,7 +243,10 @@ def test_site_builds_offline_and_links_every_number(runs, tmp_path, no_network):
         assert heading in page
     assert page.count('class="fig"') >= 5
     assert "the prompt this run was judged with" in page
-    assert bundle.aggregate["pricing"]["checked_on"] in page
+    pricing = bundle.aggregate["pricing"]
+    for value in (f"${pricing['input_per_mtok']}", f"${pricing['output_per_mtok']}", pricing["checked_on"],
+                  *map(str, bundle.manifest["seeds"])):
+        assert f">{value}</a>" in page, value
 
 
 def test_probe_pages_show_every_probe_with_context(runs, tmp_path, no_network):
