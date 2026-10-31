@@ -530,3 +530,52 @@ def test_one_run_shows_no_interval_rather_than_a_point(tmp_path):
     block = "\n".join(export.v2_markdown(bundle))
     row = next(line for line in block.splitlines() if line.startswith("| buffer |"))
     assert row.split("|")[2].strip().endswith("n/a")
+
+
+def _rendered(bundle, tmp_path):
+    md = "\n".join(export.v2_markdown(bundle))
+    page = site_build.build([bundle], tmp_path / "site").read_text()
+    return md, page
+
+
+def test_paired_seeds_are_stated_with_the_runs_used(runs, tmp_path):
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    assert bundle.aggregate["seeds"] == {"paired": True, "runs": [0, 1], "dropped": {}}
+    md, page = _rendered(bundle, tmp_path)
+    seeds = bundle.manifest["seeds"]
+    expected = f"Seeds paired: every backend is scored on runs 0 (seed {seeds[0]}), 1 (seed {seeds[1]})."
+    assert expected in md and expected in page
+    assert "WARNING" not in md and "banner warning" not in page
+
+
+def test_dropped_runs_are_listed_and_warned(runs, tmp_path):
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    bundle.aggregate["seeds"] = {"paired": True, "runs": [0], "dropped": {"buffer": [1]}}
+    md, page = _rendered(bundle, tmp_path)
+    assert "> **WARNING:**" in md and "buffer: run 1" in md
+    assert "banner warning" in page and "buffer: run 1" in page
+
+
+def test_unpaired_seeds_are_visibly_warned_with_each_backends_runs(runs, tmp_path):
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    bundle.aggregate["seeds"] = {"paired": False, "runs": None, "dropped": {}}
+    bundle.backends["buffer"]["runs_used"] = [0]
+    bundle.backends["summary"]["runs_used"] = [1]
+    md, page = _rendered(bundle, tmp_path)
+    seeds = bundle.manifest["seeds"]
+    for text in (md, page):
+        assert "UNPAIRED" in text and "not compared on the same conversations" in text
+        assert f"buffer: 0 (seed {seeds[0]})" in text and f"summary: 1 (seed {seeds[1]})" in text
+    assert "> **WARNING:** UNPAIRED" in md
+    assert '<p class="banner warning"><b>Warning.</b> UNPAIRED' in page
+
+
+def test_bundles_from_before_pairing_render_without_a_seed_line(runs, tmp_path):
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    del bundle.aggregate["seeds"]
+    md, page = _rendered(bundle, tmp_path)
+    assert "Seeds" not in md and "UNPAIRED" not in page

@@ -23,7 +23,7 @@ from pathlib import Path
 
 from src.site.data import (
     LATEST, LEGACY_V1, PAGES_URL, REPO_ROOT, RUNS_DIR, Bundle, headline_row, load_legacy,
-    published_bundles,
+    published_bundles, seed_pairing,
 )
 
 README = REPO_ROOT / "README.md"
@@ -100,6 +100,13 @@ def v2_markdown(bundle: Bundle, headline: bool = True) -> list[str]:
         f"Student t interval over runs; the per-probe Wilson interval is approximate, since probes "
         f"in one run are not independent. " + agreement_text(bundle),
         "",
+    ]
+    pairing = seed_pairing(bundle)
+    if pairing and pairing["warning"]:
+        lines += [f"> **WARNING:** {pairing['warning']}", ""]
+    if pairing and pairing["kind"] == "paired":
+        lines += [pairing["text"], ""]
+    lines += [
         "| Backend | Recall, run mean [95% t CI] | Per probe [approx. Wilson] | Probes in recall | Cost / 1K conv | Cost / correct recall "
         "| Latency p50 / p95 | Memory at end |",
         "|---------|----------------:|------------------:|-------:|---------------:|----------------------:"

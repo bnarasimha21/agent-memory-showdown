@@ -35,7 +35,7 @@ from src.bundle import TRANSCRIPT, TRANSCRIPT_GZ, iter_transcript, validate_run_
 from src.dataset import NON_HEADLINE
 from src.site.data import (
     LEGACY_V1, PAGES_URL, REPO_ROOT, Bundle, headline_row, load_bundle, load_legacy,
-    published_bundles,
+    published_bundles, seed_pairing,
 )
 from src.site.export import ci, fmt, k_text, ms, pct, usd
 
@@ -71,6 +71,7 @@ th,td{border:1px solid #dde;padding:4px 8px;text-align:right;vertical-align:top}
 th:first-child,td:first-child{text-align:left}
 a.num{color:inherit;text-decoration:none;border-bottom:1px dotted #88a}
 .banner{background:#fff4d6;border:1px solid #e7c66b;padding:10px 14px;border-radius:6px}
+.banner.warning{background:#fde2e1;border-color:#d9534f}
 .muted{color:#667}.fig{background:#fff;border:1px solid #dde;margin:1em 0;padding:4px}
 pre{white-space:pre-wrap;background:#f3f4f7;padding:8px;border-radius:4px;font-size:13px}
 details{border:1px solid #dde;background:#fff;margin:4px 0;padding:4px 8px;border-radius:4px}
@@ -200,6 +201,11 @@ def run_section(bundle: Bundle, headline: bool) -> str:
                  "Recall is the mean of the per-run recall rates; its CI is a 95% Student t "
                  "interval over runs (none for a single run). The per-probe rate's Wilson interval "
                  "is approximate, because probes in one run are not independent.</p>")
+    pairing = seed_pairing(bundle)
+    if pairing and pairing["warning"]:
+        parts.append(f'<p class="banner warning"><b>Warning.</b> {esc(pairing["warning"])}</p>')
+    if pairing and pairing["kind"] == "paired":
+        parts.append(f'<p class="muted">{esc(pairing["text"])}</p>')
     parts.append(headline_table(bundle, num))
     cap = f"Source: {src}."
     parts.append("<h3>Recall by checkpoint</h3>" + figure(viz.fig_memory_decay_curve(results), cap))

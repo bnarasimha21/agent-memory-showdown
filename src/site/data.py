@@ -108,3 +108,44 @@ def headline_row(data: dict) -> dict:
         "memory_end": memory.get("mean"),
         "memory_unit": memory.get("unit"),
     }
+
+
+def seed_pairing(bundle: Bundle) -> dict | None:
+    """How the backends' runs line up, in words both the site and the README use.
+
+    `kind` is "paired" (every backend scored on the same runs), "unpaired"
+    (no run completed everywhere, so each backend uses its own runs and the
+    comparison is not like for like), or None for a bundle aggregated before
+    pairing was recorded. `text` is one sentence; `warning` is set for the
+    unpaired case and when runs were dropped.
+    """
+    seeds = bundle.aggregate.get("seeds")
+    if not seeds:
+        return None
+    manifest_seeds = bundle.manifest.get("seeds") or []
+
+    def runs_text(runs) -> str:
+        return ", ".join(
+            f"{i} (seed {manifest_seeds[i]})" if isinstance(i, int) and i < len(manifest_seeds) else str(i)
+            for i in runs) or "none"
+
+    dropped = seeds.get("dropped") or {}
+    dropped_text = "; ".join(f"{b}: run {', '.join(str(i) for i in v)}" for b, v in sorted(dropped.items()))
+    if seeds.get("paired"):
+        text = f"Seeds paired: every backend is scored on runs {runs_text(seeds.get('runs') or [])}."
+        warning = None
+        if dropped:
+            text += f" Dropped because the run failed for another backend: {dropped_text}."
+            warning = ("Some runs were dropped so that every backend is compared on the same "
+                       f"conversations ({dropped_text}).")
+        return {"kind": "paired", "paired": True, "runs": seeds.get("runs"), "dropped": dropped,
+                "text": text, "warning": warning}
+    per_backend = {label: data.get("runs_used") for label, data in bundle.backends.items()
+                   if "error" not in data}
+    used = "; ".join(f"{b}: {runs_text(r or [])}" for b, r in per_backend.items())
+    text = ("Seeds NOT paired: no run completed for every backend, so each backend is scored on "
+            f"its own runs ({used}).")
+    return {"kind": "unpaired", "paired": False, "runs": None, "dropped": dropped,
+            "runs_by_backend": per_backend, "text": text,
+            "warning": ("UNPAIRED: the backends are not compared on the same conversations, so "
+                        "differences between them mix the backend with the dataset. " + text)}
