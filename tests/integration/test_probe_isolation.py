@@ -11,9 +11,9 @@ from tests.helpers import group, records
 
 pytestmark = pytest.mark.integration
 
-BACKENDS = ["buffer", "summary", "qdrant", "pgvector"]
+BACKENDS = list(AVAILABLE_BACKENDS)
 EXPECTED_UNITS = {"buffer": "messages", "summary": "summary_chars", "qdrant": "points",
-                  "pgvector": "rows"}
+                  "pgvector": "rows", "langgraph_store": "items", "mem0": "memories"}
 
 
 def test_checkpoints_leave_memory_unchanged_and_see_only_the_past(services, tmp_path):

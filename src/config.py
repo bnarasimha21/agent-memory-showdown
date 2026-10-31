@@ -113,12 +113,8 @@ class Config:
 
     @property
     def postgres_sqlalchemy_url(self) -> str:
-        """SQLAlchemy URL with the driver named explicitly.
-
-        SQLAlchemy 2.1 made psycopg (v3) the default for bare `postgresql://`,
-        but the community PGVector store only works with psycopg2.
-        """
-        return self.postgres_dsn.replace("postgresql://", "postgresql+psycopg2://", 1)
+        """SQLAlchemy URL for langchain_postgres, with the psycopg (v3) driver named."""
+        return self.postgres_dsn.replace("postgresql://", "postgresql+psycopg://", 1)
 
 
 config = Config()

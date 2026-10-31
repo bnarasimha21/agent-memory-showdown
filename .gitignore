@@ -27,3 +27,6 @@ remotion/public/audio/*_original.wav
 
 # Personal scratch notes
 ToDo.txt
+
+# mem0 state directory (MEM0_DIR) and other local caches
+.cache/

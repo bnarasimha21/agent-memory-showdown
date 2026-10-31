@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from langchain_community.vectorstores import Qdrant
+from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
 
@@ -20,6 +20,8 @@ COLLECTION_PREFIX = "mem_bench_qdrant_"
 
 class QdrantMemoryBackend(BaseMemoryBackend):
     name = "qdrant"
+    stores = "raw turns, one point per exchange; a write embeds the exchange (no LLM call)"
+    uses_k = True
 
     def setup(self) -> None:
         self._collection = f"{COLLECTION_PREFIX}{self.session_id[:8]}"
@@ -30,14 +32,21 @@ class QdrantMemoryBackend(BaseMemoryBackend):
             collection_name=self._collection,
             vectors_config=VectorParams(size=config.EMBEDDING_DIMENSION, distance=Distance.COSINE),
         )
-        self._store = Qdrant(
+        self._store = QdrantVectorStore(
             client=self._client,
             collection_name=self._collection,
-            embeddings=self.embeddings,
+            embedding=self.embeddings,
         )
 
     def teardown(self) -> None:
-        self._client.delete_collection(self._collection)
+        client = getattr(self, "_client", None)
+        if client is None:
+            return
+        try:
+            if client.collection_exists(self._collection):
+                client.delete_collection(self._collection)
+        finally:
+            client.close()
 
     def retrieve(self, query: str) -> Retrieval:
         if self._point_count() == 0:

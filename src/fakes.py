@@ -11,7 +11,9 @@ the Memory section, the one sharing the most content words with the user's
 question (later sentences win ties), and says the user has not told it when
 nothing overlaps enough. Recall therefore depends entirely on what the memory
 backend put in front of it. It also handles the summarizer prompt (keeps the
-most recent first-person sentences, so the summary is lossy) and the judge
+most recent first-person sentences, so the summary is lossy), mem0's memory
+extraction prompt (each first-person statement in the user's new messages
+becomes one memory, unless it is already an existing memory) and the judge
 prompt (applies the deterministic matcher, so fake judge and matcher agree).
 """
 
@@ -115,6 +117,22 @@ def fake_summary(current_summary: str, new_lines: str, max_sentences: int) -> st
     return " ".join(kept[-max_sentences:])
 
 
+def fake_mem0_extraction(new_messages: str, existing: list[str]) -> str:
+    """mem0's ADD-only extraction: {"memory": [{"id", "text", "attributed_to"}]}."""
+    seen = {e.strip() for e in existing}
+    memories: list[str] = []
+    for line in new_messages.splitlines():
+        role, _, content = line.partition(": ")
+        if role != "user":
+            continue
+        for sentence in split_sentences(content):
+            if _is_statement(sentence) and sentence not in seen and sentence not in memories:
+                memories.append(sentence)
+    return json.dumps({"memory": [
+        {"id": str(i), "text": text, "attributed_to": "user"} for i, text in enumerate(memories)
+    ]})
+
+
 def _section(text: str, start: str, end: str | None) -> str:
     """Text between the LAST `start` marker and the next `end` marker."""
     i = text.rfind(start)
@@ -141,6 +159,11 @@ class FakeMemoryChatModel(BaseChatModel):
     def respond(self, text: str) -> str:
         if "JUDGE_INPUT_JSON:" in text:
             return self._judge(text)
+        if "Memory Extractor" in text and "## New Messages\n" in text:
+            new_messages = _section(text, "## New Messages\n", "\n\n## Observation Date")
+            raw_existing = _section(text, "## Existing Memories\n", "\n\n## New Messages").strip()
+            existing = [m.get("text", "") for m in json.loads(raw_existing or "[]")]
+            return fake_mem0_extraction(new_messages, existing)
         if text.rstrip().endswith("New summary:"):
             current = _section(text, "Current summary:", "New lines of conversation:")
             new_lines = _section(text, "New lines of conversation:", "New summary:")

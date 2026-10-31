@@ -2,11 +2,11 @@
 
 **Which memory backend keeps agents sharp at scale?**
 
-A benchmark that stress-tests four LangChain memory backends across a 50-turn synthetic conversation and measures recall accuracy, retrieval latency, and token cost.
+A benchmark that runs six agent memory backends (a full buffer, a rolling LLM summary, Qdrant, pgvector, the LangGraph store and Mem0) through the same seeded synthetic conversations and measures recall accuracy, latency and token cost.
 
 ## Key Results (v1 methodology)
 
-These numbers come from the April 2026 run of the **v1 harness**. v1 had known flaws (listed under *Methodology notes and limitations* below): probes were written back into memory, buffer/summary and the vector backends used different prompts, and two of the four recall turns were silently dropped. Treat them as indicative, not as a clean measurement. The harness has since been rebuilt (v2); no v2 numbers have been published yet.
+These numbers come from the April 2026 run of the **v1 harness**, which had four backends on LangChain 0.2. v1 had known flaws (listed under *Methodology notes and limitations* below): probes were written back into memory, buffer/summary and the vector backends used different prompts, and two of the four recall turns were silently dropped. Treat them as indicative, not as a clean measurement. The harness has since been rebuilt (v2); no v2 numbers have been published yet.
 
 | Backend | Recall @ Turn 50 | Avg Latency/Turn | Cost / 1K Convos | Tokens/Run |
 |---------|:-----------------:|:----------------:|:-----------------:|:----------:|
@@ -25,16 +25,16 @@ flowchart TD
     C --> HN[harness.py]
     HN --> DS[src/dataset/\nconversation per run seed\nfrom data/facts_v2.yaml]
     DS --> HN
-    HN --> B1[BufferMemoryBackend\nConversationBufferMemory]
-    HN --> B2[SummaryMemoryBackend\nConversationSummaryMemory]
-    HN --> B3[QdrantMemoryBackend\nVectorStore via Qdrant]
-    HN --> B4[PGVectorMemoryBackend\nVectorStore via pgvector]
-    B1 & B2 --> LLM[Claude 4.5 Sonnet via\nDO Serverless Inference]
-    B3 --> LLM
-    B3 --> QD[(Qdrant\nDocker)]
-    B4 --> LLM
-    B4 --> PG[(PostgreSQL 16\npgvector)]
-    B3 & B4 --> EMB[Local Embeddings\nall-MiniLM-L6-v2]
+    HN --> B1[buffer\nfull history]
+    HN --> B2[summary\nrolling LLM summary]
+    HN --> B3[qdrant\nlangchain-qdrant]
+    HN --> B4[pgvector\nlangchain-postgres]
+    HN --> B5[langgraph_store\nLangGraph PostgresStore]
+    HN --> B6[mem0\nLLM fact extraction]
+    B1 & B2 & B3 & B4 & B5 & B6 --> LLM[Claude 4.5 Sonnet via\nDO Serverless Inference]
+    B3 & B6 --> QD[(Qdrant\nDocker)]
+    B4 & B5 --> PG[(PostgreSQL 16\npgvector)]
+    B3 & B4 & B5 & B6 --> EMB[Local Embeddings\nall-MiniLM-L6-v2]
     HN --> RS[results/benchmark_*.json]
     RS --> VIZ[visualize.py]
     VIZ --> C1[memory_decay_curve.png]
@@ -52,12 +52,26 @@ flowchart TD
 
 ## Memory Backends
 
-| Backend | Strategy | Strength | Weakness |
-|---------|----------|----------|---------|
-| `buffer` | Full conversation history | Perfect recall short-term | Context blows up, high cost |
-| `summary` | LLM-compressed summary | Low token cost | Lossy — facts get summarized away |
-| `qdrant` | Semantic vector search (Qdrant) | Fast, accurate retrieval, low cost | Requires Qdrant service |
-| `pgvector` | Semantic vector search (PostgreSQL) | SQL-native, easy ops | Slightly slower than Qdrant at massive scale |
+Every backend answers with the same chat model and the same prompt (`src/prompts.py`); only what goes into the Memory section differs. The agent loop (retrieve, answer, write) lives once in `src/backends/base.py`; a backend implements `retrieve`, `write` and a read-only fingerprint of what it holds.
+
+| Backend | What it stores | Write cost per turn | Retrieval | Built on |
+|---------|----------------|---------------------|-----------|----------|
+| `buffer` | Every exchange, verbatim | None (append) | The whole history | plain Python |
+| `summary` | One running summary | 1 LLM call (rewrite the summary) | The summary | LangChain 0.2's summarizer prompt, copied into `src/prompts.py` |
+| `qdrant` | Every exchange as one embedded point | 1 embedding | Top-k by cosine | `langchain-qdrant` `QdrantVectorStore` |
+| `pgvector` | Every exchange as one embedded row | 1 embedding | Top-k by cosine | `langchain-postgres` `PGVector` (psycopg 3) |
+| `langgraph_store` | Every exchange as one item in a namespace, embedded | 1 embedding | Top-k by cosine | LangGraph `PostgresStore` with a vector index |
+| `mem0` | Facts an LLM extracted from each exchange, add-only | 1 LLM call plus 1 embedding per extracted fact | Top-k by cosine over the facts | `mem0ai` 2.x on the compose Qdrant |
+
+Notes on the newer backends:
+
+- **mem0** is configured on the benchmark's own model, embeddings and Qdrant (one collection per session; its SQLite history is kept in memory). mem0 2.x only adds memories: there is no update or delete step, so after a corrected fact both the old and the new value are stored, and the `update` category measures whether retrieval and the answering model pick the newer one. Its optional hybrid scoring needs `fastembed` (BM25) and spaCy (entity boosts); neither is installed, so retrieval is plain semantic search. The score threshold is set to 0 so it returns k results like the other vector backends. Telemetry is off unless `MEM0_TELEMETRY` is set.
+- **langgraph_store** keeps one namespace per session and deletes every key on teardown.
+- Graphiti (temporal knowledge graph) is not included: it needs a Neo4j or FalkorDB service and its own LLM pipeline for entity and edge extraction, which is a separate project rather than a backend on the existing stack.
+
+**Retrieval depth.** `qdrant`, `pgvector`, `langgraph_store` and `mem0` retrieve the top `k` items (`RETRIEVAL_K`, default 4). `--k 2 4 8` runs a sweep: each of those backends runs once per k and is reported as `qdrant@k2`, `qdrant@k4` and so on, drawn in lighter shades of the same color as k grows; `buffer` and `summary` ignore k and run once.
+
+**Ported to LangChain 1.x (v2).** v1 used LangChain 0.2's `ConversationChain`, `ConversationBufferMemory`, `ConversationSummaryMemory` and `VectorStoreRetrieverMemory`, which are gone from LangChain 1.x. v2 uses `langchain-core` 1.x, `langchain-qdrant`, `langchain-postgres` and psycopg 3. The summarizer keeps the v1 prompt text, but stores, retrieval formatting and the answering prompt changed, so **v1 and v2 numbers are not directly comparable**. `langchain-postgres` reuses the table names `langchain_pg_collection` and `langchain_pg_embedding` with a different schema, so a Postgres volume created by v1 must be dropped first (`docker compose down -v`).
 
 ## Benchmark Design
 
@@ -99,7 +113,7 @@ flowchart TD
 
 - **Probe tokens are reported separately.** Probes are not part of the conversation, so their tokens and latency are recorded per probe in the transcript and kept out of the per-conversation totals.
 - **Substring scoring (v1).** v1 checked that each word of the answer key appeared anywhere in the reply, so "march 15" matched "turn 15", "Godel Escher Bach" failed against the accented key, the melatonin dose was never checked, and "I won't repeat your PIN 7294" scored correct. v2 replaces it with the matcher and judge above.
-- **Embeddings are local.** `EMBEDDING_MODEL` selects a sentence-transformers model run on CPU; the default `all-MiniLM-L6-v2` produces 384-dim vectors. `EMBEDDING_DIMENSION` (Qdrant collection size) must be changed together with it. The pgvector backend uses LangChain's `PGVector`, which creates its own tables, so the `memory_embeddings` table in `scripts/init_pgvector.sql` is not used.
+- **Embeddings are local.** `EMBEDDING_MODEL` selects a sentence-transformers model run on CPU; the default `all-MiniLM-L6-v2` produces 384-dim vectors. `EMBEDDING_DIMENSION` (vector size for every vector backend) must be changed together with it. The pgvector, LangGraph store and mem0 backends create their own tables and collections, so the `memory_embeddings` table in `scripts/init_pgvector.sql` is not used.
 
 ## Metrics
 
@@ -108,12 +122,12 @@ flowchart TD
 | Recall | Correct rate per checkpoint (the decay curve) and overall, with 95% intervals; `partial`, `wrong`, `refused` and `abstained` are counted separately |
 | `retrieve_ms` | Time for the backend to produce the memory context for a message: reading the buffer, the summary, or embedding the query plus the vector search. No LLM call. |
 | `llm_ms` | Time of the answering LLM call, with the rendered prompt. |
-| `write_ms` | Time to store the finished exchange: appending messages, embedding and upserting the exchange, or (summary) the summarizer LLM call plus the update. Zero for probes. |
+| `write_ms` | Time to store the finished exchange: appending messages, embedding and upserting the exchange, or the LLM call plus the update (summary rewrite, mem0 extraction). Zero for probes. |
 | Latency p50 / p95 | Percentiles of each component and of their sum over every conversation turn of every valid run. Probes are timed the same way and reported separately (`probe_latency`). |
-| Input / output tokens | Provider-reported tokens per call, summed per conversation. Answering calls (`chat`) and memory maintenance calls (`memory`, the summarizer) are reported separately; probe tokens are reported separately and excluded from conversation totals. |
+| Input / output tokens | Provider-reported tokens per call, summed per conversation. Answering calls (`chat`) and memory maintenance calls (`memory`: the summarizer, mem0's extraction) are reported separately; probe tokens are reported separately and excluded from conversation totals. |
 | Cost per conversation | input tokens x input price + output tokens x output price, prices from [`pricing.yaml`](pricing.yaml) (each entry has a source URL and a checked-on date). Also shown per 1K conversations. |
 | Cost per correct recall | (conversation spend + probe spend) / number of correct probes, across all valid runs. |
-| Memory size at end | What the backend holds after the last turn: messages (buffer), summary characters (summary), points (Qdrant), rows (pgvector). |
+| Memory size at end | What the backend holds after the last turn: messages (buffer), summary characters (summary), points (Qdrant), rows (pgvector), items (LangGraph store), extracted memories (mem0). |
 
 v1 reported a single "retrieval latency" that actually wrapped retrieval, generation and the memory write, and priced every token at a 75/25 input/output blend; the v1 table at the top of this page uses those definitions.
 
@@ -166,7 +180,7 @@ make run
 # 1. Start backing services
 make up
 
-# 2. Install dependencies
+# 2. Install dependencies (sentence-transformers pulls in torch for the local embeddings)
 pip install -r requirements.txt
 
 # 3. Run
@@ -182,7 +196,8 @@ make run-quick
 ```
 python run_benchmark.py --help
 
-  --backends  buffer summary qdrant pgvector  (subset of backends)
+  --backends  buffer summary qdrant pgvector langgraph_store mem0  (subset of backends)
+  --k         K [K ...]  retrieval depth; several values run a sweep (default: RETRIEVAL_K=4)
   --runs      N    number of runs per backend (default: 5)
   --turns     N    conversation turns per run (default: 50)
   --checkpoints 15 25 35 50   recall checkpoints (after these turns)
@@ -239,11 +254,14 @@ agent-memory-showdown/
 │   ├── llm_factory.py        # Claude + local embeddings
 │   ├── visualize.py          # Plotly + Matplotlib charts
 │   └── backends/
-│       ├── base.py           # BaseMemoryBackend, scoring helpers
-│       ├── buffer_memory.py  # ConversationBufferMemory
-│       ├── summary_memory.py # ConversationSummaryMemory
-│       ├── qdrant_memory.py  # VectorStoreRetrieverMemory via Qdrant
-│       └── pgvector_memory.py# VectorStoreRetrieverMemory via pgvector
+│       ├── base.py           # BaseMemoryBackend: the shared agent loop
+│       ├── registry.py       # name -> backend class
+│       ├── buffer_memory.py  # full history
+│       ├── summary_memory.py # rolling LLM summary
+│       ├── qdrant_memory.py  # langchain-qdrant vector store
+│       ├── pgvector_memory.py        # langchain-postgres PGVector
+│       ├── langgraph_store_memory.py # LangGraph PostgresStore
+│       └── mem0_memory.py    # mem0 on the compose Qdrant
 ├── scripts/
 │   ├── setup_droplet.sh      # Provision Qdrant + Postgres on DO Droplet
 │   └── init_pgvector.sql     # DB schema for pgvector backend
@@ -266,11 +284,11 @@ agent-memory-showdown/
 
 ## Tech Stack
 
-- Python 3.11+ / LangChain 0.2
+- Python 3.11+ / langchain-core 1.x, langchain-qdrant, langchain-postgres, LangGraph 1.x, mem0 2.x
 - Claude 4.5 Sonnet (via DigitalOcean Serverless Inference)
-- sentence-transformers (all-MiniLM-L6-v2, local embeddings)
-- Qdrant client 1.11
-- pgvector 0.3 + psycopg2
+- sentence-transformers (all-MiniLM-L6-v2, local embeddings, via langchain-huggingface)
+- Qdrant 1.20 (server and client pinned to the same version)
+- PostgreSQL 16 + pgvector, psycopg 3
 - Plotly 5 + Matplotlib 3.9
 - Remotion 4.0 (React + TypeScript video)
 - Docker Compose

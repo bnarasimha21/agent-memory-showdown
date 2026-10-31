@@ -85,7 +85,7 @@ def get_embeddings() -> Embeddings:
         raise ValueError(
             f"Unknown EMBEDDING_PROVIDER {config.EMBEDDING_PROVIDER!r} (use 'local' or 'fake')"
         )
-    from langchain_community.embeddings import HuggingFaceEmbeddings
+    from langchain_huggingface import HuggingFaceEmbeddings
 
     return HuggingFaceEmbeddings(
         model_name=config.EMBEDDING_MODEL,

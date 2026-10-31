@@ -2,7 +2,7 @@
 # `docker compose -p ams-test`, see `make test-integration`) can run alongside.
 services:
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.20.0
     ports:
       - "${QDRANT_HOST_PORT:-6333}:6333"
     volumes:

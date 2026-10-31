@@ -28,9 +28,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 TRACKED_PACKAGES = [
-    "langchain",
     "langchain-core",
-    "langchain-community",
+    "langchain-huggingface",
     "langchain-openai",
     "langchain-qdrant",
     "langchain-postgres",
@@ -39,7 +38,6 @@ TRACKED_PACKAGES = [
     "mem0ai",
     "qdrant-client",
     "psycopg",
-    "psycopg2-binary",
     "sentence-transformers",
     "numpy",
     "plotly",

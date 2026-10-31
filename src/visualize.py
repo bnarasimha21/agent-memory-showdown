@@ -16,7 +16,25 @@ BACKEND_COLORS = {
     "summary": "#DD8452",
     "qdrant": "#55A868",
     "pgvector": "#C44E52",
+    "langgraph_store": "#8172B3",
+    "mem0": "#937860",
 }
+
+
+def backend_color(label: str) -> str:
+    """Color for `name` or a k-sweep variant `name@k<k>`.
+
+    Variants of one backend share its hue; larger k is drawn lighter, so a
+    sweep reads as one family per backend.
+    """
+    name, _, k = label.partition("@k")
+    base = BACKEND_COLORS.get(name, "#888888")
+    if not k.isdigit():
+        return base
+    r, g, b = (int(base[i:i + 2], 16) for i in (1, 3, 5))
+    mix = min(0.6, 0.15 * (int(k).bit_length() - 1))
+    r, g, b = (round(c + (255 - c) * mix) for c in (r, g, b))
+    return f"#{r:02X}{g:02X}{b:02X}"
 
 
 def load_results(results_path: str | Path) -> dict:
@@ -125,7 +143,7 @@ def plot_recall_by_category_matplotlib(results: dict, output_path: Path) -> None
             lo.append(rate - d["correct_ci95"][0] * 100)
             hi.append(d["correct_ci95"][1] * 100 - rate)
         ax.bar(xs, ys, width, yerr=[lo, hi], capsize=3, label=backend,
-               color=BACKEND_COLORS.get(backend, "#888"))
+               color=backend_color(backend))
     ax.set_xticks(range(len(categories)))
     ax.set_xticklabels([c + (" *" if c == "sensitive" else "") for c in categories])
     ax.set_ylabel("Correct (%)")
@@ -146,7 +164,7 @@ def plot_recall_by_category_plotly(results: dict, output_path: Path) -> None:
         ys = [data[backend][c]["correct_rate"] * 100 if c in data[backend] else None
               for c in categories]
         fig.add_trace(go.Bar(name=backend, x=categories, y=ys,
-                             marker_color=BACKEND_COLORS.get(backend, "#888")))
+                             marker_color=backend_color(backend)))
     fig.update_layout(
         barmode="group", title="Recall by fact category (sensitive is not in the headline number)",
         yaxis_title="Correct (%)", yaxis=dict(range=[0, 105]), template="plotly_white",
@@ -164,7 +182,7 @@ def plot_memory_decay_curve_plotly(results: dict, output_path: Path) -> None:
     fig = go.Figure()
 
     for backend, data in curves.items():
-        color = BACKEND_COLORS.get(backend, "#888")
+        color = backend_color(backend)
         fig.add_trace(
             go.Scatter(
                 x=data["turns"],
@@ -203,7 +221,7 @@ def plot_memory_decay_curve_matplotlib(results: dict, output_path: Path) -> None
     fig, ax = plt.subplots(figsize=(9, 5))
 
     for backend, data in curves.items():
-        color = BACKEND_COLORS.get(backend, "#888")
+        color = backend_color(backend)
         ax.errorbar(
             data["turns"],
             [r * 100 for r in data["correct_rates"]],
@@ -294,7 +312,7 @@ def plot_latency_by_turn_matplotlib(results: dict, output_path: Path) -> None:
             by_turn = results[b]["latency_by_turn"]
             turns = sorted(by_turn, key=int)
             ax.plot([int(t) for t in turns], [by_turn[t][comp] for t in turns],
-                    color=BACKEND_COLORS.get(b, "#888"), label=b, linewidth=1.5)
+                    color=backend_color(b), label=b, linewidth=1.5)
         ax.set_title(comp)
         ax.set_xlabel("Turn")
         ax.grid(True, alpha=0.3)
@@ -318,7 +336,7 @@ def plot_latency_by_turn_plotly(results: dict, output_path: Path) -> None:
             fig.add_trace(go.Scatter(
                 x=[int(t) for t in turns], y=[by_turn[t][comp] for t in turns], mode="lines",
                 name=b, legendgroup=b, showlegend=col == 1,
-                line=dict(color=BACKEND_COLORS.get(b, "#888")),
+                line=dict(color=backend_color(b)),
             ), row=1, col=col)
     fig.update_layout(title="Latency by turn, per component (mean ms)", template="plotly_white",
                       width=1200, height=420)

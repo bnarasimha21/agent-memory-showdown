@@ -16,48 +16,35 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable
 
-from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 
 from src.prompts import render_chat_prompt
 
+logger = logging.getLogger(__name__)
 
-def usage_from_message(message: BaseMessage, llm_output: Optional[dict] = None) -> tuple[int, int]:
-    """(input_tokens, output_tokens) reported by the provider for one call."""
+
+def usage_from_message(message: BaseMessage) -> tuple[int, int]:
+    """(input_tokens, output_tokens) from the message's `usage_metadata`.
+
+    LangChain chat models fill `usage_metadata` from the provider's reported
+    usage. A message without it is counted as zero and logged, so a provider
+    that stops reporting usage shows up in the log rather than as a silent
+    cost of zero.
+    """
     usage = getattr(message, "usage_metadata", None)
-    if usage:
-        return int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0))
-    meta = getattr(message, "response_metadata", None) or {}
-    token_usage = meta.get("token_usage") or (llm_output or {}).get("token_usage") or {}
-    return int(token_usage.get("prompt_tokens", 0)), int(token_usage.get("completion_tokens", 0))
-
-
-class UsageCollector(BaseCallbackHandler):
-    """Sums token usage across every LLM call made while it is attached."""
-
-    def __init__(self) -> None:
-        self.calls = 0
-        self.input_tokens = 0
-        self.output_tokens = 0
-
-    def on_llm_end(self, response: Any, **kwargs: Any) -> None:
-        self.calls += 1
-        for generations in response.generations:
-            for gen in generations:
-                message = getattr(gen, "message", None)
-                if message is not None:
-                    i, o = usage_from_message(message, response.llm_output)
-                    self.input_tokens += i
-                    self.output_tokens += o
-                    return
+    if not usage:
+        logger.warning("LLM response has no usage_metadata; counting 0 tokens")
+        return 0, 0
+    return int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0))
 
 
 @dataclass
@@ -102,8 +89,17 @@ def fingerprint(size: int, unit: str, payload: Iterable[Any]) -> dict:
     return {"size": size, "unit": unit, "digest": digest.hexdigest()}
 
 
+def backend_label(cls: type, k: int, sweep: bool) -> str:
+    """`name@k<k>` for a k-dependent backend in a k sweep, otherwise `name`."""
+    return f"{cls.name}@k{k}" if sweep and cls.uses_k else cls.name
+
+
 class BaseMemoryBackend(ABC):
     name: str
+    # What the backend keeps, and what a write costs; shown in the README table.
+    stores: str = ""
+    # True for backends whose retrieval depth is `k` (swept by `--k`).
+    uses_k: bool = False
 
     def __init__(
         self,
@@ -117,6 +113,10 @@ class BaseMemoryBackend(ABC):
         self._llm = llm
         self._embeddings = embeddings
         self.k = k if k is not None else config.RETRIEVAL_K
+
+    def label(self, sweep: bool = False) -> str:
+        """Name used in the bundle: `qdrant`, or `qdrant@k8` in a k sweep."""
+        return backend_label(type(self), self.k, sweep)
 
     @property
     def llm(self) -> BaseChatModel:

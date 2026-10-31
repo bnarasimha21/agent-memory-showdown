@@ -5,6 +5,7 @@ Usage:
     python run_benchmark.py                               # all backends, paid LLM
     python run_benchmark.py --backends buffer summary     # subset
     python run_benchmark.py --runs 3 --turns 50
+    python run_benchmark.py --k 2 4 8                     # retrieval-depth sweep
     LLM_PROVIDER=fake EMBEDDING_PROVIDER=fake python run_benchmark.py   # free, offline
 
 Each invocation writes a run bundle to results/runs/<run_id>/.
@@ -59,6 +60,10 @@ def parse_args(argv=None):
                              f"{','.join(f'{c}={n}' for c, n in config.FACTS_PER_CATEGORY.items())})")
     parser.add_argument("--no-distractors", action="store_true",
                         help="Leave out distractor turns")
+    parser.add_argument("--k", type=int, nargs="+", default=None, metavar="K",
+                        help="Retrieval depth for top-k backends (default: RETRIEVAL_K="
+                             f"{config.RETRIEVAL_K}). Several values run a sweep: "
+                             "each top-k backend is reported once per k as name@kK")
     parser.add_argument("--results-dir", default=config.RESULTS_DIR,
                         help=f"Directory to write results (default: {config.RESULTS_DIR})")
     parser.add_argument("--label", default=None, help="Suffix for the run id")
@@ -87,6 +92,7 @@ def main(argv=None):
         results_dir=args.results_dir,
         run_label=args.label,
         judge=False if args.no_judge else None,
+        ks=args.k,
     )
     aggregate_path = bundle / "aggregate.json"
     logger.info("Benchmark complete. Bundle: %s", bundle)

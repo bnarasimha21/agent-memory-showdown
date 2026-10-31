@@ -38,7 +38,7 @@ systemctl enable docker
 systemctl start docker
 
 echo "==> Pulling Qdrant image"
-docker pull qdrant/qdrant:latest
+docker pull qdrant/qdrant:v1.20.0
 
 echo "==> Starting Qdrant container"
 docker run -d \
@@ -47,7 +47,7 @@ docker run -d \
     -p 6333:6333 \
     -p 6334:6334 \
     -v qdrant_data:/qdrant/storage \
-    qdrant/qdrant:latest
+    qdrant/qdrant:v1.20.0
 
 echo "==> Installing PostgreSQL 16 with pgvector"
 apt-get install -y postgresql-common

@@ -10,7 +10,7 @@ import os
 import time
 import urllib.request
 
-import psycopg2
+import psycopg
 import pytest
 
 from src.config import config
@@ -26,7 +26,7 @@ def _qdrant_ready() -> str | None:
 
 def _postgres_ready() -> str | None:
     try:
-        conn = psycopg2.connect(config.postgres_dsn, connect_timeout=2)
+        conn = psycopg.connect(config.postgres_dsn, connect_timeout=2)
         conn.close()
         return None
     except Exception as exc:
