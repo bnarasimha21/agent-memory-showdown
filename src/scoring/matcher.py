@@ -27,7 +27,7 @@ from typing import Iterable, Sequence
 
 from src.scoring.normalize import contains, fold, normalize
 
-MATCHER_VERSION = "matcher-v3"
+MATCHER_VERSION = "matcher-v4"
 
 _REFUSAL = [
     re.compile(

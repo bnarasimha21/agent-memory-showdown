@@ -160,8 +160,26 @@ def test_the_replaced_value_named_as_history_is_not_a_stale_answer():
     ("forty", "40"),
     ("on 9 May", "on date-05-09"),
     ("on 9 May and then", "on date-05-09 and then"),
-    ("4/9", "date-04-09"),          # month first
-    ("15/3", "date-03-15"),         # 15 cannot be a month
+    ("on 4/9", "on date-04-09"),    # month first
+    ("on 15/3", "on date-03-15"),   # 15 cannot be a month
+    ("4/9/2027", "date-04-09"),     # a year makes it a date without a cue
+    ("due 4/9", "due date-04-09"),
+    ("your appointment is 4/9", "your appointment is date-04-09"),
+    # No year and no date cue: not a date.
+    ("4/9", "4 9"),
+    ("open 24/7", "open 24 7"),
+    ("3/4 of the way there", "3 4 of the way there"),
+    ("on 3/4 of the days", "on 3 4 of the days"),  # "of" after: a fraction
+    # Ordinal words next to a month.
+    ("march twenty-first", "date-03-21"),
+    ("March 21st", "date-03-21"),
+    ("the twenty-first of March", "the date-03-21"),
+    ("march the first", "date-03-01"),
+    ("first of may", "date-05-01"),
+    ("twentieth of june", "date-06-20"),
+    ("thirtieth of april", "date-04-30"),
+    ("my first dog", "my first dog"),
+    ("the second time", "the second time"),
     ("2027-05-09", "date-05-09"),
     ("15 may be late", "15 may be late"),
 ])
@@ -173,3 +191,7 @@ def test_number_words_and_numeric_dates_match_answers():
     assert match("It's twenty-one days away.", [["21 days", "21 day"]])[0] == "correct"
     assert match("Your race is on 9 May.", [["May 9"]])[0] == "correct"
     assert match("It's on 5/9.", [["May 9"]])[0] == "correct"
+    assert match("It's on March twenty-first.", [["March 21"]])[0] == "correct"
+    # A fraction or "24/7" is not a date, so it cannot match one.
+    assert match("I'm 3/4 of the way through.", [["March 4"]])[0] == "wrong"
+    assert match("Support is open 24/7.", [["July 24"]])[0] == "wrong"

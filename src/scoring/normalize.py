@@ -7,10 +7,17 @@ strips punctuation, and replaces dates written as "March 15", "15 March",
 "15th of March", "3/15" or "2027-03-15" with one canonical token
 ("date-03-15"), so "march 15" can only match a date and never "turn 15".
 
-Numeric dates without a month name are read month first ("4/9" is April 9,
-the US order the answering models default to), unless the first number cannot
-be a month ("15/3" is March 15). The dataset writes every date with a month
-name, so this only matters for how a model chooses to answer.
+Ordinal words next to a month are days too: "march twenty-first", "the
+first of may" and "twentieth of june" become dates. Elsewhere ordinal words
+are left alone ("my first dog").
+
+A slash pair "a/b" is only read as a date when it carries a year ("4/9/2027")
+or a date cue comes just before it ("on 4/9", "due 4/9", "appointment is
+4/9"), and never when "of" follows ("3/4 of the way"). Without that, "24/7"
+or a fraction would turn into a date. Numeric dates are read month first ("4/9"
+is April 9, the US order the answering models default to), unless the first
+number cannot be a month ("15/3" is March 15). The dataset writes every date
+with a month name, so this only matters for how a model chooses to answer.
 """
 
 from __future__ import annotations
@@ -36,6 +43,20 @@ TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seve
         "eighty": 80, "ninety": 90}
 NUMBER_WORDS.update({w: str(n) for w, n in TENS.items()})
 _UNITS = {w: int(d) for w, d in NUMBER_WORDS.items() if len(d) == 1 and d != "0"}
+
+ORDINAL_WORDS = {
+    "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6, "seventh": 7,
+    "eighth": 8, "ninth": 9, "tenth": 10, "eleventh": 11, "twelfth": 12, "thirteenth": 13,
+    "fourteenth": 14, "fifteenth": 15, "sixteenth": 16, "seventeenth": 17, "eighteenth": 18,
+    "nineteenth": 19, "twentieth": 20, "thirtieth": 30,
+}
+_ORDINAL_UNITS = {w: n for w, n in ORDINAL_WORDS.items() if n < 10}
+
+# Words that, within a few words before "a/b", say it is a date.
+_DATE_CUES = {"on", "by", "due", "until", "till", "since", "before", "after", "date", "dated",
+              "deadline", "appointment", "birthday", "anniversary", "scheduled", "rescheduled",
+              "moved", "starts", "start", "starting", "ends", "expires", "renews", "day", "dates"}
+_CUE_WINDOW = 4
 
 # After "<day> may", these words mean "may" is the verb ("15 may be late").
 _MAY_VERB_NEXT = {"be", "have", "not", "need", "want", "get", "take", "come", "go", "arrive",
@@ -88,30 +109,73 @@ def _dates(tokens: list[str]) -> list[str]:
     return out
 
 
-def _numeric_date(m: re.Match) -> str:
-    if m["iso_month"]:
-        month, day = int(m["iso_month"]), int(m["iso_day"])
-    else:
-        a, b = int(m["a"]), int(m["b"])
-        month, day = (a, b) if a <= 12 else (b, a)
-    if not (1 <= month <= 12 and 1 <= day <= 31):
-        return m[0]
-    return f" {_MONTH_NAMES[month - 1]} {day} "
+def _looks_like_a_date(text: str, m: re.Match) -> bool:
+    """A slash pair is a date with a year, or with a date cue just before it and no "of" after."""
+    if m["year"]:
+        return True
+    if re.match(r"\s*of\b", text[m.end():]):
+        return False
+    before = re.findall(r"[a-z]+", text[:m.start()])[-_CUE_WINDOW:]
+    return any(w in _DATE_CUES for w in before)
+
+
+def _numeric_dates(text: str) -> str:
+    def repl(m: re.Match) -> str:
+        if m["iso_month"]:
+            month, day = int(m["iso_month"]), int(m["iso_day"])
+        else:
+            if not _looks_like_a_date(text, m):
+                return m[0]
+            a, b = int(m["a"]), int(m["b"])
+            month, day = (a, b) if a <= 12 else (b, a)
+        if not (1 <= month <= 12 and 1 <= day <= 31):
+            return m[0]
+        return f" {_MONTH_NAMES[month - 1]} {day} "
+
+    return _NUMERIC_DATE.sub(repl, text)
 
 
 _NUMERIC_DATE = re.compile(
     r"\b(?:\d{4}-(?P<iso_month>\d{1,2})-(?P<iso_day>\d{1,2})"
-    r"|(?P<a>\d{1,2})/(?P<b>\d{1,2})(?:/\d{2,4})?)\b"
+    r"|(?P<a>\d{1,2})/(?P<b>\d{1,2})(?:/(?P<year>\d{2,4}))?)\b"
 )
 
 
+def _ordinal_at(words: list[str], i: int) -> tuple[int, int] | None:
+    """(day, words used) for an ordinal word at i ("first", "twenty first")."""
+    w = words[i]
+    nxt = words[i + 1] if i + 1 < len(words) else None
+    if w in TENS and nxt in _ORDINAL_UNITS:
+        return TENS[w] + _ORDINAL_UNITS[nxt], 2
+    if w in ORDINAL_WORDS:
+        return ORDINAL_WORDS[w], 1
+    return None
+
+
+def _next_to_a_month(words: list[str], i: int, used: int) -> bool:
+    """A month just before ("march [the] first") or after ("first [of] march")."""
+    prev = words[i - 1] if i >= 1 else None
+    prev2 = words[i - 2] if i >= 2 else None
+    after = words[i + used:i + used + 2]
+    return (prev in MONTHS or (prev == "the" and prev2 in MONTHS)
+            or (after[:1] and after[0] in MONTHS)
+            or (len(after) == 2 and after[0] == "of" and after[1] in MONTHS))
+
+
 def _join_number_words(words: list[str]) -> list[str]:
-    """"twenty one" (the hyphen is already gone) -> "21"."""
+    """"twenty one" (the hyphen is already gone) -> "21"; "march twenty first" -> "march 21"."""
     out: list[str] = []
     i = 0
     while i < len(words):
         w = words[i]
         nxt = words[i + 1] if i + 1 < len(words) else None
+        ordinal = _ordinal_at(words, i)
+        if ordinal and _next_to_a_month(words, i, ordinal[1]):
+            if out and out[-1] == "the" and len(out) >= 2 and out[-2] in MONTHS:
+                out.pop()  # "march the first" reads as "march 1"
+            out.append(str(ordinal[0]))
+            i += ordinal[1]
+            continue
         if w in TENS and nxt in _UNITS:
             out.append(str(TENS[w] + _UNITS[nxt]))
             i += 2
@@ -123,7 +187,7 @@ def _join_number_words(words: list[str]) -> list[str]:
 
 def tokens(text: str) -> list[str]:
     t = fold(text)
-    t = _NUMERIC_DATE.sub(_numeric_date, t)
+    t = _numeric_dates(t)
     t = re.sub(r"'s\b", "", t)
     t = re.sub(r"\b(\d+)(st|nd|rd|th)\b", r"\1", t)
     t = re.sub(r"(\d)([a-z])", r"\1 \2", t)
