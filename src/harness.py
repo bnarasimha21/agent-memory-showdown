@@ -135,8 +135,13 @@ def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints
         "prompt_template": CHAT_TEMPLATE,
         "packages": package_versions(),
         "environment": environment_info(),
-        "is_sample": config.LLM_PROVIDER == "fake",
+        # Any fake component (chat model, judge or embeddings) makes the numbers a sample.
+        "is_sample": is_sample_config(),
     }
+
+
+def is_sample_config() -> bool:
+    return "fake" in (config.LLM_PROVIDER, config.JUDGE_PROVIDER, config.EMBEDDING_PROVIDER)
 
 
 def run_benchmark(

@@ -2,6 +2,8 @@
 
 import json
 
+import pytest
+
 from run_benchmark import format_summary
 from src.aggregate import aggregate_records
 from src.backends.registry import AVAILABLE_BACKENDS
@@ -106,3 +108,43 @@ def test_sensitive_recall_script_uses_the_dataset(monkeypatch):
     assert sum(result["labels"].values()) == 2 * len(ids)
     # the fake model answers from the conversation it is given, so it repeats them
     assert result["labels"].get("correct") == 2 * len(ids)
+
+
+@pytest.mark.parametrize("llm,judge,emb,sample", [
+    ("fake", "fake", "fake", True),
+    ("do", "do", "fake", True),      # real chat model, fake embeddings: still a sample
+    ("do", "fake", "local", True),   # fake judge labels: a sample
+    ("do", "do", "local", False),
+])
+def test_any_fake_provider_marks_the_run_as_a_sample(monkeypatch, fresh_config, llm, judge, emb, sample):
+    from src.harness import build_manifest, is_sample_config
+
+    monkeypatch.setenv("LLM_PROVIDER", llm)
+    monkeypatch.setenv("JUDGE_PROVIDER", judge)
+    monkeypatch.setenv("EMBEDDING_PROVIDER", emb)
+    fresh_config()
+    assert is_sample_config() is sample
+    assert build_manifest(["buffer"], 1, 10, {}, [10], 4)["is_sample"] is sample
+
+
+@pytest.mark.parametrize("label", ["a b", "x#y", "what?", "a/b", "*/", "..", "-lead", "x" * 65])
+def test_run_labels_that_would_break_a_path_or_url_are_rejected(label):
+    from run_benchmark import parse_args
+    from src.bundle import new_run_id
+
+    with pytest.raises(ValueError):
+        new_run_id(label)
+    with pytest.raises(SystemExit):
+        parse_args(["--label", label])
+
+
+def test_good_labels_make_valid_run_ids():
+    from run_benchmark import parse_args
+    from src.bundle import new_run_id, validate_run_id
+
+    assert parse_args(["--label", "sample-fake_2.1"]).label == "sample-fake_2.1"
+    run_id = new_run_id("sample-fake_2.1")
+    assert validate_run_id(run_id) == run_id and run_id.endswith("-sample-fake_2.1")
+    for bad in ("../x", "a/b", "a b", "x..y"):
+        with pytest.raises(ValueError):
+            validate_run_id(bad)

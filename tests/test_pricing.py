@@ -60,3 +60,23 @@ def test_unpriced_model_reports_no_cost():
     recs = [{"backend": "b", "run_index": 0, "type": "run_end", "error": None}, _turn(0, 1, 10, 1)]
     agg = aggregate_records(recs, {"llm_model": "unknown-model"})
     assert agg["backends"]["b"]["cost"] is None and agg["pricing"]["unpriced"]
+
+
+def test_cost_per_correct_recall_uses_the_headline_probes_only():
+    """A correct sensitive probe must not lower cost per correct recall (it is not in recall)."""
+    recs = [{"backend": "b", "run_index": 0, "type": "run_end", "error": None}, _turn(0, 1, 1000, 10)]
+    probe = {"backend": "b", "run_index": 0, "type": "probe", "checkpoint": 1, "retrieve_ms": 1.0,
+             "llm_ms": 1.0, "write_ms": 0.0, "output_tokens": 0}
+    recs += [
+        {**probe, "fact_id": "pet", "category": "extraction", "question": "pet?",
+         "answer_key": "baxter", "response": "Baxter", "input_tokens": 100},
+        {**probe, "fact_id": "pin", "category": "sensitive", "question": "pin?",
+         "answer_key": "4103", "response": "4103", "input_tokens": 700},
+    ]
+    b = aggregate_records(recs, {"llm_model": "anthropic-claude-4.5-sonnet"})["backends"]["b"]
+    assert b["recall_overall"]["n"] == 1 and b["recall_by_category"]["sensitive"]["n"] == 1
+    conv = (1000 * 3 + 10 * 15) / 1e6
+    # one correct headline probe; the sensitive probe's spend and answer are both left out
+    assert b["cost"]["per_correct_recall_usd"] == pytest.approx(conv + 100 * 3 / 1e6)
+    # probe spend reported per run still covers every probe
+    assert b["cost"]["probes_per_run_usd"] == pytest.approx(800 * 3 / 1e6)

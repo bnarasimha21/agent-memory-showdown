@@ -200,11 +200,11 @@ def aggregate_records(
         by_run: dict[int, list[str]] = defaultdict(list)
         by_category: dict[str, list[str]] = defaultdict(list)
         matcher_by_category: dict[str, list[str]] = defaultdict(list)
-        all_labels: list[str] = []
         primary_labels, matcher_labels, judge_labels = [], [], []
         pairs: list[tuple[str, str]] = []
         judge_errors = 0
         judge_in = judge_out = 0
+        headline_probe_in = headline_probe_out = 0
         for p in probes:
             score = score_by_key.get(score_key(p))
             if score is None:  # a probe without a score: score it with the matcher now
@@ -212,10 +212,11 @@ def aggregate_records(
             label = _primary(score, judged)
             category = probe_category(p)
             headline = category not in NON_HEADLINE
-            all_labels.append(label)
             by_category[category].append(label)
             matcher_by_category[category].append(score["matcher_label"])
             if headline:
+                headline_probe_in += p["input_tokens"]
+                headline_probe_out += p["output_tokens"]
                 primary_labels.append(label)
                 matcher_labels.append(score["matcher_label"])
                 by_checkpoint[p["checkpoint"]][p["fact_id"]].append(label)
@@ -256,10 +257,12 @@ def aggregate_records(
             (by_run[i].count("correct") / len(by_run[i])) for i in sorted(valid) if by_run[i]
         ]
 
-        n_correct = all_labels.count("correct")
+        # Cost per correct recall uses the same probes as headline recall (sensitive
+        # facts are left out of both the spend and the count of correct answers).
+        n_correct = primary_labels.count("correct")
         order = [c for c in CATEGORIES if c in by_category] + sorted(set(by_category) - set(CATEGORIES))
         if price is not None:
-            total_spend = sum(conv_costs) + (probe_cost_total or 0.0)
+            total_spend = sum(conv_costs) + _cost(price, headline_probe_in, headline_probe_out)
             cost_per_correct = total_spend / n_correct if n_correct else None
             cost_per_conv = _mean(conv_costs)
             cost = {

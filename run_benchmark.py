@@ -31,6 +31,7 @@ logger = logging.getLogger("benchmark")
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.backends.registry import AVAILABLE_BACKENDS  # noqa: E402
+from src.bundle import validate_label  # noqa: E402
 from src.config import config  # noqa: E402
 from src.dataset import parse_composition  # noqa: E402
 from src.harness import run_benchmark  # noqa: E402
@@ -66,11 +67,19 @@ def parse_args(argv=None):
                              "each top-k backend is reported once per k as name@kK")
     parser.add_argument("--results-dir", default=config.RESULTS_DIR,
                         help=f"Directory to write results (default: {config.RESULTS_DIR})")
-    parser.add_argument("--label", default=None, help="Suffix for the run id")
+    parser.add_argument("--label", default=None, type=_label,
+                        help="Suffix for the run id (letters, digits, '.', '_', '-')")
     parser.add_argument("--no-viz", action="store_true", help="Skip generating visualizations")
     parser.add_argument("--no-judge", action="store_true",
                         help="Score with the deterministic matcher only (no judge LLM calls)")
     return parser.parse_args(argv)
+
+
+def _label(value: str) -> str:
+    try:
+        return validate_label(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def main(argv=None):

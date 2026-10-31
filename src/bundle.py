@@ -23,6 +23,7 @@ from __future__ import annotations
 import gzip
 import json
 import platform
+import re
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -77,9 +78,28 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# Run ids are directory names and URL path segments on the results site, so
+# they are limited to characters that need no escaping in either.
+RUN_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+LABEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+
+
+def validate_run_id(run_id: str) -> str:
+    if not isinstance(run_id, str) or not RUN_ID_RE.fullmatch(run_id) or ".." in run_id:
+        raise ValueError(f"invalid run id {run_id!r}: use letters, digits, '.', '_' and '-' only")
+    return run_id
+
+
+def validate_label(label: str) -> str:
+    if not LABEL_RE.fullmatch(label) or ".." in label:
+        raise ValueError(f"invalid run label {label!r}: use letters, digits, '.', '_' and '-' only "
+                         "(it becomes part of a directory name and a URL)")
+    return label
+
+
 def new_run_id(label: str | None = None) -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-    return f"{stamp}-{label}" if label else stamp
+    return f"{stamp}-{validate_label(label)}" if label else stamp
 
 
 def environment_info() -> dict:
