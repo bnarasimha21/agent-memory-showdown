@@ -1,0 +1,90 @@
+{
+  "methodology": "v2",
+  "created_at": "2026-10-31T13:32:58Z",
+  "git": {
+    "sha": "1e2d7908a27fd42cf59da32f3581de4a8ea23781",
+    "dirty": false
+  },
+  "llm_provider": "fake",
+  "llm_model": "fake-memory-v1",
+  "embedding_provider": "fake",
+  "embedding_model": "fake-hashing-384",
+  "embedding_dimension": 384,
+  "k": [
+    2,
+    4
+  ],
+  "backends": [
+    "buffer",
+    "summary",
+    "qdrant@k2",
+    "qdrant@k4",
+    "pgvector@k2",
+    "pgvector@k4",
+    "langgraph_store@k2",
+    "langgraph_store@k4",
+    "mem0@k2",
+    "mem0@k4"
+  ],
+  "num_runs": 2,
+  "num_turns": 20,
+  "dataset": {
+    "bank": "data/facts_v2.yaml",
+    "bank_version": "facts_v2",
+    "bank_sha256": "727ae24cc1af8f2cf02bd079c06eaacd63dcfdb2bac30955e7368c8f154da2f7",
+    "composition": {
+      "extraction": 2,
+      "update": 1,
+      "temporal": 1,
+      "multi_hop": 1,
+      "abstention": 1,
+      "sensitive": 1
+    },
+    "distractors": true,
+    "headline_excludes": [
+      "abstention",
+      "sensitive"
+    ]
+  },
+  "checkpoints": [
+    10,
+    20
+  ],
+  "seeds": [
+    42,
+    43
+  ],
+  "prompt_hash": "2a6636710814e818ea943d0f7e477c0154d200ac47c691ff3614ef0f348de0b1",
+  "prompt_template": "You are a helpful assistant in a long-running conversation with one user.\nBelow is what you remember from earlier in the conversation. Use it to answer the user's latest message. If the answer is not in your memory, say that the user has not told you.\n\nMemory:\n{history}\n\nUser: {input}\nAssistant:",
+  "packages": {
+    "langchain-core": "1.7.3",
+    "langchain-huggingface": "1.2.3",
+    "langchain-openai": "1.7.3",
+    "langchain-qdrant": "1.1.0",
+    "langchain-postgres": "0.0.19",
+    "langgraph": "1.2.18",
+    "langgraph-checkpoint-postgres": "3.2.0",
+    "mem0ai": "2.2.1",
+    "qdrant-client": "1.20.0",
+    "psycopg": "3.3.6",
+    "numpy": "1.26.4",
+    "plotly": "5.24.1"
+  },
+  "environment": {
+    "python": "3.12.13",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "is_sample": true,
+  "run_id": "20261031T133258550763Z-sample-fake",
+  "finished_at": "2026-10-31T13:33:00Z",
+  "duration_s": 2.0744279159698635,
+  "scoring": {
+    "matcher": "matcher-v3",
+    "scored_at": "2026-10-31T13:33:00Z",
+    "judge_provider": "fake",
+    "judge_model": "fake-judge-v1",
+    "judge_prompt": "src/scoring/judge_prompt.md",
+    "judge_prompt_hash": "84419ead9364c2e845ec9a1f3a40156926f986637d80c101c0841eafbfb90e28",
+    "judge_is_answering_model": false
+  }
+}
