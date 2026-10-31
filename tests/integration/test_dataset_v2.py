@@ -40,9 +40,11 @@ def test_every_category_is_reported_with_the_expected_probe_count(services, tmp_
         by_cat = b["recall_by_category"]
         assert set(by_cat) == set(CATEGORIES)
         assert {c: by_cat[c]["n"] for c in CATEGORIES} == dict(expected), backend
-        # sensitive is reported on its own and left out of the headline
+        # abstention and sensitive are reported on their own and left out of the headline
         assert b["recall_sensitive"]["n"] == expected["sensitive"]
-        assert b["recall_overall"]["n"] == sum(expected.values()) - expected["sensitive"]
+        assert b["recall_abstention"]["n"] == expected["abstention"]
+        assert b["recall_overall"]["n"] == (sum(expected.values()) - expected["sensitive"]
+                                            - expected["abstention"])
         assert sum(e["n"] for e in b["recall_by_checkpoint"].values()) == b["recall_overall"]["n"]
 
     probes = records(bundle, "probe")
