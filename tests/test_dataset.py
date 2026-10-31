@@ -190,3 +190,35 @@ def test_probe_category_for_old_records():
     assert probe_category({"fact_id": "bank_pin"}) == "sensitive"
     assert probe_category({"fact_id": "dog_name"}) == "extraction"
     assert probe_category({"fact_id": "x", "category": "update"}) == "update"
+
+
+def test_no_two_facts_share_a_list_value_over_1000_seeds():
+    # flight_date and deadline_before_trip both draw a city; on about 3% of seeds
+    # they used to draw the same one, so "my flight to Tokyo" and "my trip to
+    # Tokyo" had two different right dates.
+    from src.dataset.generate import list_values
+
+    bank = load_bank()
+    everything = {c: len(bank.by_category(c)) for c in CATEGORIES}
+    templates = {t.id: t for c in CATEGORIES for t in bank.by_category(c)}
+    both = 0
+    for seed in range(1000):
+        d = generate_dataset(num_turns=120, checkpoints=[120], random_seed=seed,
+                             composition=everything, bank=bank)
+        seen: set[str] = set()
+        for fact in d.facts:
+            mine = list_values(templates[fact.id], fact.values)
+            assert not mine & seen, (seed, fact.id, mine & seen)
+            seen |= mine
+        by_id = {f.id: f for f in d.facts}
+        if "flight_date" in by_id and "deadline_before_trip" in by_id:
+            both += 1
+            assert by_id["flight_date"].values["city"] != by_id["deadline_before_trip"].values["city"]
+            assert by_id["flight_date"].values["other_city"] != by_id["deadline_before_trip"].values["city"]
+    assert both == 1000
+
+
+def test_default_composition_still_varies_cities_over_seeds():
+    cities = {f.values["city"] for seed in range(200)
+              for f in generate_dataset(random_seed=seed).facts if f.id in ("flight_date", "deadline_before_trip")}
+    assert len(cities) == 6

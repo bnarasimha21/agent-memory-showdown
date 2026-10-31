@@ -115,6 +115,15 @@ class ConversationDataset:
         return asdict(self)
 
 
+MAX_VALUE_DRAWS = 200
+
+
+def list_values(template, values: dict[str, str]) -> set[str]:
+    """Case-folded values a fact drew for its list slots, and for their `other_` (distractor) values."""
+    names = [n for n, spec in template.slots.items() if isinstance(spec, list)]
+    return {values[key].casefold() for n in names for key in (n, f"other_{n}")}
+
+
 def generate_dataset(
     num_turns: int = 50,
     checkpoints: list[int] | None = None,
@@ -141,15 +150,30 @@ def generate_dataset(
     )
     dataset.checkpoints = sorted({c for c in checkpoints if 1 <= c <= num_turns})
 
-    # 1. Which templates, with which values.
+    # 1. Which templates, with which values. Two facts may not draw the same
+    # list value (flight_date and deadline_before_trip both pick a city: "my
+    # flight to Tokyo" and "my trip to Tokyo" would have two right dates), and
+    # that includes the values their distractors use.
     chosen = []
+    used: set[str] = set()
     for category in CATEGORIES:
         count = composition.get(category, 0)
         pool = bank.by_category(category)
         if count > len(pool):
             raise ValueError(f"{count} {category} facts requested but the bank has {len(pool)}")
         for template in rng.sample(pool, count):
-            chosen.append((template, realize_slots(template.slots, rng)))
+            for _ in range(MAX_VALUE_DRAWS):
+                values = realize_slots(template.slots, rng)
+                mine = list_values(template, values)
+                if not mine & used:
+                    break
+            else:
+                raise ValueError(
+                    f"{template.id}: no draw of its values in {MAX_VALUE_DRAWS} tries avoids the values "
+                    f"other facts in this dataset already use ({sorted(mine & used)}); give its slots "
+                    "more values")
+            used |= mine
+            chosen.append((template, values))
 
     # 2. Statement turns: all before the last checkpoint, so every fact is probed.
     last = dataset.checkpoints[-1] if dataset.checkpoints else num_turns
