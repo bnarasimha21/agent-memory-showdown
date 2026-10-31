@@ -20,7 +20,9 @@ the matcher label for probes the judge could not score) and the matcher label
 otherwise; both scorers' figures are always reported. The headline interval is
 run-level: `recall_run_mean` is the mean of the per-run recall rates with a 95%
 Student t interval over runs (a bootstrap over a handful of runs is too
-narrow; it is kept as `bootstrap_ci95`). Every rate also carries a Wilson
+narrow; it is kept as `bootstrap_ci95`). When every run scores the same, the t
+interval has zero width, so the Wilson interval over the pooled probes is used
+instead and `method` is "wilson-pooled". Every rate also carries a Wilson
 interval over probes, which is only approximate: probes from one run share a
 memory, so they are not independent and that interval is too narrow.
 
@@ -148,6 +150,25 @@ def _retries(turns: list[dict], probes: list[dict], scores: list[dict]) -> dict:
         "judge": total(scores, "judge_retries"),
         "wait_s": wait_ms / 1000,
     }
+
+
+POOLED_FALLBACK = "wilson-pooled"
+
+
+def run_mean_recall(run_rates: list[float], correct: int, n_probes: int) -> dict:
+    """Mean of per-run recall with a 95% t interval over runs.
+
+    When every run has the same recall the t interval has zero width, which
+    would claim certainty that a handful of runs cannot give. Then the
+    interval is the Wilson interval over the pooled probes instead, and
+    `method` says so ("wilson-pooled", with `degenerate_t` true).
+    """
+    out = {**t_mean_interval(run_rates, bounds=(0.0, 1.0)),
+           "bootstrap_ci95": bootstrap_mean(run_rates)["ci95"]}
+    ci = out["ci95"]
+    if ci is not None and ci[1] - ci[0] <= 1e-12 and n_probes:
+        out.update(ci95=wilson(correct, n_probes), method=POOLED_FALLBACK, degenerate_t=True)
+    return out
 
 
 def _primary(score: dict, judged: bool) -> str:
@@ -367,8 +388,7 @@ def aggregate_records(
             "memory_size_end": memory_size,
             "recall_by_checkpoint": recall_by_checkpoint,
             "recall_overall": _dist(primary_labels),
-            "recall_run_mean": {**t_mean_interval(run_rates, bounds=(0.0, 1.0)),
-                                "bootstrap_ci95": bootstrap_mean(run_rates)["ci95"]},
+            "recall_run_mean": run_mean_recall(run_rates, n_correct, len(primary_labels)),
             "recall_by_category": {c: _dist(by_category[c]) for c in order},
             **{f"recall_{c}": (_dist(by_category[c]) if c in by_category else None)
                for c in sorted(NON_HEADLINE)},

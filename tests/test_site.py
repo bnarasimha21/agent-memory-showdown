@@ -511,9 +511,9 @@ def test_headline_recall_is_the_run_mean_with_its_t_interval(runs, tmp_path):
         r = headline_row(data)
         row = next(line for line in block.splitlines() if line.startswith(f"| {label} |"))
         cells = [c.strip() for c in row.strip("|").split("|")]
-        assert cells[1] == f"{export.pct(r['run_mean'])} {export.ci(r['run_mean_ci'])}"
+        assert cells[1] == f"{export.pct(r['run_mean'])} {export.ci(r['run_mean_ci'])}{export.pooled_mark(r)}"
         assert cells[2] == f"{export.pct(r['recall'])} {export.ci(r['recall_ci'])}"
-        assert data["recall_run_mean"]["method"] == "t"
+        assert data["recall_run_mean"]["method"] in ("t", "wilson-pooled")
     summary = export.latest_run_summary(bundle)["backends"][0]
     first = headline_row(next(iter(bundle.backends.values())))
     assert summary["recallPct"] == round(first["run_mean"] * 100, 1)
@@ -579,3 +579,20 @@ def test_bundles_from_before_pairing_render_without_a_seed_line(runs, tmp_path):
     del bundle.aggregate["seeds"]
     md, page = _rendered(bundle, tmp_path)
     assert "Seeds" not in md and "UNPAIRED" not in page
+
+
+def test_identical_runs_show_the_pooled_wilson_interval_and_say_so(runs, tmp_path):
+    # Two runs that score the same give a zero-width t interval; the headline
+    # must show the pooled Wilson interval instead and label it.
+    _, _, bundle_path = runs
+    bundle = load_bundle(bundle_path)
+    label, data = next(iter(bundle.backends.items()))
+    data["recall_run_mean"] = {**data["recall_run_mean"], "mean": 0.5, "n": 2,
+                               "ci95": [0.2, 0.8], "method": "wilson-pooled", "degenerate_t": True}
+    block = export.readme_block([bundle], load_legacy())
+    row = next(line for line in block.splitlines() if line.startswith(f"| {label} |"))
+    assert "50.0% [20, 80] (runs identical: pooled Wilson)" in row
+    summary = export.latest_run_summary(bundle)["backends"]
+    assert next(b for b in summary if b["label"] == label)["recallCiMethod"] == "wilson-pooled"
+    page = site_build.build([bundle], tmp_path / "site").read_text()
+    assert "(runs identical: pooled Wilson)" in page

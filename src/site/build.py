@@ -37,7 +37,7 @@ from src.site.data import (
     LEGACY_V1, PAGES_URL, REPO_ROOT, Bundle, headline_row, load_bundle, load_legacy,
     published_bundles, seed_pairing,
 )
-from src.site.export import ci, fmt, k_text, ms, pct, usd
+from src.site.export import ci, fmt, k_text, ms, pct, pooled_mark, usd
 
 SITE_DIR = REPO_ROOT / "site"
 MARKER = ".ams-site"  # build only ever clears a directory it created
@@ -134,7 +134,7 @@ def headline_table(bundle: Bundle, num: Numbers) -> str:
                         f"<td></td></tr>")
             continue
         rows.append(
-            f"<tr><td>{esc(label)}</td><td>{num(pct(r['run_mean']))}</td><td>{num(ci(r['run_mean_ci']))}</td>"
+            f"<tr><td>{esc(label)}</td><td>{num(pct(r['run_mean']))}</td><td>{num(ci(r['run_mean_ci']))}{esc(pooled_mark(r))}</td>"
             f"<td>{num(pct(r['recall']))} {num(ci(r['recall_ci']))}</td>"
             f"<td>{num(str(r['headline_n']))}</td><td>{num(usd(r['cost_per_1k']))}</td>"
             f"<td>{num(usd(r['cost_per_correct'], 4))}</td>"
@@ -199,7 +199,8 @@ def run_section(bundle: Bundle, headline: bool) -> str:
     parts.append("<h3>Headline</h3><p class=\"muted\">Recall leaves out the abstention and "
                  "sensitive categories, which are shown on their own below. "
                  "Recall is the mean of the per-run recall rates; its CI is a 95% Student t "
-                 "interval over runs (none for a single run). The per-probe rate's Wilson interval "
+                 "interval over runs (none for a single run; when every run scores the same, the "
+                 "Wilson interval over the pooled probes, marked as such). The per-probe rate's Wilson interval "
                  "is approximate, because probes in one run are not independent.</p>")
     pairing = seed_pairing(bundle)
     if pairing and pairing["warning"]:

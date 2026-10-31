@@ -97,7 +97,7 @@ def v2_markdown(bundle: Bundle, headline: bool = True) -> list[str]:
         f"Source: [`manifest.json`]({src}/manifest.json), [`aggregate.json`]({src}/aggregate.json). "
         f"Recall leaves out the `abstention` and `sensitive` categories (reported on their own on "
         f"the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% "
-        f"Student t interval over runs; the per-probe Wilson interval is approximate, since probes "
+        f"Student t interval over runs (when every run scores the same, which would make it zero width, the Wilson interval over the pooled probes, marked as such); the per-probe Wilson interval is approximate, since probes "
         f"in one run are not independent. " + agreement_text(bundle),
         "",
     ]
@@ -118,12 +118,17 @@ def v2_markdown(bundle: Bundle, headline: bool = True) -> list[str]:
             lines.append(f"| {label} | failed: {r['error']} | | | | | | |")
             continue
         lines.append(
-            f"| {label} | {pct(r['run_mean'])} {ci(r['run_mean_ci'])} | {pct(r['recall'])} "
+            f"| {label} | {pct(r['run_mean'])} {ci(r['run_mean_ci'])}{pooled_mark(r)} | {pct(r['recall'])} "
             f"{ci(r['recall_ci'])} | {r['headline_n']} | {usd(r['cost_per_1k'])} | "
             f"{usd(r['cost_per_correct'], 4)} | {ms(r['latency_p50'])} / {ms(r['latency_p95'])} ms | "
             f"{fmt(r['memory_end'])} {r['memory_unit'] or ''} |"
         )
     return lines
+
+
+def pooled_mark(r: dict) -> str:
+    """Flag an interval that is not the t interval (every run scored the same)."""
+    return " (runs identical: pooled Wilson)" if r.get("run_mean_method") == "wilson-pooled" else ""
 
 
 def agreement_text(bundle: Bundle) -> str:
@@ -250,6 +255,8 @@ def latest_run_summary(bundle: Bundle) -> dict:
             "recallCi95Pct": ([round(v * 100, 1) for v in r["run_mean_ci"]]
                               if r["run_mean_ci"] else None),
             "recallRuns": r["runs_used"],
+            # "t", or "wilson-pooled" when every run scored the same.
+            "recallCiMethod": r["run_mean_method"],
             # Pooled over probes; the Wilson interval is approximate (probes in a run are not independent).
             "perProbeRecallPct": None if r["recall"] is None else round(r["recall"] * 100, 1),
             "perProbeApproxCi95Pct": [round(v * 100, 1) for v in r["recall_ci"]] if r["recall_ci"] else None,

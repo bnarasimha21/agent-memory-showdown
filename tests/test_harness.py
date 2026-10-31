@@ -5,7 +5,7 @@ import json
 import pytest
 
 from run_benchmark import format_summary
-from src.aggregate import aggregate_records
+from src.aggregate import aggregate_records, wilson
 from src.backends.registry import AVAILABLE_BACKENDS
 from src.harness import run_benchmark
 from src.prompts import template_hash
@@ -239,6 +239,19 @@ def test_run_mean_uses_a_t_interval_and_one_run_has_none():
     one = single["backends"]["a"]["recall_run_mean"]
     assert one["ci95"] is None and one["n"] == 1
     assert "[no interval]" in format_summary(single)
+
+
+def test_identical_runs_fall_back_to_a_pooled_wilson_interval():
+    # Both runs score 1 of 2: the t interval would be [0.5, 0.5], claiming a
+    # certainty two runs of two probes cannot support.
+    recs = [_end("a", 0), _end("a", 1)]
+    recs += [_run_probe("a", r, f"f{j}", "Baxter" if j == 0 else "no") for r in (0, 1) for j in (0, 1)]
+    agg = aggregate_records(recs)
+    rm = agg["backends"]["a"]["recall_run_mean"]
+    assert rm["mean"] == 0.5 and rm["method"] == "wilson-pooled" and rm["degenerate_t"] is True
+    assert rm["ci95"] == pytest.approx(wilson(2, 4))
+    assert rm["ci95"][1] - rm["ci95"][0] > 0.4
+    assert "(runs identical: pooled Wilson)" in format_summary(agg)
 
 
 def test_a_run_whose_judge_calls_all_failed_is_scored_by_the_matcher():

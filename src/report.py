@@ -43,7 +43,9 @@ def format_summary(aggregate: dict) -> str:
         o = data["recall_overall"]
         rm = data["recall_run_mean"]
         line = (
-            f"{backend:12s}  recall={_pct(rm['mean'])} {_ci(rm['ci95'])} (runs={rm['n']})  "
+            f"{backend:12s}  recall={_pct(rm['mean'])} {_ci(rm['ci95'])}"
+            f"{' (runs identical: pooled Wilson)' if rm.get('method') == 'wilson-pooled' else ''}"
+            f" (runs={rm['n']})  "
             f"per probe={_pct(o['correct_rate'])} ~{_ci(o['correct_ci95'])} (n={o['n']})  "
             f"partial={o['counts']['partial']} wrong={o['counts']['wrong']} "
             f"refused={o['counts']['refused']} abstained={o['counts']['abstained']}"

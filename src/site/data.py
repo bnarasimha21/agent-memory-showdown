@@ -102,6 +102,8 @@ def headline_row(data: dict) -> dict:
         "probes_all": sum(d["n"] for d in (data.get("recall_by_category") or {}).values()),
         "run_mean": run_mean.get("mean"),
         "run_mean_ci": run_mean.get("ci95"),
+        # "t", or "wilson-pooled" when every run scored the same (zero-width t).
+        "run_mean_method": run_mean.get("method"),
         "runs": data.get("num_valid_runs"),
         "runs_used": run_mean.get("n"),
         "cost_per_1k": cost.get("per_1k_conversations_usd"),
