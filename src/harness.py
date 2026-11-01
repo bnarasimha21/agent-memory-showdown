@@ -268,6 +268,18 @@ def run_benchmark(
             f"ready by a checkpoint: composition {dict(composition)}, checkpoints {checkpoints}, "
             f"{num_turns} turns), so there would be no recall to report")
 
+    # Load the embedding model before any paid work too: with a missing package
+    # or model every vector backend would fail run after run, after the
+    # buffer and summary conversations had already been paid for.
+    if any_k:
+        from src.llm_factory import get_embeddings
+
+        try:
+            get_embeddings().embed_query("preflight")
+        except Exception as exc:
+            raise RuntimeError(f"the embedding model ({embedding_model_id()}) cannot be loaded, so the "
+                               f"vector backends cannot run: {exc}") from exc
+
     # Resolve the judge before any paid work, so a bad judge setting fails now
     # rather than after every conversation has been paid for.
     judge_obj = None

@@ -117,3 +117,18 @@ def test_resume_refuses_a_different_configuration(fake, tmp_path):
 def test_resume_by_bare_run_id_finds_the_bundle(fake, tmp_path):
     bundle = bench(tmp_path)
     assert bench(tmp_path, resume=bundle.name) == bundle
+
+
+def test_a_missing_embedding_model_stops_the_run_before_any_paid_call(fake, tmp_path, monkeypatch):
+    import src.llm_factory as factory
+
+    def broken():
+        raise ImportError("Could not import sentence_transformers")
+
+    monkeypatch.setattr(factory, "get_embeddings", broken)
+    with pytest.raises(RuntimeError, match="embedding model.*cannot be loaded"):
+        run_benchmark([AVAILABLE_BACKENDS["buffer"], AVAILABLE_BACKENDS["qdrant"]], num_runs=2,
+                      num_turns=6, checkpoints=[3, 6], results_dir=tmp_path, composition=COMPOSITION)
+    assert fake.calls() == []
+    # Backends that need no embeddings do not load the model at all.
+    bench(tmp_path, judge=False)
