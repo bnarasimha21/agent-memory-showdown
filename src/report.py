@@ -11,12 +11,31 @@ def _ci(ci: list[float] | None) -> str:
     return "[no interval]" if ci is None else f"[{ci[0] * 100:.0f}-{ci[1] * 100:.0f}]"
 
 
+def provider_note(caveats: dict | None) -> str:
+    """One paragraph on what a provider changes about the numbers; empty when nothing does."""
+    if not caveats:
+        return ""
+    parts = []
+    if caveats.get("cost_basis") == "api_equivalent":
+        parts.append("Run on a Claude subscription through the claude CLI: costs are API-equivalent "
+                     "(the recorded tokens at the API list price), not billed.")
+    if caveats.get("llm_latency_comparable") is False:
+        parts.append("LLM latency includes CLI process start-up (about 2 s per call), so it is not "
+                     "comparable with an API provider; memory read and write latencies are unaffected.")
+    if caveats.get("temperature_controllable") is False:
+        parts.append("Temperature cannot be set through the CLI; the model samples at its default.")
+    return " ".join(parts)
+
+
 def format_summary(aggregate: dict) -> str:
     lines = ["", "=== BENCHMARK SUMMARY ===", ""]
     if aggregate.get("is_sample"):
         lines.append("SAMPLE RUN (a fake chat model, embedder or judge): numbers below are not "
                      "benchmark results.")
         lines.append("")
+    note = provider_note(aggregate.get("provider_caveats"))
+    if note:
+        lines += [note, ""]
     scoring = aggregate.get("scoring") or {}
     if scoring.get("judge_model"):
         lines.append(f"Scored by judge {scoring['judge_model']} (matcher shown alongside).")

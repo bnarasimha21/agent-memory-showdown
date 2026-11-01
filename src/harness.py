@@ -9,6 +9,7 @@ the measurement would be contaminated.
 
 from __future__ import annotations
 
+import json
 import logging
 import random
 import time
@@ -26,8 +27,9 @@ from src.bundle import (
 )
 from src.config import config
 from src.dataset import NON_HEADLINE, ConversationDataset, generate_dataset, load_bank
-from src.llm_factory import embedding_model_id, llm_model_id
+from src.llm_factory import embedding_model_id, llm_model_id, provider_caveats
 from src.prompts import CHAT_TEMPLATE, template_hash
+from src.retry import USAGE_LIMIT_PAUSES
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +126,8 @@ def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints
         "git": git_info(),
         "llm_provider": config.LLM_PROVIDER,
         "llm_model": llm_model_id(),
+        "judge_provider": config.JUDGE_PROVIDER if judge else None,
+        "provider_caveats": provider_caveats(),
         "embedding_provider": config.EMBEDDING_PROVIDER,
         "embedding_model": embedding_model_id(),
         "embedding_dimension": config.EMBEDDING_DIMENSION,
@@ -146,6 +150,26 @@ def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints
     }
 
 
+def _cli_calls() -> int:
+    import sys
+
+    module = sys.modules.get("src.claude_cli")
+    return module.CALLS if module else 0
+
+
+def _check_resumable(old: dict, new: dict, path: Path, datasets) -> None:
+    """Refuse to resume into a bundle the current configuration would not have produced."""
+    for key in ("backends", "num_runs", "num_turns", "checkpoints", "seeds", "k", "dataset",
+                "prompt_hash", "llm_provider", "llm_model", "embedding_model"):
+        if old.get(key) != new.get(key):
+            raise ValueError(f"cannot resume {path}: {key} differs (bundle {old.get(key)!r}, "
+                             f"now {new.get(key)!r})")
+    saved = json.loads((path / "dataset.json").read_text(encoding="utf-8"))
+    if saved != json.loads(json.dumps({str(i): d.to_dict() for i, d in enumerate(datasets)})):
+        raise ValueError(f"cannot resume {path}: the datasets it was run on are not the ones "
+                         "this configuration generates")
+
+
 def is_sample_config(judge: bool = True) -> bool:
     """A fake JUDGE_PROVIDER only matters when the judge runs (not under --no-judge)."""
     providers = [config.LLM_PROVIDER, config.EMBEDDING_PROVIDER] + ([config.JUDGE_PROVIDER] if judge else [])
@@ -164,6 +188,7 @@ def run_benchmark(
     backend_kwargs: dict | None = None,
     judge: bool | None = None,
     ks: list[int] | None = None,
+    resume: str | Path | None = None,
 ) -> Path:
     """Run the benchmark and write a bundle. Returns the bundle directory.
 
@@ -171,15 +196,24 @@ def run_benchmark(
     and (unless `judge` is False, or JUDGE=0) by the LLM judge; the labels go to
     `scores.jsonl` and the judge settings into the manifest.
 
+    `resume` continues an unfinished bundle (a path, or a run id under the
+    results directory): runs that finished are kept, runs that did not (or that
+    failed) are dropped from the transcript and run again, and judge verdicts
+    already made are reused. The configuration must match the bundle's
+    manifest and regenerate the same datasets, otherwise it is refused.
+
     `ks` sweeps the retrieval depth: with more than one value, every backend
     that retrieves top-k (`uses_k`) runs once per k and is reported as
     `name@k<k>`; backends that ignore k run once. A single value just sets k.
     """
     from src.aggregate import aggregate_bundle
     from src.bundle import read_transcript
-    from src.scoring.rescore import score_probes, scoring_info, write_jsonl
+    from src.scoring.rescore import JudgeCache, score_probes, scoring_info, write_jsonl
 
     use_judge = config.JUDGE_ENABLED if judge is None else judge
+    # Calls and usage-limit pauses are counted from here, so two benchmarks in
+    # one process (a resume in a test, say) do not count each other's.
+    calls_before, pauses_before = _cli_calls(), len(USAGE_LIMIT_PAUSES)
 
     num_runs = config.NUM_RUNS if num_runs is None else num_runs
     num_turns = config.NUM_TURNS if num_turns is None else num_turns
@@ -243,23 +277,57 @@ def run_benchmark(
         datasets[0].checkpoints if datasets else checkpoints, (ks if sweep else k) if any_k else None,
         judge=bool(use_judge),
     )
-    writer = BundleWriter(runs_root, new_run_id(run_label), manifest)
-    writer.write_dataset({str(i): d.to_dict() for i, d in enumerate(datasets)})
+    prior_s, prior_calls, prior_pauses = 0.0, 0, []
+    done: set[tuple[str, int]] = set()
+    if resume:
+        bundle_dir = Path(resume)
+        if not bundle_dir.exists():
+            bundle_dir = runs_root / str(resume)
+        writer = BundleWriter.reopen(bundle_dir)
+        _check_resumable(writer.manifest, manifest, bundle_dir, datasets)
+        old = read_transcript(writer.path)
+        done = {(r["backend"], r["run_index"]) for r in old
+                if r["type"] == "run_end" and r.get("error") is None}
+        started_keys = {(r["backend"], r["run_index"]) for r in old if r["type"] == "run_start"}
+        dropped = writer.drop_runs(started_keys - done)
+        logger.info("RESUMING %s: %d run(s) already finished, %d unfinished or failed run(s) "
+                    "dropped (%d records) and rerun", writer.run_id, len(done),
+                    len(started_keys - done), dropped)
+        prior_s = float(writer.manifest.get("duration_s") or 0.0)
+        prior_calls = int(writer.manifest.get("claude_cli_calls") or 0)
+        prior_pauses = list(writer.manifest.get("usage_limit_pauses") or [])
+        writer.manifest.setdefault("resumed_at", []).append(utc_now())
+        writer.write_json("manifest.json", writer.manifest)
+    else:
+        writer = BundleWriter(runs_root, new_run_id(run_label), manifest)
+        writer.write_dataset({str(i): d.to_dict() for i, d in enumerate(datasets)})
 
     started = time.perf_counter()
     for label, backend_cls, kwargs in plan:
         logger.info("Benchmarking backend: %s", label)
         for run_idx, dataset in enumerate(datasets):
+            if (label, run_idx) in done:
+                logger.info("  Run %d / %d already finished, skipped", run_idx + 1, num_runs)
+                continue
             logger.info("  Run %d / %d", run_idx + 1, num_runs)
             run_single(backend_cls, dataset, run_idx, writer, kwargs, sweep)
 
-    duration = time.perf_counter() - started
+    duration = prior_s + time.perf_counter() - started
     writer.close_transcript()
-    scores = score_probes(read_transcript(writer.path), judge_obj)
+    cache = JudgeCache(writer.path / "judge_cache.jsonl", judge_obj) if judge_obj is not None else None
+    scores = score_probes(read_transcript(writer.path), judge_obj, cache)
     info = scoring_info(judge_obj)
     write_jsonl(writer.path / "scores.jsonl", scores)
     writer.write_json("scoring.json", info)
-    writer.finalize(finished_at=utc_now(), duration_s=duration, scoring=info)
+    extra = {}
+    if "claude_cli" in (config.LLM_PROVIDER, config.JUDGE_PROVIDER):
+        from src import claude_cli
+
+        extra["claude_cli_calls"] = prior_calls + claude_cli.CALLS - calls_before
+    pauses = prior_pauses + USAGE_LIMIT_PAUSES[pauses_before:]
+    if pauses:
+        extra["usage_limit_pauses"] = pauses
+    writer.finalize(finished_at=utc_now(), duration_s=duration, scoring=info, **extra)
     writer.write_aggregate(aggregate_bundle(writer.path))
     logger.info("Run bundle written to %s", writer.path)
     return writer.path

@@ -21,6 +21,7 @@ import json
 import sys
 from pathlib import Path
 
+from src.report import provider_note
 from src.site.data import (
     LATEST, LEGACY_V1, PAGES_URL, REPO_ROOT, RUNS_DIR, Bundle, headline_row, load_legacy,
     published_bundles, seed_pairing,
@@ -90,6 +91,9 @@ def v2_markdown(bundle: Bundle, headline: bool = True) -> list[str]:
             "are what the recorded token counts would cost at the listed price.",
             "",
         ]
+    note = provider_note(m.get("provider_caveats"))
+    if note:
+        lines += [f"> **Provider note.** {note}", ""]
     lines += [
         f"{m.get('num_runs')} runs x {m.get('num_turns')} turns, checkpoints "
         f"{', '.join(str(c) for c in m.get('checkpoints', []))}, model `{m.get('llm_model')}`, "

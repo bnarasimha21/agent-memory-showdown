@@ -409,6 +409,7 @@ def aggregate_records(
         "run_id": (manifest or {}).get("run_id"),
         "is_sample": is_sample(manifest, scoring),
         "scoring": scoring,
+        "provider_caveats": (manifest or {}).get("provider_caveats") or {},
         "pricing": (
             {**price.to_dict(), "formula": "input_tokens * input_per_mtok / 1e6 + "
                                            "output_tokens * output_per_mtok / 1e6"}

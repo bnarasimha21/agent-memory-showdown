@@ -72,6 +72,9 @@ def parse_args(argv=None):
     parser.add_argument("--no-viz", action="store_true", help="Skip generating visualizations")
     parser.add_argument("--no-judge", action="store_true",
                         help="Score with the deterministic matcher only (no judge LLM calls)")
+    parser.add_argument("--resume", default=None, metavar="RUN_ID_OR_PATH",
+                        help="Continue an unfinished bundle with the same options: finished runs are "
+                             "kept, the rest are rerun, judge verdicts already made are reused")
     return parser.parse_args(argv)
 
 
@@ -102,6 +105,7 @@ def main(argv=None):
         run_label=args.label,
         judge=False if args.no_judge else None,
         ks=args.k,
+        resume=args.resume,
     )
     aggregate_path = bundle / "aggregate.json"
     logger.info("Benchmark complete. Bundle: %s", bundle)

@@ -33,6 +33,7 @@ from pathlib import Path
 
 from src.bundle import TRANSCRIPT, TRANSCRIPT_GZ, iter_transcript, validate_run_id
 from src.dataset import NON_HEADLINE
+from src.report import provider_note
 from src.site.data import (
     LEGACY_V1, PAGES_URL, REPO_ROOT, Bundle, headline_row, load_bundle, load_legacy,
     published_bundles, seed_pairing,
@@ -187,6 +188,9 @@ def run_section(bundle: Bundle, headline: bool) -> str:
             '<p class="banner"><b>Sample run, not a benchmark result.</b> Made offline with the fake '
             "chat model and hashing embeddings, to show the bundle format and this page. The numbers "
             "describe the harness, not any model or memory backend.</p>")
+    note = provider_note(m.get("provider_caveats"))
+    if note:
+        parts.append(f'<p class="banner">{esc(note)}</p>')
     parts.append(
         f"<p>{num(str(m.get('num_runs')))} runs x {num(str(m.get('num_turns')))} turns, checkpoints "
         f"{', '.join(num(str(c)) for c in m.get('checkpoints', []))}; model <code>{esc(m.get('llm_model'))}"
