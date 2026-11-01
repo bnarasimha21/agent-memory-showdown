@@ -3,6 +3,10 @@
 LLM:        `LLM_PROVIDER=do` (default) is Claude via DigitalOcean Serverless
             Inference (OpenAI-compatible API, paid). `LLM_PROVIDER=fake` is the
             deterministic offline model in src/fakes.py (free, for tests).
+            `LLM_PROVIDER=claude_cli` runs the `claude` CLI on a Claude
+            subscription (src/claude_cli.py; no API key, costs are
+            API-equivalent and not billed). The judge has the same three
+            choices through `JUDGE_PROVIDER`.
 Embeddings: `EMBEDDING_PROVIDER=local` (default) is sentence-transformers on CPU
             (all-MiniLM-L6-v2, 384-dim). `EMBEDDING_PROVIDER=fake` is a
             deterministic hashing embedding of the same dimension.
@@ -20,6 +24,10 @@ def llm_model_id() -> str:
     """The model id recorded in manifests and used for pricing lookups."""
     if config.LLM_PROVIDER == "fake":
         return "fake-memory-v1"
+    if config.LLM_PROVIDER == "claude_cli":
+        from src.claude_cli import resolve_model_id
+
+        return resolve_model_id(config.CLAUDE_CLI_MODEL)
     return config.LLM_MODEL
 
 
@@ -32,7 +40,28 @@ def embedding_model_id() -> str:
 def judge_model_id() -> str:
     if config.JUDGE_PROVIDER == "fake":
         return "fake-judge-v1"
+    if config.JUDGE_PROVIDER == "claude_cli":
+        from src.claude_cli import resolve_model_id
+
+        return resolve_model_id(config.CLAUDE_CLI_JUDGE_MODEL)
     return config.JUDGE_MODEL
+
+
+def provider_caveats() -> dict:
+    """Facts about the providers in use that change how a run's numbers read.
+
+    Recorded in the manifest. Empty when no provider needs a caveat."""
+    out: dict = {}
+    if "claude_cli" in (config.LLM_PROVIDER, config.JUDGE_PROVIDER):
+        out.update(
+            billing="subscription (claude CLI); costs are API-equivalent at list price, not billed",
+            cost_basis="api_equivalent",
+            temperature_controllable=False,
+            llm_latency_comparable=False,
+            llm_latency_note="includes claude CLI process start-up (about 2 s per call); memory read "
+                             "and write latencies are unaffected",
+        )
+    return out
 
 
 def _do_chat_model(model: str) -> BaseChatModel:
@@ -53,13 +82,21 @@ def _do_chat_model(model: str) -> BaseChatModel:
     )
 
 
+def _claude_cli_model(alias: str) -> BaseChatModel:
+    from src.claude_cli import ChatClaudeCLI
+
+    return ChatClaudeCLI(model=alias, timeout_s=config.CLAUDE_CLI_TIMEOUT_S)
+
+
 def get_judge_llm() -> BaseChatModel:
     if config.JUDGE_PROVIDER == "fake":
         from src.fakes import FakeMemoryChatModel
 
         return FakeMemoryChatModel(model_name="fake-judge-v1")
+    if config.JUDGE_PROVIDER == "claude_cli":
+        return _claude_cli_model(config.CLAUDE_CLI_JUDGE_MODEL)
     if config.JUDGE_PROVIDER != "do":
-        raise ValueError(f"Unknown JUDGE_PROVIDER {config.JUDGE_PROVIDER!r} (use 'do' or 'fake')")
+        raise ValueError(f"Unknown JUDGE_PROVIDER {config.JUDGE_PROVIDER!r} (use 'do', 'claude_cli' or 'fake')")
     return _do_chat_model(config.JUDGE_MODEL)
 
 
@@ -73,8 +110,10 @@ def get_llm() -> BaseChatModel:
             sleep_ms=config.FAKE_LLM_SLEEP_MS,
             summary_max_sentences=config.FAKE_SUMMARY_MAX_SENTENCES,
         )
+    if config.LLM_PROVIDER == "claude_cli":
+        return _claude_cli_model(config.CLAUDE_CLI_MODEL)
     if config.LLM_PROVIDER != "do":
-        raise ValueError(f"Unknown LLM_PROVIDER {config.LLM_PROVIDER!r} (use 'do' or 'fake')")
+        raise ValueError(f"Unknown LLM_PROVIDER {config.LLM_PROVIDER!r} (use 'do', 'claude_cli' or 'fake')")
     return _do_chat_model(config.LLM_MODEL)
 
 

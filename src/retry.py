@@ -22,6 +22,25 @@ _TRANSIENT_NAMES = {"APIConnectionError", "APITimeoutError", "RateLimitError",
                     "ReadTimeout", "ConnectError"}
 
 
+class UsageLimitError(Exception):
+    """A subscription usage limit was hit; waiting `wait_s` seconds is the only fix.
+
+    Not a failure of the call: `call_with_retry` sleeps (the sleep is reported
+    as wait time, never as latency) and repeats the call without using up a
+    retry. `reset_at` is the parsed reset time (epoch seconds) when the
+    message carried one.
+    """
+
+    def __init__(self, message: str, wait_s: float, reset_at: float | None = None) -> None:
+        super().__init__(message)
+        self.wait_s = wait_s
+        self.reset_at = reset_at
+
+
+# Every usage-limit pause of this process: dicts with when, seconds and message.
+USAGE_LIMIT_PAUSES: list[dict] = []
+
+
 def status_of(exc: BaseException) -> int | None:
     for obj in (exc, getattr(exc, "response", None)):
         code = getattr(obj, "status_code", None) if obj is not None else None
@@ -31,6 +50,8 @@ def status_of(exc: BaseException) -> int | None:
 
 
 def is_transient(exc: BaseException) -> bool:
+    if getattr(exc, "transient", False):  # raised on purpose by a provider, e.g. src/claude_cli.py
+        return True
     code = status_of(exc)
     if code is not None:
         return code == 429 or code >= 500
@@ -54,12 +75,29 @@ def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: 
     max_retries = config.LLM_MAX_RETRIES if max_retries is None else max_retries
     base_delay = config.LLM_RETRY_BASE_S if base_delay is None else base_delay
     sleep = sleep or time.sleep
+    max_pauses = config.USAGE_LIMIT_MAX_PAUSES
     attempt = 0
+    pauses = 0
+    reported = 0  # retries reported to the caller: attempts plus usage-limit pauses
     waited_ms = 0.0
     while True:
         start = time.perf_counter()
         try:
             result = fn()
+        except UsageLimitError as exc:
+            if pauses >= max_pauses:
+                raise
+            pauses += 1
+            reported += 1
+            wait = max(1.0, min(exc.wait_s, config.USAGE_LIMIT_MAX_WAIT_S))
+            USAGE_LIMIT_PAUSES.append({"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "seconds": wait,
+                                       "what": what, "message": str(exc)[:200]})
+            logger.warning("USAGE LIMIT during %s (%s); pausing %.0f s (pause %d of at most %d), "
+                           "then continuing", what, exc, wait, pauses, max_pauses)
+            slept = time.perf_counter()
+            sleep(wait)
+            waited_ms += (time.perf_counter() - slept) * 1000
+            continue
         except Exception as exc:
             if attempt >= max_retries or not is_transient(exc):
                 raise
@@ -71,8 +109,9 @@ def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: 
             sleep(delay)
             waited_ms += (time.perf_counter() - slept) * 1000
             attempt += 1
+            reported += 1
             continue
-        return result, attempt, (time.perf_counter() - start) * 1000, waited_ms
+        return result, reported, (time.perf_counter() - start) * 1000, waited_ms
 
 
 def invoke_with_retry(model, messages, what: str = "LLM call"):

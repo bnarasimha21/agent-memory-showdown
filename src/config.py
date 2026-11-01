@@ -64,6 +64,20 @@ class Config:
         self.LLM_MAX_RETRIES: int = int(env("LLM_MAX_RETRIES", "5"))
         self.LLM_RETRY_BASE_S: float = float(env("LLM_RETRY_BASE_S", "2"))
 
+        # claude_cli provider (src/claude_cli.py): runs the `claude` CLI on the
+        # user's subscription. CLAUDE_BIN empty = `claude` on PATH.
+        self.CLAUDE_BIN: str = env("CLAUDE_BIN", "")
+        self.CLAUDE_CLI_MODEL: str = env("CLAUDE_CLI_MODEL", "sonnet")
+        self.CLAUDE_CLI_JUDGE_MODEL: str = env("CLAUDE_CLI_JUDGE_MODEL") or self.CLAUDE_CLI_MODEL
+        self.CLAUDE_CLI_TIMEOUT_S: float = float(env("CLAUDE_CLI_TIMEOUT_S", "300"))
+        # A subscription usage limit is waited out, not retried: until the reset
+        # time in the message, else USAGE_LIMIT_WAIT_S; no pause is longer than
+        # USAGE_LIMIT_MAX_WAIT_S, and after USAGE_LIMIT_MAX_PAUSES pauses in one
+        # call the limit error is raised.
+        self.USAGE_LIMIT_WAIT_S: float = float(env("USAGE_LIMIT_WAIT_S", "1800"))
+        self.USAGE_LIMIT_MAX_WAIT_S: float = float(env("USAGE_LIMIT_MAX_WAIT_S", "21600"))
+        self.USAGE_LIMIT_MAX_PAUSES: int = int(env("USAGE_LIMIT_MAX_PAUSES", "40"))
+
         # Retrieval depth for vector backends
         self.RETRIEVAL_K: int = int(env("RETRIEVAL_K", "4"))
 
