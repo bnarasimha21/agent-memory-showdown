@@ -115,6 +115,40 @@ class BundleWriter:
         self._write_json("manifest.json", self.manifest)
         self._transcript = open(self.path / "transcript.jsonl", "a", encoding="utf-8")
 
+    @classmethod
+    def reopen(cls, path: str | Path) -> "BundleWriter":
+        """Continue an unfinished bundle: same run id and manifest, transcript appended to."""
+        self = cls.__new__(cls)
+        self.path = Path(path)
+        self.manifest = load_manifest(self.path)
+        self.run_id = self.manifest["run_id"]
+        if not (self.path / TRANSCRIPT).exists():
+            raise FileNotFoundError(f"{self.path} has no plain {TRANSCRIPT} to resume")
+        self._transcript = open(self.path / TRANSCRIPT, "a", encoding="utf-8")
+        return self
+
+    def drop_runs(self, runs: set[tuple[str, int]]) -> int:
+        """Remove every transcript record of the given (backend, run_index) pairs.
+
+        Used on resume for runs that never finished, so a rerun does not leave
+        two copies of a turn in the transcript. Returns how many records went."""
+        self._transcript.close()
+        path = self.path / TRANSCRIPT
+        kept, dropped = [], 0
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            if (rec.get("backend"), rec.get("run_index")) in runs:
+                dropped += 1
+            else:
+                kept.append(line)
+        tmp = path.with_suffix(".jsonl.tmp")
+        tmp.write_text("".join(f"{line}\n" for line in kept), encoding="utf-8")
+        tmp.replace(path)
+        self._transcript = open(path, "a", encoding="utf-8")
+        return dropped
+
     def write_json(self, name: str, data: Any) -> None:
         self._write_json(name, data)
 

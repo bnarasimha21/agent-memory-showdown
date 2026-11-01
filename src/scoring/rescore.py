@@ -29,7 +29,40 @@ def score_key(record: dict) -> tuple:
     return tuple(record[k] for k in SCORE_KEY)
 
 
-def score_probes(records: Iterable[dict], judge=None) -> list[dict]:
+class JudgeCache:
+    """Judge verdicts saved as they are made (`judge_cache.jsonl`), so a run that is
+    interrupted while judging does not pay for the finished verdicts again.
+
+    A verdict is reused only for the same probe, judge model and judge prompt;
+    `error` verdicts are never saved."""
+
+    def __init__(self, path: str | Path, judge) -> None:
+        self.path = Path(path)
+        info = judge.info()
+        self.stamp = (info["judge_model"], info["judge_prompt_hash"])
+        self._verdicts: dict[tuple, dict] = {}
+        if self.path.exists():
+            for line in self.path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if (row["judge_model"], row["judge_prompt_hash"]) == self.stamp:
+                    self._verdicts[tuple(row["key"])] = row["verdict"]
+
+    def get(self, key: tuple) -> dict | None:
+        return self._verdicts.get(tuple(key))
+
+    def put(self, key: tuple, verdict: dict) -> None:
+        if verdict.get("label") == "error":
+            return
+        self._verdicts[tuple(key)] = verdict
+        with open(self.path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"key": list(key), "judge_model": self.stamp[0],
+                                 "judge_prompt_hash": self.stamp[1], "verdict": verdict},
+                                ensure_ascii=False) + "\n")
+
+
+def score_probes(records: Iterable[dict], judge=None, cache: "JudgeCache | None" = None) -> list[dict]:
     """One score per probe record: matcher label always, judge label if a judge is given."""
     scores = []
     for rec in records:
@@ -43,7 +76,12 @@ def score_probes(records: Iterable[dict], judge=None) -> list[dict]:
             judge_retries=0,
         )
         if judge is not None:
-            verdict = judge.judge(rec)
+            key = score_key(rec)
+            verdict = cache.get(key) if cache is not None else None
+            if verdict is None:
+                verdict = judge.judge(rec)
+                if cache is not None:
+                    cache.put(key, verdict)
             score.update(
                 judge_label=verdict["label"], judge_rationale=verdict["rationale"],
                 judge_input_tokens=verdict["input_tokens"],
