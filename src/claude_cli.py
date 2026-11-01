@@ -61,6 +61,18 @@ JSON_INSTRUCTION = ("Respond with a single valid JSON object and nothing else: n
 # headers, Foundry), the Bedrock/Vertex switches and their cloud credentials.
 STRIPPED_PREFIXES = ("ANTHROPIC_", "CLAUDE_CODE_USE_", "AWS_", "GOOGLE_APPLICATION_CREDENTIALS",
                      "CLOUD_ML_REGION", "VERTEX_")
+# Variables set by a parent Claude Code session. Left in, they make the child think it is a
+# nested session (sharing its messaging socket and token, entrypoint or effort setting).
+# CLAUDE_CODE_OAUTH_TOKEN (the subscription login) and HOME are deliberately kept.
+STRIPPED_NAMES = frozenset({
+    "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_MESSAGING_SOCKET",
+    "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_EFFORT"})
+
+
+def _child_env() -> dict[str, str]:
+    """The environment for the CLI child: ours, minus billing switches and parent-session markers."""
+    return {k: v for k, v in os.environ.items()
+            if not k.startswith(STRIPPED_PREFIXES) and k not in STRIPPED_NAMES}
 
 
 # Number of `claude` processes started by this Python process (all attempts).
@@ -114,15 +126,29 @@ def flatten_messages(messages: List[BaseMessage]) -> tuple[str, str]:
 
 # ------------------------------------------------------------- error handling
 
-_LIMIT_RE = re.compile(r"usage limit|\d+-hour limit|weekly limit|session limit|opus limit"
+_MODEL_NAME = r"(?:opus|sonnet|haiku)"
+_LIMIT_RE = re.compile(r"usage limit|\d+-hour limit|weekly limit|session limit|" + _MODEL_NAME + r" limit"
                        r"|(?:hit|reached) your (?:\w+ )?limit|out of (?:extra )?usage", re.I)
-# A limit notice that came back as a normal result (is_error false) looks like this at the start.
-_LIMIT_START_RE = re.compile(r"^\W*(?:claude(?: ai)?\s+)?(?:usage limit|you.?ve (?:hit|reached)|\d+-hour limit"
-                             r"|weekly limit|session limit)", re.I)
+# A limit notice that came back as a normal result (is_error false) starts like this, optionally
+# after "Claude", "Claude AI" or a model name ("Opus weekly limit reached").
+_LIMIT_START_RE = re.compile(r"^\W*(?:(?:claude(?: ai)?|" + _MODEL_NAME + r")(?:\s+\d+(?:\.\d+)?)?\s+)*"
+                             r"(?:usage limit|you.?ve (?:hit|reached)|\d+-hour limit|weekly limit|session limit"
+                             r"|limit reached)", re.I)
+_LIMIT_WORDS_RE = re.compile(r"limit reached|resets?\b", re.I)
 _EPOCH_RE = re.compile(r"\|\s*(\d{10})\b")
-_CLOCK_RE = re.compile(r"resets?\s*(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)(?:\s*\(([^)]+)\))?", re.I)
-_IN_RE = re.compile(r"(?:resets?|try again|available)\s+in\s+(?:about\s+)?(\d+(?:\.\d+)?)\s*"
-                    r"(hours?|hrs?|h|minutes?|mins?|m)\b", re.I)
+_WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+_CLOCK_RE = re.compile(
+    r"resets?\s*(?:on\s+)?"
+    r"(?:(?P<wd>mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+)?"
+    r"(?:(?P<mon>jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?P<day>\d{1,2})(?:st|nd|rd|th)?,?\s*)?"
+    r"(?:at\s*)?(?P<h>\d{1,2})(?::(?P<m>\d{2}))?\s*(?P<ap>[ap]m)(?:\s*\((?P<tz>[^)]+)\))?", re.I)
+_IN_RE = re.compile(r"(?:resets?|try again|available)\s+in\s+(?P<span>(?:about\s+)?\d+(?:\.\d+)?\s*[a-z]+"
+                    r"(?:(?:\s*,)?(?:\s+and)?\s*\d+(?:\.\d+)?\s*[a-z]+)*)", re.I)
+_UNIT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b", re.I)
+_UNIT_SECONDS = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+# A reset time this far in the past still counts as "now": the notice was written a moment ago.
+_PAST_GRACE_S = 3600
 _TRANSIENT_TEXT = re.compile(r"overloaded|timed? ?out|timeout|temporar|econn|socket|connection|"
                              r"\b(?:429|500|502|503|504|529)\b|internal server|unavailable|try again", re.I)
 _AUTH_TEXT = re.compile(r"log ?in|logged|authenticat|invalid api key|credit balance|unauthori[sz]ed", re.I)
@@ -134,35 +160,75 @@ def is_usage_limit(text: str) -> bool:
     return bool(_LIMIT_RE.search(text)) and "context" not in text.lower()
 
 
+def is_limit_notice(text: str) -> bool:
+    """True when a normal (non-error) CLI result is really a limit notice.
+
+    Short, starting with the notice (after an optional "Claude" or model name) and containing
+    "limit reached" or "resets", so "You've reached your daily limit of 2 coffees" is an answer."""
+    text = text or ""
+    return (len(text) < 200 and bool(_LIMIT_START_RE.search(text)) and bool(_LIMIT_WORDS_RE.search(text))
+            and is_usage_limit(text))
+
+
+def _span_seconds(span: str) -> float:
+    return sum(float(n) * _UNIT_SECONDS[u[0].lower()] for n, u in _UNIT_RE.findall(span))
+
+
 def parse_reset(text: str, now: float | None = None) -> float | None:
-    """Reset time as epoch seconds, from a usage-limit message, or None."""
+    """Reset time as epoch seconds, from a usage-limit message, or None.
+
+    Understands "|<epoch>", "resets in 2h 30m", and clock times such as "resets 10am (Asia/Kolkata)",
+    "resets Mon 9am", "resets Nov 5, 10am", "resets Oct 9 at 10am". A named IANA zone is honoured,
+    otherwise local time. A time up to an hour in the past counts as now."""
     now = time.time() if now is None else now
     m = _EPOCH_RE.search(text)
     if m:
         return float(m.group(1))
     m = _IN_RE.search(text)
     if m:
-        amount = float(m.group(1))
-        return now + amount * (3600 if m.group(2).lower().startswith("h") else 60)
+        seconds = _span_seconds(m.group("span"))
+        if seconds > 0:
+            return now + seconds
     m = _CLOCK_RE.search(text)
-    if m:
-        hour, minute = int(m.group(1)) % 12, int(m.group(2) or 0)
-        if m.group(3).lower() == "pm":
-            hour += 12
-        tz = None
-        if m.group(4):
-            try:
-                from zoneinfo import ZoneInfo
+    if not m:
+        return None
+    hour, minute = int(m.group("h")) % 12, int(m.group("m") or 0)
+    if m.group("ap").lower() == "pm":
+        hour += 12
+    if minute > 59 or int(m.group("h")) > 12:
+        return None
+    tz = None
+    if m.group("tz"):
+        try:
+            from zoneinfo import ZoneInfo
 
-                tz = ZoneInfo(m.group(4).strip())
-            except Exception:  # unknown zone name: fall back to local time
-                tz = None
-        base = datetime.fromtimestamp(now, tz)
-        target = base.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if target.timestamp() <= now:
-            target += timedelta(days=1)
-        return target.timestamp()
-    return None
+            tz = ZoneInfo(m.group("tz").strip())
+        except Exception:  # unknown zone name: fall back to local time
+            tz = None
+
+    def stamp(naive: datetime) -> float:
+        return naive.replace(tzinfo=tz).timestamp() if tz else naive.timestamp()
+
+    today = datetime.fromtimestamp(now, tz).replace(tzinfo=None)
+    cutoff = now - _PAST_GRACE_S
+    try:
+        if m.group("mon"):
+            month, day = _MONTHS.index(m.group("mon").lower()) + 1, int(m.group("day"))
+            target = today.replace(month=month, day=day, hour=hour, minute=minute, second=0, microsecond=0)
+            if stamp(target) <= cutoff:
+                target = target.replace(year=target.year + 1)
+        else:
+            target = today.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if m.group("wd"):
+                target += timedelta(days=(_WEEKDAYS.index(m.group("wd").lower()) - target.weekday()) % 7)
+                step = timedelta(days=7)
+            else:
+                step = timedelta(days=1)
+            if stamp(target) <= cutoff:
+                target += step
+    except ValueError:  # an impossible date such as Feb 30
+        return None
+    return max(stamp(target), now)
 
 
 def usage_limit_error(text: str, now: float | None = None) -> UsageLimitError:
@@ -227,7 +293,7 @@ class ChatClaudeCLI(BaseChatModel):
         """One CLI call; returns the parsed JSON result or raises (see module docstring)."""
         global CALLS
         CALLS += 1
-        env = {k: v for k, v in os.environ.items() if not k.startswith(STRIPPED_PREFIXES)}
+        env = _child_env()
         with tempfile.TemporaryDirectory(prefix="ams-claude-") as cwd:  # empty: nothing to read
             try:
                 proc = subprocess.run(self._command(system), input=prompt, capture_output=True,
@@ -252,8 +318,7 @@ class ChatClaudeCLI(BaseChatModel):
             raise ClaudeCLITransientError(f"claude CLI exited {proc.returncode} without JSON: {detail}")
         result = data.get("result")
         text = result if isinstance(result, str) else ""
-        if (not data.get("is_error") and proc.returncode == 0 and len(text) < 200
-                and _LIMIT_START_RE.search(text) and is_usage_limit(text)):
+        if not data.get("is_error") and proc.returncode == 0 and is_limit_notice(text):
             raise usage_limit_error(text)
         if data.get("is_error") or proc.returncode != 0:
             detail = (text or err or json.dumps(data)[:300]).strip()

@@ -356,3 +356,123 @@ def test_provider_caveats_follow_the_answering_provider(monkeypatch, fresh_confi
     assert ("540 tokens" in note) is billing
     if not billing and not judge_note:
         assert caveats == {} and note == ""
+
+
+def _ist(year, month, day, hour, minute=0) -> float:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    return datetime(year, month, day, hour, minute, tzinfo=ZoneInfo("Asia/Kolkata")).timestamp()
+
+
+# 2027-01-15 is a Friday; 17:30 in Asia/Kolkata.
+NOW = _ist(2027, 1, 15, 17, 30)
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("You've hit your limit - resets 10am (Asia/Kolkata)", _ist(2027, 1, 16, 10)),
+    ("limit reached, resets Mon 9am (Asia/Kolkata)", _ist(2027, 1, 18, 9)),
+    ("limit reached, resets Friday 9pm (Asia/Kolkata)", _ist(2027, 1, 15, 21)),
+    ("limit reached, resets Nov 5, 10am (Asia/Kolkata)", _ist(2027, 11, 5, 10)),
+    ("limit reached, resets Jan 20 at 10am (Asia/Kolkata)", _ist(2027, 1, 20, 10)),
+    ("limit reached, resets Oct 9 at 10am (Asia/Kolkata)", _ist(2027, 10, 9, 10)),
+    ("limit reached, resets Jan 2 at 10am (Asia/Kolkata)", _ist(2028, 1, 2, 10)),
+    ("limit reached, resets 12am (Asia/Kolkata)", _ist(2027, 1, 16, 0)),
+    ("limit reached, resets 11:45 pm (Asia/Kolkata)", _ist(2027, 1, 15, 23, 45)),
+])
+def test_parse_reset_clock_forms_with_a_named_zone(text, expected):
+    assert parse_reset(text, NOW) == expected
+
+
+@pytest.mark.parametrize("text,seconds", [
+    ("limit reached, resets in 2h 30m", 9000),
+    ("limit reached, resets in 2 hours 30 minutes", 9000),
+    ("limit reached, resets in 1 day, 2 hours and 5 minutes", 86400 + 7200 + 300),
+    ("try again in about 45 minutes", 2700),
+    ("limit reached, resets in 90m", 5400),
+    ("limit reached, resets in 1.5 hours", 5400),
+])
+def test_parse_reset_relative_forms_sum_every_unit(text, seconds):
+    assert parse_reset(text, NOW) == NOW + seconds
+
+
+def test_parse_reset_without_a_zone_uses_local_time(monkeypatch):
+    import os
+    from datetime import datetime
+
+    monkeypatch.setenv("TZ", "America/New_York")
+    time.tzset()
+    try:
+        now = datetime(2027, 1, 15, 12, 0).timestamp()  # noon in New York
+        assert parse_reset("resets 3pm", now) == datetime(2027, 1, 15, 15, 0).timestamp()
+        assert parse_reset("resets Nov 5, 10am", now) == datetime(2027, 11, 5, 10, 0).timestamp()
+    finally:
+        monkeypatch.undo()
+        time.tzset()
+
+
+def test_a_reset_up_to_an_hour_in_the_past_counts_as_now_and_older_ones_roll_over():
+    assert parse_reset("resets 5pm (Asia/Kolkata)", NOW) == NOW  # 30 minutes ago
+    assert parse_reset("resets 4:31pm (Asia/Kolkata)", NOW) == NOW  # 59 minutes ago
+    assert parse_reset("resets 4pm (Asia/Kolkata)", NOW) == _ist(2027, 1, 16, 16)  # 90 minutes ago
+    assert parse_reset("resets Fri 5pm (Asia/Kolkata)", NOW) == NOW
+    assert parse_reset("resets Fri 4pm (Asia/Kolkata)", NOW) == _ist(2027, 1, 22, 16)
+    assert parse_reset("resets Jan 15 at 5pm (Asia/Kolkata)", NOW) == NOW
+
+
+def test_an_impossible_or_unreadable_reset_is_none():
+    assert parse_reset("resets Feb 30 at 10am (Asia/Kolkata)", NOW) is None
+    assert parse_reset("resets soon", NOW) is None
+
+
+def test_a_just_passed_reset_means_a_short_wait():
+    err = claude_cli.usage_limit_error("limit reached, resets 5pm (Asia/Kolkata)", NOW)
+    assert err.wait_s == 60 and err.reset_at == NOW  # just the 60 s margin
+
+
+@pytest.mark.parametrize("text", [
+    "Opus weekly limit reached | resets Mon 9am (Asia/Kolkata)",
+    "Sonnet limit reached, resets 3pm",
+    "Claude Opus 4 usage limit reached|1800000000",
+    "You've hit your limit - resets 10am (Asia/Kolkata)",
+    "5-hour limit reached. Resets at 3pm",
+])
+def test_limit_notices_are_recognised_with_or_without_a_model_name(text):
+    assert claude_cli.is_limit_notice(text)
+
+
+@pytest.mark.parametrize("text", [
+    "You've reached your daily limit of 2 coffees",
+    "Session limit for the gym is 90 minutes",
+    "The Opus weekly limit reached by the team last week is documented below. " + "x" * 200,
+    "In my notes: Claude AI usage limit reached|1800000000",
+    "Sonnet is a poem form, and the limit reached 14 lines",
+    "Prompt is too long: context limit reached",
+])
+def test_ordinary_answers_that_mention_limits_are_not_notices(text):
+    assert not claude_cli.is_limit_notice(text)
+
+
+def test_a_model_prefixed_notice_returned_as_a_result_pauses(fake, sleeps):
+    fake.plan({"prose": "Opus weekly limit reached | resets in 2h 30m"}, "ok")
+    message, *_ = invoke_with_retry(model(), "hi")
+    assert sleeps and message.content
+
+
+def test_a_coffee_sentence_is_returned_as_the_answer_not_a_pause(fake, sleeps):
+    fake.plan({"prose": "You've reached your daily limit of 2 coffees"})
+    message, *_ = invoke_with_retry(model(), "hi")
+    assert not sleeps and "coffees" in message.content
+
+
+def test_parent_session_variables_are_stripped_but_login_and_home_are_kept(fake, monkeypatch):
+    stripped = ("CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_CHILD_SESSION",
+                "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_ENTRYPOINT",
+                "CLAUDE_EFFORT", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_VERTEX")
+    for name in stripped:
+        monkeypatch.setenv(name, "x")
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "subscription-login")
+    model().invoke("hello")
+    seen = set(fake.calls()[-1]["env_names"])
+    assert not seen & set(stripped)
+    assert {"CLAUDE_CODE_OAUTH_TOKEN", "HOME"} <= seen

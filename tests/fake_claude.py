@@ -39,7 +39,8 @@ def opt(name):
     return argv[argv.index(name) + 1] if name in argv else None
 system = opt("--system-prompt") or ""
 log = {{"argv": argv, "stdin": prompt, "system": system, "cwd": os.getcwd(),
-        "cwd_entries": sorted(os.listdir(".")), "api_key_visible": "ANTHROPIC_API_KEY" in os.environ}}
+        "cwd_entries": sorted(os.listdir(".")), "api_key_visible": "ANTHROPIC_API_KEY" in os.environ,
+        "env_names": sorted(os.environ)}}
 with open(os.path.join(state, "calls.jsonl"), "a") as fh:
     fh.write(json.dumps(log) + "\\n")
 n = sum(1 for _ in open(os.path.join(state, "calls.jsonl")))
