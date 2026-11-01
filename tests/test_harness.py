@@ -426,3 +426,25 @@ def test_per_probe_charts_say_they_are_per_probe():
     assert "per probe" in visualize.fig_recall_by_category(results).layout.title.text
     decay = visualize.fig_memory_decay_curve(results)
     assert "per probe" in decay.layout.title.text
+
+
+def test_manifest_write_is_atomic(tmp_path, monkeypatch):
+    import os
+
+    from src.bundle import BundleWriter
+
+    writer = BundleWriter(tmp_path, "atomic", {"a": 1})
+    writer.finalize(b=2)
+    manifest = tmp_path / "atomic" / "manifest.json"
+    assert json.loads(manifest.read_text())["b"] == 2
+    assert not list((tmp_path / "atomic").glob("*.tmp"))
+
+    def crash(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os, "replace", crash)
+    with pytest.raises(OSError):
+        writer.finalize(b=3)
+    monkeypatch.undo()
+    assert json.loads(manifest.read_text())["b"] == 2  # the previous manifest is intact
+    assert not list((tmp_path / "atomic").glob("*.tmp"))

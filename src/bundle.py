@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import platform
 import re
 import subprocess
@@ -188,10 +189,17 @@ class BundleWriter:
             self._transcript.close()
 
     def _write_json(self, name: str, data: Any) -> None:
-        (self.path / name).write_text(
-            json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False) + "\n",
-            encoding="utf-8",
-        )
+        """Write via a temp file in the same directory and os.replace, so a crash mid-write
+        leaves the previous file whole instead of a truncated manifest."""
+        target = self.path / name
+        tmp = target.with_name(target.name + ".tmp")
+        try:
+            tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False, sort_keys=False) + "\n",
+                           encoding="utf-8")
+            os.replace(tmp, target)
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
 
     def write_dataset(self, datasets: dict) -> None:
         self._write_json("dataset.json", datasets)
