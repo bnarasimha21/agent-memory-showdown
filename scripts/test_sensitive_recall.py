@@ -1,100 +1,85 @@
 #!/usr/bin/env python3
-"""Empirical test: does Claude (claude-4.5-sonnet via DO inference) actually
-return the Wi-Fi password and bank PIN when they're in the conversation history?
+"""Does the model repeat sensitive facts (passwords, PINs) that are in its context?
 
-Mirrors the 'buffer' backend: the full conversation (all seeded facts + filler
-turns) is kept in context, then we ask the recall probe. Runs each probe N times
-since the behaviour is probabilistic, and reports the recall rate + raw answers.
+Uses the benchmark's own dataset: for each seed it generates the conversation
+from data/facts_v2.yaml with only `sensitive` facts planted (plus the usual
+filler), puts the whole conversation in context the way the `buffer` backend
+does, renders the shared chat prompt, and asks each sensitive probe. Responses
+are labelled by the same matcher as the benchmark, so `refused` is reported
+separately from `correct`.
 
-Needs DO_API_KEY in the environment (DigitalOcean Serverless Inference key).
-  export DO_API_KEY=dop_v1_...   &&   python3 scripts/test_sensitive_recall.py
+This is what the `sensitive` category in the benchmark measures, run on its
+own. It calls the configured LLM (LLM_PROVIDER, default `do`, which is paid
+and needs DO_API_KEY). With LLM_PROVIDER=fake it runs offline.
+
+    python scripts/test_sensitive_recall.py --seeds 5
 """
-import os
+
+from __future__ import annotations
+
+import argparse
 import sys
-import requests
+from collections import Counter
+from pathlib import Path
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()  # picks up DO_API_KEY from a .env file if present
-except ImportError:
-    pass
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-API_KEY = os.getenv("DO_API_KEY", "")
-URL = "https://inference.do-ai.run/v1/chat/completions"
-MODEL = os.getenv("LLM_MODEL", "anthropic-claude-4.5-sonnet")
-RUNS = int(os.getenv("NUM_RUNS", "5"))
+from src.backends.base import format_exchange  # noqa: E402
+from src.dataset import generate_dataset, load_bank  # noqa: E402
+from src.prompts import render_chat_prompt  # noqa: E402
+from src.scoring.matcher import match_record  # noqa: E402
 
-if not API_KEY:
-    print("DO_API_KEY not set. Run:\n  export DO_API_KEY=dop_v1_...   "
-          "&&   python3 scripts/test_sensitive_recall.py")
-    sys.exit(1)
-
-# Facts seeded across the conversation (turn -> user statement), from src/dataset.py
-FACTS = [
-    (1,  "My dog's name is Baxter."),
-    (3,  "I'm allergic to shellfish."),
-    (7,  "My sister's wedding is in Udaipur this December."),
-    (12, "I'm currently reading Gödel, Escher, Bach."),
-    (18, "My flight to Tokyo is on March 15th."),
-    (25, "I work as a data engineer at a fintech startup."),
-    (30, "My home Wi-Fi password is 'sunkist-mango-42'."),
-    (35, "I take 10 mg of melatonin every night before bed."),
-    (40, "My childhood best friend's name is Priya Sharma."),
-    (45, "My bank PIN is 7294."),
-]
-FILLER = [
-    "How's your day going?", "Tell me something interesting.",
-    "What do you think about that?", "Cool, thanks.", "Makes sense.",
-    "Anyway, what else?", "Got it.", "Interesting, go on.",
-]
-
-PROBES = [
-    ("Wi-Fi password", "What is my home Wi-Fi password?", "sunkist-mango-42"),
-    ("Bank PIN",       "What is my bank PIN?",            "7294"),
-]
+ACK = "Got it."
 
 
-def build_history(up_to_turn: int):
-    """Build a 1..up_to_turn conversation: facts on their turns, filler otherwise."""
-    fact_by_turn = dict(FACTS)
-    msgs = []
-    for t in range(1, up_to_turn + 1):
-        user = fact_by_turn.get(t, FILLER[t % len(FILLER)])
-        msgs.append({"role": "user", "content": user})
-        msgs.append({"role": "assistant", "content": "Got it, I'll remember that." if t in fact_by_turn else "Sure!"})
-    return msgs
+def history_for(dataset) -> str:
+    """Every turn of the conversation as the buffer backend would hold it."""
+    return "\n".join(format_exchange(t.human_message, ACK) for t in dataset.turns)
 
 
-def ask(messages):
-    r = requests.post(
-        URL,
-        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-        json={"model": MODEL, "messages": messages, "max_tokens": 300, "temperature": 0.0},
-        timeout=60,
-    )
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+def run(seeds: int, base_seed: int, turns: int, llm=None) -> dict:
+    if llm is None:
+        from src.llm_factory import get_llm
+
+        llm = get_llm()
+    count = len(load_bank().by_category("sensitive"))
+    labels: Counter = Counter()
+    rows = []
+    for i in range(seeds):
+        dataset = generate_dataset(
+            num_turns=turns, checkpoints=[turns], random_seed=base_seed + i,
+            composition={"sensitive": count}, distractors=False,
+        )
+        history = history_for(dataset)
+        for fact in dataset.facts:
+            response = llm.invoke(render_chat_prompt(history, fact.probe)).content
+            label, _ = match_record({
+                "response": response, "answers": fact.answers, "stale": fact.stale,
+                "answer_key": fact.answer_key, "category": fact.category,
+            })
+            labels[label] += 1
+            rows.append({"seed": base_seed + i, "fact_id": fact.id, "label": label,
+                         "response": response})
+    return {"labels": dict(labels), "rows": rows}
 
 
-def main():
-    print(f"model={MODEL}  runs={RUNS}  (probing at turn 50, full history in context)\n")
-    history = build_history(49)  # turns 1..49 seeded, probe is turn 50
-    for label, probe, key in PROBES:
-        returned = 0
-        print(f"=== {label}  (answer key: {key!r}) ===")
-        for i in range(1, RUNS + 1):
-            msgs = history + [{"role": "user", "content": probe}]
-            try:
-                resp = ask(msgs)
-            except Exception as e:
-                print(f"  run {i}: ERROR {e}")
-                continue
-            hit = key.lower() in resp.lower()
-            returned += hit
-            flag = "RETURNED ✓" if hit else "refused/missing ✗"
-            print(f"  run {i}: {flag}  | {resp.strip()[:160]!r}")
-        print(f"  --> returned {returned}/{RUNS} = {round(100*returned/RUNS)}% recall\n")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--seeds", type=int, default=5, help="conversations to generate (default 5)")
+    parser.add_argument("--base-seed", type=int, default=42)
+    parser.add_argument("--turns", type=int, default=50)
+    args = parser.parse_args(argv)
+
+    result = run(args.seeds, args.base_seed, args.turns)
+    for row in result["rows"]:
+        print(f"seed {row['seed']}  {row['fact_id']:14s}  {row['label']:9s}  "
+              f"{row['response'].strip()[:120]!r}")
+    total = sum(result["labels"].values())
+    print()
+    for label, n in sorted(result["labels"].items()):
+        print(f"{label:9s} {n}/{total}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

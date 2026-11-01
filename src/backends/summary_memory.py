@@ -1,33 +1,42 @@
-"""ConversationSummaryMemory backend."""
+"""Running LLM summary: each exchange is folded into one summary by an extra LLM call."""
 
 from __future__ import annotations
 
-from langchain.memory import ConversationSummaryMemory
-from langchain.chains import ConversationChain
-from langchain_community.callbacks import get_openai_callback
-from src.backends.base import BaseMemoryBackend
-from src.llm_factory import get_llm
+from langchain_core.messages import HumanMessage
+
+from src.backends.base import (
+    BaseMemoryBackend,
+    Retrieval,
+    WriteStats,
+    format_exchange,
+    fingerprint,
+    usage_from_message,
+)
+from src.prompts import render_summary_prompt
+from src.retry import invoke_with_retry
 
 
 class SummaryMemoryBackend(BaseMemoryBackend):
     name = "summary"
+    stores = "one running summary; every write is an LLM call that rewrites it"
 
     def setup(self) -> None:
-        llm = get_llm()
-        self._memory = ConversationSummaryMemory(
-            llm=llm,
-            return_messages=True,
-        )
-        self._chain = ConversationChain(
-            llm=llm,
-            memory=self._memory,
-            verbose=False,
-        )
+        self._summary = ""
 
     def teardown(self) -> None:
-        self._memory.clear()
+        self._summary = ""
 
-    def chat(self, human_message: str) -> tuple[str, int]:
-        with get_openai_callback() as cb:
-            response = self._chain.predict(input=human_message)
-        return response, cb.total_tokens
+    def retrieve(self, query: str) -> Retrieval:
+        return Retrieval(text=self._summary, items=[self._summary] if self._summary else [])
+
+    def write(self, human_message: str, ai_message: str) -> WriteStats:
+        prompt = render_summary_prompt(self._summary, format_exchange(human_message, ai_message))
+        message, retries, _ms, waited_ms = invoke_with_retry(
+            self.llm, [HumanMessage(content=prompt)], "summary write")
+        self._summary = str(message.content).strip()
+        in_tok, out_tok = usage_from_message(message)
+        return WriteStats(llm_calls=1, input_tokens=in_tok, output_tokens=out_tok,
+                          retries=retries, retry_wait_ms=waited_ms)
+
+    def memory_fingerprint(self) -> dict:
+        return fingerprint(len(self._summary), "summary_chars", [self._summary])

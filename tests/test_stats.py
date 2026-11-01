@@ -1,0 +1,59 @@
+import pytest
+
+from src.stats import bootstrap_mean, cohen_kappa, wilson
+
+
+def test_wilson_known_values():
+    lo, hi = wilson(9, 14)
+    # hand-computed from the Wilson formula with z = 1.96
+    assert lo == pytest.approx(0.3876, abs=1e-4)
+    assert hi == pytest.approx(0.8366, abs=1e-4)
+    assert wilson(0, 0) == [0.0, 0.0]
+    assert wilson(10, 10)[1] == pytest.approx(1.0)
+    assert wilson(0, 10)[0] == pytest.approx(0.0)
+
+
+def test_bootstrap_is_deterministic_and_brackets_the_mean():
+    a = bootstrap_mean([0.8, 0.9, 0.7, 1.0, 0.6])
+    b = bootstrap_mean([0.8, 0.9, 0.7, 1.0, 0.6])
+    assert a == b
+    assert a["ci95"][0] <= a["mean"] <= a["ci95"][1]
+    assert bootstrap_mean([0.5]) == {"mean": 0.5, "ci95": [0.5, 0.5], "n": 1}
+
+
+def test_cohen_kappa():
+    assert cohen_kappa(["a", "b", "a"], ["a", "b", "a"]) == 1.0
+    # textbook example: 20 items, observed 0.7, expected 0.5 -> 0.4
+    m = ["y"] * 10 + ["n"] * 10
+    j = ["y"] * 7 + ["n"] * 3 + ["y"] * 3 + ["n"] * 7
+    assert cohen_kappa(m, j) == pytest.approx(0.4)
+    assert cohen_kappa([], []) is None
+    assert cohen_kappa(["a", "a"], ["a", "a"]) == 1.0
+
+
+def test_wilson_bounds_contain_the_estimate_exactly_at_the_extremes():
+    for n in (1, 3, 7, 10, 49):
+        assert wilson(0, n)[0] == 0.0 and wilson(n, n)[1] == 1.0
+        for k in range(n + 1):
+            low, high = wilson(k, n)
+            assert low <= k / n <= high
+
+
+def test_t_quantiles_match_tables():
+    from src.stats import t95
+
+    assert t95(1) == 12.706 and t95(4) == 2.776 and t95(30) == 2.042
+    assert abs(t95(40) - 2.021) < 1e-3 and abs(t95(120) - 1.980) < 1e-3
+    assert t95(10 ** 6) == pytest.approx(1.96, abs=1e-3)
+
+
+def test_t_interval_is_wider_than_the_bootstrap_for_few_runs():
+    from src.stats import t_mean_interval
+
+    vals = [0.6, 0.7, 0.8]
+    t = t_mean_interval(vals)
+    b = bootstrap_mean(vals)
+    assert t["mean"] == pytest.approx(0.7)
+    assert t["ci95"][0] < b["ci95"][0] and t["ci95"][1] > b["ci95"][1]
+    assert t_mean_interval([1.0, 1.0, 0.9], bounds=(0, 1))["ci95"][1] == 1.0
+    assert t_mean_interval([0.5])["ci95"] is None and t_mean_interval([])["mean"] is None

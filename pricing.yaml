@@ -1,0 +1,42 @@
+# Model prices used to compute cost from recorded token counts.
+# Cost = input_tokens * input_per_mtok / 1e6 + output_tokens * output_per_mtok / 1e6
+# Keys are the model ids recorded in run manifests (LLM_MODEL / JUDGE_MODEL).
+# Update `checked_on` whenever a price is re-checked against its source.
+currency: USD
+models:
+  anthropic-claude-4.5-sonnet:
+    display_name: Claude Sonnet 4.5 (DigitalOcean Serverless Inference)
+    input_per_mtok: 3.00
+    output_per_mtok: 15.00
+    note: standard tier, prompts up to 200K tokens
+    source: https://docs.digitalocean.com/products/gradient-ai-platform/details/pricing/
+    checked_on: "2026-10-30"
+  # Claude subscription via the `claude` CLI (LLM_PROVIDER=claude_cli). The key is
+  # the real model id the CLI reports in modelUsage for `--model sonnet`. Costs
+  # computed from this entry are API-equivalent (what the same tokens would cost
+  # on the API); a subscription run is not billed per token. All input tokens
+  # (fresh, cache write, cache read) are priced at the base input rate, so this
+  # is a stable list-price figure and not what Anthropic would invoice.
+  claude-sonnet-5-5:
+    display_name: Claude Sonnet 5.5 (Anthropic API list price; subscription run, not billed)
+    input_per_mtok: 2.00
+    output_per_mtok: 10.00
+    note: base input and output rate; the cache-read rate ($0.20 per MTok) and cache-write rates are not used, all input tokens are priced at the base rate
+    source: https://platform.claude.com/docs/en/about-claude/pricing
+    checked_on: "2026-11-01"
+  # The offline fake model is priced like the default model so sample runs show
+  # how cost is computed. Sample-run costs are not real costs.
+  fake-memory-v1:
+    display_name: Fake memory model (offline tests and sample runs only)
+    input_per_mtok: 3.00
+    output_per_mtok: 15.00
+    note: mirrors anthropic-claude-4.5-sonnet; not a real price
+    source: pricing.yaml (mirrors anthropic-claude-4.5-sonnet)
+    checked_on: "2026-10-30"
+  fake-judge-v1:
+    display_name: Fake judge (offline tests and sample runs only)
+    input_per_mtok: 3.00
+    output_per_mtok: 15.00
+    note: mirrors anthropic-claude-4.5-sonnet; not a real price
+    source: pricing.yaml (mirrors anthropic-claude-4.5-sonnet)
+    checked_on: "2026-10-30"

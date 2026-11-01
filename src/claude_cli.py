@@ -1,0 +1,386 @@
+"""Chat model that runs the `claude` CLI, so the benchmark uses a Claude subscription.
+
+Selected with `LLM_PROVIDER=claude_cli` and/or `JUDGE_PROVIDER=claude_cli`.
+Every call is one process:
+
+    claude -p --model <alias> --system-prompt <system text> --tools ""
+           --strict-mcp-config --setting-sources "" --no-session-persistence
+           --output-format json          (prompt on stdin, cwd = an empty temp dir)
+
+That combination sends only the system text and the prompt (about 540 input
+tokens of overhead): no CLAUDE.md, no memory files, no tools, no MCP servers.
+`--bare` is deliberately not used, because it ignores the subscription login.
+Every ANTHROPIC_* variable and the Bedrock/Vertex/AWS credentials are removed
+from the child's environment so a stray key or endpoint can never turn a
+subscription run into a billed one.
+
+What the CLI cannot do, and the consequences:
+
+- no temperature: the model samples at its default (recorded in the manifest as
+  `temperature_controllable: false`);
+- latency includes process start-up (about 2 s), so LLM latency from this
+  provider is not comparable with an API provider (`llm_latency_comparable:
+  false` in the manifest); memory read and write latencies are unaffected;
+- no tool calling and no structured-output mode: `response_format` asks for
+  JSON in the system text and the reply is checked to be valid JSON.
+
+Errors map onto src/retry.py: a transient failure (timeout, overloaded, CLI
+crash, malformed JSON when JSON was requested) raises `ClaudeCLITransientError`
+(retried with backoff); a subscription usage limit raises `UsageLimitError`
+(slept out until the reset time, no retry used, sleep not counted as latency);
+anything else (not logged in, bad flag) raises `ClaudeCLIError` at once.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import time
+from datetime import datetime, timedelta
+from typing import Any, List, Optional
+
+from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
+
+from src.retry import UsageLimitError
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_SYSTEM = "You are a helpful assistant."
+JSON_INSTRUCTION = ("Respond with a single valid JSON object and nothing else: no prose before or "
+                    "after it and no code fences.")
+# Variables that would make the CLI bill an API account, a cloud provider or another
+# endpoint instead of the subscription: every ANTHROPIC_* (key, token, base URL,
+# headers, Foundry), the Bedrock/Vertex switches and their cloud credentials.
+STRIPPED_PREFIXES = ("ANTHROPIC_", "CLAUDE_CODE_USE_", "AWS_", "GOOGLE_APPLICATION_CREDENTIALS",
+                     "CLOUD_ML_REGION", "VERTEX_")
+# Variables set by a parent Claude Code session. Left in, they make the child think it is a
+# nested session (sharing its messaging socket and token, entrypoint or effort setting).
+# CLAUDE_CODE_OAUTH_TOKEN (the subscription login) and HOME are deliberately kept.
+STRIPPED_NAMES = frozenset({
+    "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_MESSAGING_SOCKET",
+    "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_EFFORT"})
+
+
+def _child_env() -> dict[str, str]:
+    """The environment for the CLI child: ours, minus billing switches and parent-session markers."""
+    return {k: v for k, v in os.environ.items()
+            if not k.startswith(STRIPPED_PREFIXES) and k not in STRIPPED_NAMES}
+
+
+# Number of `claude` processes started by this Python process (all attempts).
+CALLS = 0
+
+
+class ClaudeCLIError(RuntimeError):
+    """The CLI failed in a way that retrying will not fix."""
+
+
+class ClaudeCLITransientError(ClaudeCLIError):
+    """The CLI failed in a way that is worth retrying (src/retry.py checks `transient`)."""
+
+    transient = True
+
+
+# ----------------------------------------------------------------- flattening
+
+
+def _text(message: BaseMessage) -> str:
+    content = message.content
+    if isinstance(content, str):
+        return content
+    parts = []
+    for block in content:
+        parts.append(block if isinstance(block, str) else str(block.get("text", "")) if isinstance(block, dict) else str(block))
+    return "".join(parts)
+
+
+def flatten_messages(messages: List[BaseMessage]) -> tuple[str, str]:
+    """(system text, prompt) for the CLI.
+
+    System messages are joined into the system prompt. A conversation that is
+    a single human message is sent as it is, which is what every benchmark
+    call is. Anything longer is sent as a labelled transcript ending with a cue
+    for the assistant's turn, so no turn is dropped or merged.
+    """
+    system = "\n\n".join(_text(m) for m in messages if m.type == "system").strip()
+    rest = [m for m in messages if m.type != "system"]
+    if not rest:
+        raise ValueError("No non-system message to send to the model")
+    if len(rest) == 1 and rest[0].type == "human":
+        return system, _text(rest[0])
+    labels = {"human": "User", "ai": "Assistant"}
+    lines = ["Below is the conversation so far. Write the next Assistant turn only.", ""]
+    for m in rest:
+        lines += [f"[{labels.get(m.type, m.type.capitalize())}]", _text(m), ""]
+    lines.append("[Assistant]")
+    return system, "\n".join(lines)
+
+
+# ------------------------------------------------------------- error handling
+
+_MODEL_NAME = r"(?:opus|sonnet|haiku)"
+_LIMIT_RE = re.compile(r"usage limit|\d+-hour limit|weekly limit|session limit|" + _MODEL_NAME + r" limit"
+                       r"|(?:hit|reached) your (?:\w+ )?limit|out of (?:extra )?usage", re.I)
+# A limit notice that came back as a normal result (is_error false) starts like this, optionally
+# after "Claude", "Claude AI" or a model name ("Opus weekly limit reached").
+_LIMIT_START_RE = re.compile(r"^\W*(?:(?:claude(?: ai)?|" + _MODEL_NAME + r")(?:\s+\d+(?:\.\d+)?)?\s+)*"
+                             r"(?:usage limit|you.?ve (?:hit|reached)|\d+-hour limit|weekly limit|session limit"
+                             r"|limit reached)", re.I)
+_LIMIT_WORDS_RE = re.compile(r"limit reached|resets?\b", re.I)
+_EPOCH_RE = re.compile(r"\|\s*(\d{10})\b")
+_WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+_MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+_CLOCK_RE = re.compile(
+    r"resets?\s*(?:on\s+)?"
+    r"(?:(?P<wd>mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+)?"
+    r"(?:(?P<mon>jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?P<day>\d{1,2})(?:st|nd|rd|th)?,?\s*)?"
+    r"(?:at\s*)?(?P<h>\d{1,2})(?::(?P<m>\d{2}))?\s*(?P<ap>[ap]m)(?:\s*\((?P<tz>[^)]+)\))?", re.I)
+_IN_RE = re.compile(r"(?:resets?|try again|available)\s+in\s+(?P<span>(?:about\s+)?\d+(?:\.\d+)?\s*[a-z]+"
+                    r"(?:(?:\s*,)?(?:\s+and)?\s*\d+(?:\.\d+)?\s*[a-z]+)*)", re.I)
+_UNIT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b", re.I)
+_UNIT_SECONDS = {"d": 86400, "h": 3600, "m": 60, "s": 1}
+# A reset time this far in the past still counts as "now": the notice was written a moment ago.
+_PAST_GRACE_S = 3600
+_TRANSIENT_TEXT = re.compile(r"overloaded|timed? ?out|timeout|temporar|econn|socket|connection|"
+                             r"\b(?:429|500|502|503|504|529)\b|internal server|unavailable|try again", re.I)
+_AUTH_TEXT = re.compile(r"log ?in|logged|authenticat|invalid api key|credit balance|unauthori[sz]ed", re.I)
+
+
+def is_usage_limit(text: str) -> bool:
+    """True for a subscription limit notice; a context-window overflow is not one."""
+    text = text or ""
+    return bool(_LIMIT_RE.search(text)) and "context" not in text.lower()
+
+
+def is_limit_notice(text: str) -> bool:
+    """True when a normal (non-error) CLI result is really a limit notice.
+
+    Short, starting with the notice (after an optional "Claude" or model name) and containing
+    "limit reached" or "resets", so "You've reached your daily limit of 2 coffees" is an answer."""
+    text = text or ""
+    return (len(text) < 200 and bool(_LIMIT_START_RE.search(text)) and bool(_LIMIT_WORDS_RE.search(text))
+            and is_usage_limit(text))
+
+
+def _span_seconds(span: str) -> float:
+    return sum(float(n) * _UNIT_SECONDS[u[0].lower()] for n, u in _UNIT_RE.findall(span))
+
+
+def parse_reset(text: str, now: float | None = None) -> float | None:
+    """Reset time as epoch seconds, from a usage-limit message, or None.
+
+    Understands "|<epoch>", "resets in 2h 30m", and clock times such as "resets 10am (Asia/Kolkata)",
+    "resets Mon 9am", "resets Nov 5, 10am", "resets Oct 9 at 10am". A named IANA zone is honoured,
+    otherwise local time. A time up to an hour in the past counts as now."""
+    now = time.time() if now is None else now
+    m = _EPOCH_RE.search(text)
+    if m:
+        return float(m.group(1))
+    m = _IN_RE.search(text)
+    if m:
+        seconds = _span_seconds(m.group("span"))
+        if seconds > 0:
+            return now + seconds
+    m = _CLOCK_RE.search(text)
+    if not m:
+        return None
+    hour, minute = int(m.group("h")) % 12, int(m.group("m") or 0)
+    if m.group("ap").lower() == "pm":
+        hour += 12
+    if minute > 59 or int(m.group("h")) > 12:
+        return None
+    tz = None
+    if m.group("tz"):
+        try:
+            from zoneinfo import ZoneInfo
+
+            tz = ZoneInfo(m.group("tz").strip())
+        except Exception:  # unknown zone name: fall back to local time
+            tz = None
+
+    def stamp(naive: datetime) -> float:
+        return naive.replace(tzinfo=tz).timestamp() if tz else naive.timestamp()
+
+    today = datetime.fromtimestamp(now, tz).replace(tzinfo=None)
+    cutoff = now - _PAST_GRACE_S
+    try:
+        if m.group("mon"):
+            month, day = _MONTHS.index(m.group("mon").lower()) + 1, int(m.group("day"))
+            target = today.replace(month=month, day=day, hour=hour, minute=minute, second=0, microsecond=0)
+            if stamp(target) <= cutoff:
+                target = target.replace(year=target.year + 1)
+        else:
+            target = today.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if m.group("wd"):
+                target += timedelta(days=(_WEEKDAYS.index(m.group("wd").lower()) - target.weekday()) % 7)
+                step = timedelta(days=7)
+            else:
+                step = timedelta(days=1)
+            if stamp(target) <= cutoff:
+                target += step
+    except ValueError:  # an impossible date such as Feb 30
+        return None
+    return max(stamp(target), now)
+
+
+def usage_limit_error(text: str, now: float | None = None) -> UsageLimitError:
+    from src.config import config
+
+    now = time.time() if now is None else now
+    reset = parse_reset(text, now)
+    # A minute of margin after the stated reset; no stated reset = the configured wait.
+    wait = (reset - now + 60) if reset is not None else config.USAGE_LIMIT_WAIT_S
+    return UsageLimitError(text.strip()[:300], max(60.0, wait), reset)
+
+
+# ------------------------------------------------------------------ the model
+
+
+def claude_bin() -> str:
+    from src.config import config
+
+    path = config.CLAUDE_BIN or shutil.which("claude")
+    if not path:
+        raise ClaudeCLIError("The 'claude' CLI was not found on PATH. Install Claude Code or set CLAUDE_BIN.")
+    return path
+
+
+def extract_json(text: str) -> str:
+    """The first JSON object in `text` (code fences and surrounding prose removed), re-serialised."""
+    decoder = json.JSONDecoder()
+    pos = text.find("{")
+    while pos != -1:
+        try:
+            data, _ = decoder.raw_decode(text, pos)
+        except json.JSONDecodeError:
+            pos = text.find("{", pos + 1)
+            continue
+        if isinstance(data, dict):
+            return json.dumps(data, ensure_ascii=False)
+        pos = text.find("{", pos + 1)
+    raise ValueError("no JSON object in the reply")
+
+
+class ChatClaudeCLI(BaseChatModel):
+    """LangChain chat model over `claude -p`. One process per call, no concurrency."""
+
+    model: str = "sonnet"
+    timeout_s: float = 300.0
+    # Real model id seen in the CLI's `modelUsage` on the last call.
+    last_model_id: Optional[str] = None
+
+    @property
+    def _llm_type(self) -> str:
+        return "claude-cli"
+
+    def bind_tools(self, *args: Any, **kwargs: Any):
+        raise NotImplementedError("the claude_cli provider has no tool calling")
+
+    def _command(self, system: str) -> list[str]:
+        return [claude_bin(), "-p", "--model", self.model, "--system-prompt", system or DEFAULT_SYSTEM,
+                "--tools", "", "--strict-mcp-config", "--setting-sources", "",
+                "--no-session-persistence", "--output-format", "json"]
+
+    def run_cli(self, system: str, prompt: str) -> dict:
+        """One CLI call; returns the parsed JSON result or raises (see module docstring)."""
+        global CALLS
+        CALLS += 1
+        env = _child_env()
+        with tempfile.TemporaryDirectory(prefix="ams-claude-") as cwd:  # empty: nothing to read
+            try:
+                proc = subprocess.run(self._command(system), input=prompt, capture_output=True,
+                                      text=True, timeout=self.timeout_s, cwd=cwd, env=env)
+            except subprocess.TimeoutExpired as exc:
+                raise ClaudeCLITransientError(f"claude CLI timed out after {self.timeout_s:.0f} s") from exc
+            except (OSError, ValueError) as exc:  # ValueError: a NUL byte in the prompt
+                raise ClaudeCLIError(f"could not run the claude CLI: {exc}") from exc
+        out, err = (proc.stdout or "").strip(), (proc.stderr or "").strip()
+        data = None
+        if out:
+            try:
+                data = json.loads(out)
+            except json.JSONDecodeError:
+                data = None
+        if not isinstance(data, dict):
+            detail = (err or out)[:300] or "no output"
+            if is_usage_limit(detail):
+                raise usage_limit_error(detail)
+            if proc.returncode != 0 and _AUTH_TEXT.search(detail):
+                raise ClaudeCLIError(f"claude CLI exited {proc.returncode}: {detail}")
+            raise ClaudeCLITransientError(f"claude CLI exited {proc.returncode} without JSON: {detail}")
+        result = data.get("result")
+        text = result if isinstance(result, str) else ""
+        if not data.get("is_error") and proc.returncode == 0 and is_limit_notice(text):
+            raise usage_limit_error(text)
+        if data.get("is_error") or proc.returncode != 0:
+            detail = (text or err or json.dumps(data)[:300]).strip()
+            if is_usage_limit(detail):
+                raise usage_limit_error(detail)
+            status = data.get("api_error_status")
+            if (isinstance(status, int) and (status == 429 or status >= 500)) or (
+                    _TRANSIENT_TEXT.search(detail) and not _AUTH_TEXT.search(detail)):
+                raise ClaudeCLITransientError(f"claude CLI error: {detail[:300]}")
+            raise ClaudeCLIError(f"claude CLI error: {detail[:300]}")
+        return data
+
+    def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None,
+                  run_manager: Optional[CallbackManagerForLLMRun] = None, **kwargs: Any) -> ChatResult:
+        system, prompt = flatten_messages(messages)
+        want_json = (kwargs.get("response_format") or {}).get("type") in ("json_object", "json_schema")
+        if want_json:
+            system = f"{system}\n\n{JSON_INSTRUCTION}".strip()
+        data = self.run_cli(system, prompt)
+        text = data.get("result") if isinstance(data.get("result"), str) else ""
+        if want_json:
+            try:
+                text = extract_json(text)
+            except ValueError as exc:  # the model answered in prose: worth another attempt
+                raise ClaudeCLITransientError(f"JSON was requested but the reply is not JSON: {text[:120]!r}") from exc
+        usage = data.get("usage") or {}
+        in_tok = (int(usage.get("input_tokens") or 0) + int(usage.get("cache_creation_input_tokens") or 0)
+                  + int(usage.get("cache_read_input_tokens") or 0))
+        out_tok = int(usage.get("output_tokens") or 0)
+        model_usage = data.get("modelUsage") or {}
+        # The model that produced the most output; usually the only entry.
+        model_id = max(model_usage, key=lambda k: (model_usage[k] or {}).get("outputTokens", 0),
+                       default=None) or self.model
+        if self.last_model_id not in (None, model_id):
+            logger.warning("claude CLI answered with model %s, earlier calls used %s", model_id, self.last_model_id)
+        self.last_model_id = model_id
+        message = AIMessage(
+            content=text,
+            usage_metadata={"input_tokens": in_tok, "output_tokens": out_tok, "total_tokens": in_tok + out_tok},
+            response_metadata={"model_name": model_id, "total_cost_usd": data.get("total_cost_usd")},
+        )
+        return ChatResult(generations=[ChatGeneration(message=message)],
+                          llm_output={"model_name": model_id})
+
+
+_RESOLVED: dict[tuple[str, str], str] = {}
+
+
+def resolve_model_id(alias: str) -> str:
+    """The real model id behind a CLI alias such as `sonnet`, from one tiny call (cached).
+
+    Needed before a run starts, because the manifest and the price lookup use
+    the id the API reports, not the alias."""
+    from src.config import config
+    from src.retry import invoke_with_retry
+
+    key = (config.CLAUDE_BIN or "", alias)
+    if key not in _RESOLVED:
+        model = ChatClaudeCLI(model=alias, timeout_s=config.CLAUDE_CLI_TIMEOUT_S)
+        from langchain_core.messages import HumanMessage
+
+        invoke_with_retry(model, [HumanMessage(content="Reply with the single word OK.")],
+                          "claude_cli model id probe")
+        _RESOLVED[key] = model.last_model_id or alias
+    return _RESOLVED[key]

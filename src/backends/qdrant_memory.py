@@ -1,68 +1,76 @@
-"""Vector-backed memory using Qdrant."""
+"""Vector-backed memory using Qdrant: each exchange is one point, top-k retrieved."""
 
 from __future__ import annotations
 
-from langchain.memory import VectorStoreRetrieverMemory
-from langchain.chains import ConversationChain
-from langchain_community.vectorstores import Qdrant
-from langchain_community.callbacks import get_openai_callback
-from langchain_core.prompts import PromptTemplate
+from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams
-from src.backends.base import BaseMemoryBackend
-from src.llm_factory import get_llm, get_embeddings
+
+from src.backends.base import (
+    BaseMemoryBackend,
+    Retrieval,
+    WriteStats,
+    format_exchange,
+    fingerprint,
+)
 from src.config import config
 
 COLLECTION_PREFIX = "mem_bench_qdrant_"
 
-MEMORY_PROMPT = PromptTemplate(
-    input_variables=["history", "input"],
-    template=(
-        "The following is a friendly conversation between a human and an AI. "
-        "The AI uses the relevant memory snippets below to answer accurately.\n\n"
-        "Relevant memory:\n{history}\n\n"
-        "Human: {input}\n"
-        "AI:"
-    ),
-)
-
 
 class QdrantMemoryBackend(BaseMemoryBackend):
     name = "qdrant"
+    stores = "raw turns, one point per exchange; a write embeds the exchange (no LLM call)"
+    uses_k = True
 
     def setup(self) -> None:
         self._collection = f"{COLLECTION_PREFIX}{self.session_id[:8]}"
         self._client = QdrantClient(url=config.QDRANT_URL)
-        self._embeddings = get_embeddings()
-
-        self._client.recreate_collection(
+        if self._client.collection_exists(self._collection):
+            self._client.delete_collection(self._collection)
+        self._client.create_collection(
             collection_name=self._collection,
-            vectors_config=VectorParams(
-                size=config.EMBEDDING_DIMENSION, distance=Distance.COSINE
-            ),
+            vectors_config=VectorParams(size=config.EMBEDDING_DIMENSION, distance=Distance.COSINE),
         )
-
-        vectorstore = Qdrant(
+        self._store = QdrantVectorStore(
             client=self._client,
             collection_name=self._collection,
-            embeddings=self._embeddings,
-        )
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
-        self._memory = VectorStoreRetrieverMemory(retriever=retriever)
-        self._chain = ConversationChain(
-            llm=get_llm(),
-            memory=self._memory,
-            prompt=MEMORY_PROMPT,
-            verbose=False,
+            embedding=self.embeddings,
         )
 
     def teardown(self) -> None:
+        client = getattr(self, "_client", None)
+        if client is None:
+            return
         try:
-            self._client.delete_collection(self._collection)
-        except Exception:
-            pass
+            if client.collection_exists(self._collection):
+                client.delete_collection(self._collection)
+        finally:
+            client.close()
 
-    def chat(self, human_message: str) -> tuple[str, int]:
-        with get_openai_callback() as cb:
-            response = self._chain.predict(input=human_message)
-        return response, cb.total_tokens
+    def retrieve(self, query: str) -> Retrieval:
+        # One similarity search and nothing else: retrieve_ms is compared across
+        # backends, so no extra round trip (a row count, a connection) belongs here.
+        # An empty store simply returns no documents.
+        docs = self._store.similarity_search(query, k=self.k)
+        items = [d.page_content for d in docs]
+        return Retrieval(text="\n\n".join(items), items=items)
+
+    def write(self, human_message: str, ai_message: str) -> WriteStats:
+        self._store.add_texts([format_exchange(human_message, ai_message)])
+        return WriteStats()
+
+    def _point_count(self) -> int:
+        return self._client.count(self._collection, exact=True).count
+
+    def memory_fingerprint(self) -> dict:
+        points, offset = [], None
+        while True:
+            batch, offset = self._client.scroll(
+                self._collection, limit=256, offset=offset, with_payload=True, with_vectors=False
+            )
+            points.extend(batch)
+            if offset is None:
+                break
+        payloads = sorted((str(p.id), p.payload.get("page_content", "")) for p in points)
+        return fingerprint(self._point_count(), "points", payloads)

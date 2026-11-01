@@ -1,34 +1,143 @@
 """Factory for LLM and embedding instances.
 
-LLM: Claude via DigitalOcean Serverless Inference (OpenAI-compatible API).
-Embeddings: local sentence-transformers (all-MiniLM-L6-v2) to avoid API
-            dependency and cost; 384-dim vectors, runs on CPU.
+LLM:        `LLM_PROVIDER=do` (default) is Claude via DigitalOcean Serverless
+            Inference (OpenAI-compatible API, paid). `LLM_PROVIDER=fake` is the
+            deterministic offline model in src/fakes.py (free, for tests).
+            `LLM_PROVIDER=claude_cli` runs the `claude` CLI on a Claude
+            subscription (src/claude_cli.py; no API key, costs are
+            API-equivalent and not billed). The judge has the same three
+            choices through `JUDGE_PROVIDER`.
+Embeddings: `EMBEDDING_PROVIDER=local` (default) is sentence-transformers on CPU
+            (all-MiniLM-L6-v2, 384-dim). `EMBEDDING_PROVIDER=fake` is a
+            deterministic hashing embedding of the same dimension.
 """
 
 from __future__ import annotations
 
-from langchain_core.language_models import BaseChatModel
 from langchain_core.embeddings import Embeddings
+from langchain_core.language_models import BaseChatModel
+
 from src.config import config
 
-EMBEDDING_DIMENSION = 384
+
+def llm_model_id() -> str:
+    """The model id recorded in manifests and used for pricing lookups."""
+    if config.LLM_PROVIDER == "fake":
+        return "fake-memory-v1"
+    if config.LLM_PROVIDER == "claude_cli":
+        from src.claude_cli import resolve_model_id
+
+        return resolve_model_id(config.CLAUDE_CLI_MODEL)
+    return config.LLM_MODEL
 
 
-def get_llm() -> BaseChatModel:
-    """Claude via DigitalOcean Serverless Inference (OpenAI-compatible API)."""
+def embedding_model_id() -> str:
+    if config.EMBEDDING_PROVIDER == "fake":
+        return f"fake-hashing-{config.EMBEDDING_DIMENSION}"
+    return config.EMBEDDING_MODEL
+
+
+def judge_model_id() -> str:
+    if config.JUDGE_PROVIDER == "fake":
+        return "fake-judge-v1"
+    if config.JUDGE_PROVIDER == "claude_cli":
+        from src.claude_cli import resolve_model_id
+
+        return resolve_model_id(config.CLAUDE_CLI_JUDGE_MODEL)
+    return config.JUDGE_MODEL
+
+
+def provider_caveats(judge: bool = True) -> dict:
+    """Facts about the providers in use that change how a run's numbers read.
+
+    Recorded in the manifest. Billing, latency and temperature caveats follow the
+    answering model (LLM_PROVIDER) only. A claude_cli judge that is not also the
+    answering provider gets its own `judge_note`, and only when the judge runs.
+    Empty when no provider needs a caveat."""
+    out: dict = {}
+    if config.LLM_PROVIDER == "claude_cli":
+        out.update(
+            billing="subscription (claude CLI); costs are API-equivalent at list price, not billed",
+            cost_basis="api_equivalent",
+            temperature_controllable=False,
+            llm_latency_comparable=False,
+            llm_latency_note="includes claude CLI process start-up (about 2 s per call); memory read "
+                             "and write latencies are unaffected",
+            cli_overhead_note="each CLI call carries about 540 tokens of fixed overhead, counted as "
+                              "input on every call, so backends that make more LLM calls per turn "
+                              "(summary, mem0) have inflated API-equivalent cost relative to buffer "
+                              "and vector backends",
+        )
+    elif judge and config.JUDGE_PROVIDER == "claude_cli":
+        out["judge_note"] = ("The judge runs on a Claude subscription through the claude CLI: its "
+                             "temperature cannot be set and its verdicts are not billed. Answering-model "
+                             "costs and latencies are unaffected.")
+    return out
+
+
+def _do_chat_model(model: str) -> BaseChatModel:
+    if not config.DO_API_KEY:
+        raise RuntimeError(
+            "The 'do' provider needs DO_API_KEY in the environment or .env. "
+            "Set LLM_PROVIDER=fake (and JUDGE_PROVIDER=fake) for an offline run."
+        )
     from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(
-        model=config.LLM_MODEL,
+        model=model,
         openai_api_key=config.DO_API_KEY,
         openai_api_base=config.DO_INFERENCE_URL,
         temperature=0.0,
+        # src/retry.py does the retrying, so every attempt is counted once
+        max_retries=0,
     )
 
 
+def _claude_cli_model(alias: str) -> BaseChatModel:
+    from src.claude_cli import ChatClaudeCLI
+
+    return ChatClaudeCLI(model=alias, timeout_s=config.CLAUDE_CLI_TIMEOUT_S)
+
+
+def get_judge_llm() -> BaseChatModel:
+    if config.JUDGE_PROVIDER == "fake":
+        from src.fakes import FakeMemoryChatModel
+
+        return FakeMemoryChatModel(model_name="fake-judge-v1")
+    if config.JUDGE_PROVIDER == "claude_cli":
+        return _claude_cli_model(config.CLAUDE_CLI_JUDGE_MODEL)
+    if config.JUDGE_PROVIDER != "do":
+        raise ValueError(f"Unknown JUDGE_PROVIDER {config.JUDGE_PROVIDER!r} (use 'do', 'claude_cli' or 'fake')")
+    return _do_chat_model(config.JUDGE_MODEL)
+
+
+def get_llm() -> BaseChatModel:
+    if config.LLM_PROVIDER == "fake":
+        from src.fakes import FakeMemoryChatModel
+
+        return FakeMemoryChatModel(
+            input_tokens=config.FAKE_LLM_INPUT_TOKENS,
+            output_tokens=config.FAKE_LLM_OUTPUT_TOKENS,
+            sleep_ms=config.FAKE_LLM_SLEEP_MS,
+            summary_max_sentences=config.FAKE_SUMMARY_MAX_SENTENCES,
+        )
+    if config.LLM_PROVIDER == "claude_cli":
+        return _claude_cli_model(config.CLAUDE_CLI_MODEL)
+    if config.LLM_PROVIDER != "do":
+        raise ValueError(f"Unknown LLM_PROVIDER {config.LLM_PROVIDER!r} (use 'do', 'claude_cli' or 'fake')")
+    return _do_chat_model(config.LLM_MODEL)
+
+
 def get_embeddings() -> Embeddings:
-    """Local sentence-transformers embeddings (no API key needed)."""
-    from langchain_community.embeddings import HuggingFaceEmbeddings
+    if config.EMBEDDING_PROVIDER == "fake":
+        from src.fakes import HashingEmbeddings
+
+        return HashingEmbeddings(dimension=config.EMBEDDING_DIMENSION)
+    if config.EMBEDDING_PROVIDER != "local":
+        raise ValueError(
+            f"Unknown EMBEDDING_PROVIDER {config.EMBEDDING_PROVIDER!r} (use 'local' or 'fake')"
+        )
+    from langchain_huggingface import HuggingFaceEmbeddings
 
     return HuggingFaceEmbeddings(
         model_name=config.EMBEDDING_MODEL,

@@ -1,0 +1,377 @@
+# Fact bank for dataset v2 (src/dataset/).
+#
+# Each run samples, with its own seed, which templates appear, the slot values
+# and the turns they are stated on, so runs are samples rather than repeats.
+#
+# Template fields:
+#   id           unique id, used as fact_id in the transcript
+#   category     extraction | update | temporal | multi_hop | abstention | sensitive
+#   slots        name -> one of:
+#                  [a, b, c]                         pick one value
+#                  {digits: N}                       N random digits, no leading zero
+#                  {date: {}}                        a date between mid March and mid October
+#                  {date: {after: s, min_days: a, max_days: b}}   s plus a..b days
+#                  {date: {before: s, min_days: a, max_days: b}}  s minus a..b days
+#                  {days_between: [s1, s2]}          whole days from s1 to s2
+#                Every slot also gets `other_<name>`, a different value of the
+#                same kind, which distractors use.
+#   statements   what the user says, in order (update: original then correction;
+#                abstention: none)
+#   probe        the recall question
+#   answer       the reference answer shown to the judge (null for abstention)
+#   answers      required parts, each a list of accepted aliases
+#   stale        values that are wrong because they were replaced (update only)
+#   distractors  filler turns that mention the same kind of thing with a
+#                different value, so retrieval has to discriminate
+#
+# Placeholders are Python format fields: {name}, {other_name}.
+
+version: facts_v2
+
+# Wrappers apply to the first statement of a fact only; corrections and second
+# statements are said plainly.
+fact_wrappers:
+  - "{text}"
+  - "Something worth remembering: {text}"
+  - "Quick note so you have it: {text}"
+  - "Oh, and one more thing. {text}"
+
+filler_templates:
+  - "Let's talk about {topic}. What do you think about it?"
+  - "I've been reading a bit about {topic} lately. Any thoughts?"
+  - "Can you give me a quick tip on {topic}?"
+  - "My coworkers were arguing about {topic} at lunch today. Where do you land?"
+  - "What's one thing most people get wrong about {topic}?"
+  - "I keep meaning to look into {topic}. Where should I start?"
+
+filler_topics:
+  - the weather in different cities
+  - a recent movie I watched
+  - weekend plans
+  - cooking tips for pasta
+  - differences between Python and JavaScript
+  - tips for better sleep
+  - hiking trail recommendations
+  - the best podcasts to listen to
+  - strategies for learning a new language
+  - home office ergonomics
+  - the latest smartphone features
+  - vegetarian recipes
+  - time management strategies
+  - popular board games
+  - meditation techniques
+  - gardening advice
+  - financial budgeting tips
+  - sports highlights
+  - the future of AI assistants
+  - electric vehicle pros and cons
+  - coffee brewing methods
+  - work-life balance
+  - streaming service recommendations
+  - space exploration milestones
+  - local restaurant recommendations
+  - DIY home improvement ideas
+  - music playlists for focus
+  - running shoes
+  - houseplants that survive neglect
+  - learning to draw
+
+facts:
+  # ---------------------------------------------------------------- extraction
+  - id: dog_name
+    category: extraction
+    slots:
+      name: [Baxter, Juniper, Mochi, Pepper, Biscuit, Ziggy, Hazel, Rocket]
+    statements:
+      - "My dog's name is {name}."
+    probe: "What is my dog's name?"
+    answer: "{name}"
+    answers: [["{name}"]]
+    distractors:
+      - "My neighbour just adopted a dog called {other_name}."
+
+  - id: allergy
+    category: extraction
+    slots:
+      food: [shellfish, peanuts, sesame, kiwi, mustard, buckwheat]
+    statements:
+      - "I'm allergic to {food}."
+    probe: "What food am I allergic to?"
+    answer: "{food}"
+    answers: [["{food}"]]
+    distractors:
+      - "My roommate is allergic to {other_food}, so we keep it out of the flat."
+
+  - id: current_book
+    category: extraction
+    slots:
+      book: ["Gödel, Escher, Bach", "The Overstory", "Piranesi", "Middlemarch", "The Dispossessed", "Thinking in Systems"]
+    statements:
+      - "I'm currently reading '{book}'."
+    probe: "What book am I currently reading?"
+    answer: "{book}"
+    answers: [["{book}"]]
+    distractors:
+      - "My book club picked '{other_book}' for next month."
+
+  - id: wedding_location
+    category: extraction
+    slots:
+      place: [Lake Como, Udaipur, Santorini, Kyoto, Cartagena, Hallstatt]
+    statements:
+      - "My sister's wedding is in {place} this winter."
+    probe: "Where is my sister's wedding?"
+    answer: "{place}"
+    answers: [["{place}"]]
+    distractors:
+      - "A colleague of mine just got back from a wedding in {other_place}."
+
+  - id: supplement_dose
+    category: extraction
+    slots:
+      supplement: [melatonin, magnesium, vitamin D, iron, zinc]
+      dose: ["5", "10", "15", "25", "50"]
+    statements:
+      - "I take {dose} mg of {supplement} every night before bed."
+    probe: "What supplement do I take before bed, and at what dose?"
+    answer: "{supplement}, {dose} mg"
+    answers: [["{supplement}"], ["{dose} mg", "{dose} milligrams"]]
+    distractors:
+      - "My dad takes {other_dose} mg of {other_supplement} in the mornings."
+
+  - id: best_friend
+    category: extraction
+    slots:
+      first: [Priya, Tomas, Aiko, Femi, Lucia, Ravi]
+      last: [Sharma, Novak, Tanaka, Adeyemi, Romero, Iyer]
+    statements:
+      - "My childhood best friend's name is {first} {last}."
+    probe: "What is my childhood best friend's name?"
+    answer: "{first} {last}"
+    answers: [["{first}"], ["{last}"]]
+    distractors:
+      - "I ran into {other_first} {other_last} from my old school yesterday."
+
+  # -------------------------------------------------------------------- update
+  - id: flight_date
+    category: update
+    slots:
+      city: [Tokyo, Lisbon, Nairobi, Toronto, Seoul, Lima]
+      date: {date: {}}
+      new_date: {date: {after: date, min_days: 2, max_days: 9}}
+    statements:
+      - "My flight to {city} is on {date}."
+      - "Change of plans: my flight to {city} moved to {new_date}."
+    probe: "When is my flight to {city}?"
+    answer: "{new_date}"
+    answers: [["{new_date}"]]
+    stale: ["{date}"]
+    distractors:
+      - "My manager flies to {other_city} on {other_date}."
+
+  - id: moving_city
+    category: update
+    slots:
+      city: [Denver, Austin, Portland, Pittsburgh, Raleigh, Minneapolis]
+      new_city: [Boulder, Madison, Burlington, Asheville, Tucson, Savannah]
+    statements:
+      - "We've decided to move to {city} next year."
+      - "Update on the move: we dropped {city}, it's going to be {new_city} instead."
+    probe: "Which city are we moving to?"
+    answer: "{new_city}"
+    answers: [["{new_city}"]]
+    stale: ["{city}"]
+    distractors:
+      - "My cousin is moving to {other_new_city} in the spring."
+
+  - id: gym_day
+    category: update
+    slots:
+      day: [Monday, Tuesday, Wednesday, Thursday]
+      new_day: [Friday, Saturday, Sunday]
+    statements:
+      - "My climbing class is every {day} evening."
+      - "The gym rescheduled things, so my climbing class is on {new_day} evenings now."
+    probe: "Which evening is my climbing class?"
+    answer: "{new_day}"
+    answers: [["{new_day}"]]
+    stale: ["{day}"]
+    distractors:
+      - "My partner's yoga class is on {other_day} evenings."
+
+  - id: car_color
+    category: update
+    slots:
+      color: [red, silver, navy blue, white]
+      new_color: [green, black, orange, yellow]
+    statements:
+      - "I'm buying a {color} hatchback this month."
+      - "Small change: the dealer was out of {color}, so the hatchback I'm getting is {new_color}."
+    probe: "What color is the hatchback I'm getting?"
+    answer: "{new_color}"
+    answers: [["{new_color}"]]
+    stale: ["{color}"]
+    distractors:
+      - "My brother just bought a pickup truck, painted {other_new_color}."
+
+  # ------------------------------------------------------------------ temporal
+  - id: deadline_before_trip
+    category: temporal
+    slots:
+      city: [Tokyo, Lisbon, Nairobi, Toronto, Seoul, Lima]
+      report: [the grant report, the website relaunch, the quarterly review, the conference talk]
+      trip: {date: {}}
+      deadline: {date: {before: trip, min_days: 3, max_days: 40}}
+      gap: {days_between: [deadline, trip]}
+    statements:
+      - "I'm flying to {city} on {trip}."
+      - "The deadline for {report} is {deadline}."
+    probe: "How many days before my trip to {city} is the deadline for {report}?"
+    answer: "{gap} days"
+    answers: [["{gap} days", "{gap} day"]]
+    distractors:
+      - "My friend's deadline for {other_report} is {other_deadline}."
+
+  - id: race_after_birthday
+    category: temporal
+    slots:
+      race: [half marathon, 10K, triathlon, trail race]
+      birthday: {date: {}}
+      race_day: {date: {after: birthday, min_days: 4, max_days: 45}}
+      gap: {days_between: [birthday, race_day]}
+    statements:
+      - "My birthday is on {birthday}."
+      - "I signed up for a {race} on {race_day}."
+    probe: "How many days after my birthday is the {race}?"
+    answer: "{gap} days"
+    answers: [["{gap} days", "{gap} day"]]
+    distractors:
+      - "My sister's {other_race} is on {other_race_day}."
+
+  # ----------------------------------------------------------------- multi_hop
+  - id: sister_city
+    category: multi_hop
+    slots:
+      name: [Maya, Leela, Ines, Hana, Zara, Noor]
+      city: [Lisbon, Montreal, Kyoto, Cape Town, Melbourne, Oslo]
+    statements:
+      - "My younger sister is called {name}."
+      - "{name} just moved to {city} for a new job."
+    probe: "Which city does my younger sister live in now?"
+    answer: "{city}"
+    answers: [["{city}"]]
+    distractors:
+      - "My cousin {other_name} lives in {other_city}."
+
+  - id: dentist_street
+    category: multi_hop
+    slots:
+      dentist: [Dr. Okafor, Dr. Lindqvist, Dr. Mehta, Dr. Castillo]
+      street: [Elm Street, Harbour Road, Mill Lane, Kingsway]
+    statements:
+      - "My dentist is {dentist}."
+      - "{dentist} has an office on {street}."
+    probe: "What street is my dentist's office on?"
+    answer: "{street}"
+    answers: [["{street}"]]
+    distractors:
+      - "My kids see {other_dentist}, whose clinic is on {other_street}."
+
+  - id: manager_language
+    category: multi_hop
+    slots:
+      manager: [Kenji, Amara, Bjorn, Sofia]
+      language: [Portuguese, Polish, Vietnamese, Arabic]
+    statements:
+      - "My new manager is {manager}."
+      - "{manager} grew up speaking {language}."
+    probe: "What language did my new manager grow up speaking?"
+    answer: "{language}"
+    answers: [["{language}"]]
+    distractors:
+      - "My old manager {other_manager} spoke {other_language} at home."
+
+  # ---------------------------------------------------------------- abstention
+  # Never stated. The correct response says it was not told. Distractors put a
+  # tempting value in memory.
+  - id: cat_name
+    category: abstention
+    slots:
+      name: [Miso, Pickles, Luna, Tofu, Ginger]
+    statements: []
+    probe: "What is my cat's name?"
+    answer: null
+    answers: []
+    distractors:
+      - "My coworker's cat is called {other_name}."
+
+  - id: blood_type
+    category: abstention
+    slots:
+      type: [A positive, B negative, O positive, AB positive]
+    statements: []
+    probe: "What is my blood type?"
+    answer: null
+    answers: []
+    distractors:
+      - "My brother found out at the blood drive that he is {other_type}."
+
+  - id: first_car
+    category: abstention
+    slots:
+      car: [a Corolla, a Beetle, a Civic, a Fiesta]
+    statements: []
+    probe: "What was my first car?"
+    answer: null
+    answers: []
+    distractors:
+      - "My dad's first car was {other_car}."
+
+  - id: mother_hometown
+    category: abstention
+    slots:
+      town: [Mysore, Galway, Porto, Kraków]
+    statements: []
+    probe: "Which town is my mother from?"
+    answer: null
+    answers: []
+    distractors:
+      - "My friend's mother is from {other_town}."
+
+  # ----------------------------------------------------------------- sensitive
+  # Kept so refusal behaviour is visible, but reported separately and left
+  # out of the headline recall number.
+  - id: wifi_password
+    category: sensitive
+    slots:
+      w1: [sunkist, copper, velvet, maple, harbor]
+      w2: [mango, falcon, lantern, pebble, comet]
+      n: {digits: 2}
+    statements:
+      - "My home Wi-Fi password is '{w1}-{w2}-{n}'."
+    probe: "What is my home Wi-Fi password?"
+    answer: "{w1}-{w2}-{n}"
+    answers: [["{w1}-{w2}-{n}"]]
+    distractors: []
+
+  - id: bank_pin
+    category: sensitive
+    slots:
+      pin: {digits: 4}
+    statements:
+      - "My bank PIN is {pin}."
+    probe: "What is my bank PIN?"
+    answer: "{pin}"
+    answers: [["{pin}"]]
+    distractors: []
+
+  - id: locker_code
+    category: sensitive
+    slots:
+      code: {digits: 6}
+    statements:
+      - "The code for my office locker is {code}."
+    probe: "What is the code for my office locker?"
+    answer: "{code}"
+    answers: [["{code}"]]
+    distractors: []
