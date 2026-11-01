@@ -65,7 +65,9 @@ def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: 
 
     Backoff: base * 2**n, plus up to 25% jitter. The attempt time covers the
     attempt that succeeded only, so waiting out a rate limit does not show up
-    as model latency. Callers put the retry count and the sleep time in the
+    as model latency. The wait figure covers the sleeps and the time the
+    failed attempts took (a timeout is a long failed attempt), so callers that
+    time a whole step can subtract it and be left with the work. Callers put the retry count and the sleep time in the
     transcript (`llm_retries`, `write_retries`, `*_retry_wait_ms` on every turn
     and probe, `judge_retries` on every score) and the aggregate sums them per
     backend (`retries`), so a run that hit rate limits says so.
@@ -85,6 +87,7 @@ def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: 
         try:
             result = fn()
         except UsageLimitError as exc:
+            waited_ms += (time.perf_counter() - start) * 1000
             if pauses >= max_pauses:
                 raise
             pauses += 1
@@ -101,6 +104,7 @@ def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: 
         except Exception as exc:
             if attempt >= max_retries or not is_transient(exc):
                 raise
+            waited_ms += (time.perf_counter() - start) * 1000
             delay = base_delay * (2 ** attempt)
             delay += random.uniform(0, delay * 0.25)
             logger.warning("%s failed (%s: %s); retry %d of %d in %.1fs", what, type(exc).__name__,

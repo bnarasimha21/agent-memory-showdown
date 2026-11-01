@@ -10,8 +10,9 @@ Every call is one process:
 That combination sends only the system text and the prompt (about 540 input
 tokens of overhead): no CLAUDE.md, no memory files, no tools, no MCP servers.
 `--bare` is deliberately not used, because it ignores the subscription login.
-ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN are removed from the child's
-environment so a stray key can never turn a subscription run into a billed one.
+Every ANTHROPIC_* variable and the Bedrock/Vertex/AWS credentials are removed
+from the child's environment so a stray key or endpoint can never turn a
+subscription run into a billed one.
 
 What the CLI cannot do, and the consequences:
 
@@ -55,8 +56,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_SYSTEM = "You are a helpful assistant."
 JSON_INSTRUCTION = ("Respond with a single valid JSON object and nothing else: no prose before or "
                     "after it and no code fences.")
-# Variables that would make the CLI bill an API account instead of the subscription.
-STRIPPED_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+# Variables that would make the CLI bill an API account, a cloud provider or another
+# endpoint instead of the subscription: every ANTHROPIC_* (key, token, base URL,
+# headers, Foundry), the Bedrock/Vertex switches and their cloud credentials.
+STRIPPED_PREFIXES = ("ANTHROPIC_", "CLAUDE_CODE_USE_", "AWS_", "GOOGLE_APPLICATION_CREDENTIALS",
+                     "CLOUD_ML_REGION", "VERTEX_")
 
 
 # Number of `claude` processes started by this Python process (all attempts).
@@ -110,8 +114,11 @@ def flatten_messages(messages: List[BaseMessage]) -> tuple[str, str]:
 
 # ------------------------------------------------------------- error handling
 
-_LIMIT_RE = re.compile(r"usage limit|limit reached|hit your (?:\w+ )?limit|reached your (?:\w+ )?limit"
-                       r"|out of (?:extra )?usage|session limit|weekly limit", re.I)
+_LIMIT_RE = re.compile(r"usage limit|\d+-hour limit|weekly limit|session limit|opus limit"
+                       r"|(?:hit|reached) your (?:\w+ )?limit|out of (?:extra )?usage", re.I)
+# A limit notice that came back as a normal result (is_error false) looks like this at the start.
+_LIMIT_START_RE = re.compile(r"^\W*(?:claude(?: ai)?\s+)?(?:usage limit|you.?ve (?:hit|reached)|\d+-hour limit"
+                             r"|weekly limit|session limit)", re.I)
 _EPOCH_RE = re.compile(r"\|\s*(\d{10})\b")
 _CLOCK_RE = re.compile(r"resets?\s*(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)(?:\s*\(([^)]+)\))?", re.I)
 _IN_RE = re.compile(r"(?:resets?|try again|available)\s+in\s+(?:about\s+)?(\d+(?:\.\d+)?)\s*"
@@ -122,7 +129,9 @@ _AUTH_TEXT = re.compile(r"log ?in|logged|authenticat|invalid api key|credit bala
 
 
 def is_usage_limit(text: str) -> bool:
-    return bool(_LIMIT_RE.search(text or ""))
+    """True for a subscription limit notice; a context-window overflow is not one."""
+    text = text or ""
+    return bool(_LIMIT_RE.search(text)) and "context" not in text.lower()
 
 
 def parse_reset(text: str, now: float | None = None) -> float | None:
@@ -163,7 +172,7 @@ def usage_limit_error(text: str, now: float | None = None) -> UsageLimitError:
     reset = parse_reset(text, now)
     # A minute of margin after the stated reset; no stated reset = the configured wait.
     wait = (reset - now + 60) if reset is not None else config.USAGE_LIMIT_WAIT_S
-    return UsageLimitError(text.strip()[:300], max(1.0, wait), reset)
+    return UsageLimitError(text.strip()[:300], max(60.0, wait), reset)
 
 
 # ------------------------------------------------------------------ the model
@@ -218,14 +227,14 @@ class ChatClaudeCLI(BaseChatModel):
         """One CLI call; returns the parsed JSON result or raises (see module docstring)."""
         global CALLS
         CALLS += 1
-        env = {k: v for k, v in os.environ.items() if k not in STRIPPED_ENV}
+        env = {k: v for k, v in os.environ.items() if not k.startswith(STRIPPED_PREFIXES)}
         with tempfile.TemporaryDirectory(prefix="ams-claude-") as cwd:  # empty: nothing to read
             try:
                 proc = subprocess.run(self._command(system), input=prompt, capture_output=True,
                                       text=True, timeout=self.timeout_s, cwd=cwd, env=env)
             except subprocess.TimeoutExpired as exc:
                 raise ClaudeCLITransientError(f"claude CLI timed out after {self.timeout_s:.0f} s") from exc
-            except OSError as exc:
+            except (OSError, ValueError) as exc:  # ValueError: a NUL byte in the prompt
                 raise ClaudeCLIError(f"could not run the claude CLI: {exc}") from exc
         out, err = (proc.stdout or "").strip(), (proc.stderr or "").strip()
         data = None
@@ -243,6 +252,9 @@ class ChatClaudeCLI(BaseChatModel):
             raise ClaudeCLITransientError(f"claude CLI exited {proc.returncode} without JSON: {detail}")
         result = data.get("result")
         text = result if isinstance(result, str) else ""
+        if (not data.get("is_error") and proc.returncode == 0 and len(text) < 200
+                and _LIMIT_START_RE.search(text) and is_usage_limit(text)):
+            raise usage_limit_error(text)
         if data.get("is_error") or proc.returncode != 0:
             detail = (text or err or json.dumps(data)[:300]).strip()
             if is_usage_limit(detail):
@@ -272,7 +284,9 @@ class ChatClaudeCLI(BaseChatModel):
                   + int(usage.get("cache_read_input_tokens") or 0))
         out_tok = int(usage.get("output_tokens") or 0)
         model_usage = data.get("modelUsage") or {}
-        model_id = next(iter(model_usage), None) or self.model
+        # The model that produced the most output; usually the only entry.
+        model_id = max(model_usage, key=lambda k: (model_usage[k] or {}).get("outputTokens", 0),
+                       default=None) or self.model
         if self.last_model_id not in (None, model_id):
             logger.warning("claude CLI answered with model %s, earlier calls used %s", model_id, self.last_model_id)
         self.last_model_id = model_id
