@@ -21,7 +21,7 @@ models:
     display_name: Claude Sonnet 5.5 (Anthropic API list price; subscription run, not billed)
     input_per_mtok: 2.00
     output_per_mtok: 10.00
-    note: base input and output rate; 5m cache write $2.50, 1h write $4, cache hit $0.10 per MTok are not used
+    note: base input and output rate; the cache-read rate ($0.20 per MTok) and cache-write rates are not used, all input tokens are priced at the base rate
     source: https://platform.claude.com/docs/en/about-claude/pricing
     checked_on: "2026-11-01"
   # The offline fake model is priced like the default model so sample runs show

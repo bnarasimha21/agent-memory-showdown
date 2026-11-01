@@ -128,5 +128,14 @@ def test_a_judge_grading_its_own_model_is_flagged(monkeypatch, fresh_config, cap
     fresh_config()
     with caplog.at_level("WARNING", logger="src.scoring.judge"):
         assert judge_mod.get_judge(answering_model="m-1").same_as_answerer
-    assert "favour its own answers" in caplog.text
+    assert "favour its own answers" in caplog.text and "Set JUDGE_MODEL " in caplog.text
+    # with the CLI provider the setting to change is CLAUDE_CLI_JUDGE_MODEL
+    caplog.clear()
+    monkeypatch.setenv("JUDGE_PROVIDER", "claude_cli")
+    fresh_config()
+    with caplog.at_level("WARNING", logger="src.scoring.judge"):
+        judge_mod.get_judge(answering_model="m-1")
+    assert "Set CLAUDE_CLI_JUDGE_MODEL " in caplog.text
+    monkeypatch.setenv("JUDGE_PROVIDER", "do")
+    fresh_config()
     assert not judge_mod.get_judge(answering_model="m-0").same_as_answerer

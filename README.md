@@ -245,6 +245,9 @@ Each model call is one `claude -p --model sonnet --system-prompt ... --tools "" 
 --setting-sources "" --no-session-persistence --output-format json` process with the prompt on stdin and
 an empty temporary directory as its working directory, so only the system text and the prompt reach the
 model (about 540 tokens of fixed overhead; no CLAUDE.md, memory files, tools or MCP servers).
+That fixed overhead is counted as input on every call, so backends that make more LLM calls per turn
+(summary, mem0) have inflated API-equivalent cost relative to buffer and the vector backends. Compare
+quality and memory latencies across backends freely, but read the cost column with that in mind.
 `--bare` is not used because it ignores the subscription login, and `ANTHROPIC_API_KEY` is removed from
 the child's environment so a stray key cannot make a run billed. Settings: `CLAUDE_BIN` (default: `claude` on
 PATH), `CLAUDE_CLI_MODEL` (default `sonnet`), `CLAUDE_CLI_JUDGE_MODEL` (default: the same),

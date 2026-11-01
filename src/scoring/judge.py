@@ -126,8 +126,9 @@ def get_judge(answering_model: str | None = None) -> Judge:
     judge = Judge(get_judge_llm(), config.JUDGE_PROVIDER, judge_model_id(),
                   answering_model or llm_model_id())
     if judge.same_as_answerer and config.JUDGE_PROVIDER != "fake":
+        setting = "CLAUDE_CLI_JUDGE_MODEL" if config.JUDGE_PROVIDER == "claude_cli" else "JUDGE_MODEL"
         logger.warning(
-            "The judge (%s) is the answering model: it may favour its own answers. Set JUDGE_MODEL "
+            "The judge (%s) is the answering model: it may favour its own answers. Set %s "
             "to a different model to avoid that; agreement with the matcher is reported either way.",
-            judge.model)
+            judge.model, setting)
     return judge
