@@ -150,6 +150,17 @@ def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints
     }
 
 
+def _counters(duration_s, prior_calls, prior_pauses, calls_before, pauses_before) -> dict:
+    """Manifest fields that accumulate over invocations: wall time, claude CLI calls, limit pauses."""
+    out = {"duration_s": duration_s}
+    if "claude_cli" in (config.LLM_PROVIDER, config.JUDGE_PROVIDER):
+        out["claude_cli_calls"] = prior_calls + _cli_calls() - calls_before
+    pauses = prior_pauses + USAGE_LIMIT_PAUSES[pauses_before:]
+    if pauses:
+        out["usage_limit_pauses"] = pauses
+    return out
+
+
 def _cli_calls() -> int:
     import sys
 
@@ -160,7 +171,8 @@ def _cli_calls() -> int:
 def _check_resumable(old: dict, new: dict, path: Path, datasets) -> None:
     """Refuse to resume into a bundle the current configuration would not have produced."""
     for key in ("backends", "num_runs", "num_turns", "checkpoints", "seeds", "k", "dataset",
-                "prompt_hash", "llm_provider", "llm_model", "embedding_model"):
+                "prompt_hash", "llm_provider", "llm_model", "embedding_provider", "embedding_model",
+                "embedding_dimension", "judge_provider"):
         if old.get(key) != new.get(key):
             raise ValueError(f"cannot resume {path}: {key} differs (bundle {old.get(key)!r}, "
                              f"now {new.get(key)!r})")
@@ -311,6 +323,10 @@ def run_benchmark(
                 continue
             logger.info("  Run %d / %d", run_idx + 1, num_runs)
             run_single(backend_cls, dataset, run_idx, writer, kwargs, sweep)
+            # Totals so far, so a killed process still leaves honest counters for a resume.
+            writer.manifest.update(_counters(prior_s + time.perf_counter() - started, prior_calls,
+                                             prior_pauses, calls_before, pauses_before))
+            writer.write_json("manifest.json", writer.manifest)
 
     duration = prior_s + time.perf_counter() - started
     writer.close_transcript()
@@ -319,15 +335,8 @@ def run_benchmark(
     info = scoring_info(judge_obj)
     write_jsonl(writer.path / "scores.jsonl", scores)
     writer.write_json("scoring.json", info)
-    extra = {}
-    if "claude_cli" in (config.LLM_PROVIDER, config.JUDGE_PROVIDER):
-        from src import claude_cli
-
-        extra["claude_cli_calls"] = prior_calls + claude_cli.CALLS - calls_before
-    pauses = prior_pauses + USAGE_LIMIT_PAUSES[pauses_before:]
-    if pauses:
-        extra["usage_limit_pauses"] = pauses
-    writer.finalize(finished_at=utc_now(), duration_s=duration, scoring=info, **extra)
+    extra = _counters(duration, prior_calls, prior_pauses, calls_before, pauses_before)
+    writer.finalize(finished_at=utc_now(), scoring=info, **extra)
     writer.write_aggregate(aggregate_bundle(writer.path))
     logger.info("Run bundle written to %s", writer.path)
     return writer.path

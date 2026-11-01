@@ -11,6 +11,7 @@ so scoring can change without re-running the expensive conversation.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import sys
@@ -41,6 +42,9 @@ class JudgeCache:
         info = judge.info()
         self.stamp = (info["judge_model"], info["judge_prompt_hash"])
         self._verdicts: dict[tuple, dict] = {}
+        from src.bundle import repair_jsonl
+
+        repair_jsonl(self.path)
         if self.path.exists():
             for line in self.path.read_text(encoding="utf-8").splitlines():
                 if not line.strip():
@@ -49,13 +53,22 @@ class JudgeCache:
                 if (row["judge_model"], row["judge_prompt_hash"]) == self.stamp:
                     self._verdicts[tuple(row["key"])] = row["verdict"]
 
-    def get(self, key: tuple) -> dict | None:
-        return self._verdicts.get(tuple(key))
+    @staticmethod
+    def _key(record: dict) -> tuple:
+        """The probe plus a digest of what the judge sees, so a rerun of the same
+        probe with a different response never reuses an old verdict."""
+        seen = json.dumps([record.get("question"), record.get("answer_key"), record.get("response")],
+                          ensure_ascii=False)
+        return (*score_key(record), hashlib.sha256(seen.encode("utf-8")).hexdigest())
 
-    def put(self, key: tuple, verdict: dict) -> None:
+    def get(self, record: dict) -> dict | None:
+        return self._verdicts.get(self._key(record))
+
+    def put(self, record: dict, verdict: dict) -> None:
         if verdict.get("label") == "error":
             return
-        self._verdicts[tuple(key)] = verdict
+        key = self._key(record)
+        self._verdicts[key] = verdict
         with open(self.path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps({"key": list(key), "judge_model": self.stamp[0],
                                  "judge_prompt_hash": self.stamp[1], "verdict": verdict},
@@ -76,12 +89,11 @@ def score_probes(records: Iterable[dict], judge=None, cache: "JudgeCache | None"
             judge_retries=0,
         )
         if judge is not None:
-            key = score_key(rec)
-            verdict = cache.get(key) if cache is not None else None
+            verdict = cache.get(rec) if cache is not None else None
             if verdict is None:
                 verdict = judge.judge(rec)
                 if cache is not None:
-                    cache.put(key, verdict)
+                    cache.put(rec, verdict)
             score.update(
                 judge_label=verdict["label"], judge_rationale=verdict["rationale"],
                 judge_input_tokens=verdict["input_tokens"],

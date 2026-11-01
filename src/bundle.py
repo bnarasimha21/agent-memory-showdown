@@ -106,6 +106,36 @@ def environment_info() -> dict:
     return {"python": sys.version.split()[0], "platform": platform.platform()}
 
 
+def repair_jsonl(path: Path) -> bool:
+    """Cut a torn last line (a write interrupted by a kill) off a JSON-lines file.
+
+    Returns True if something was removed. Also makes the file end in a newline,
+    so the next appended record starts on its own line."""
+    if not path.exists():
+        return False
+    raw = path.read_bytes()
+    if not raw:
+        return False
+    lines = raw.split(b"\n")
+    tail = lines[-1] if lines[-1] else (lines[-2] if len(lines) > 1 else b"")
+    removed = False
+    try:
+        json.loads(tail)
+        ok = True
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        ok = False
+    if not ok:
+        keep = lines[:-1] if lines[-1] else lines[:-2]
+        raw = b"".join(line + b"\n" for line in keep)
+        removed = True
+    elif not raw.endswith(b"\n"):
+        raw += b"\n"
+        removed = True
+    if removed:
+        path.write_bytes(raw)
+    return removed
+
+
 class BundleWriter:
     def __init__(self, root: str | Path, run_id: str, manifest: dict) -> None:
         self.run_id = run_id
@@ -124,6 +154,7 @@ class BundleWriter:
         self.run_id = self.manifest["run_id"]
         if not (self.path / TRANSCRIPT).exists():
             raise FileNotFoundError(f"{self.path} has no plain {TRANSCRIPT} to resume")
+        repair_jsonl(self.path / TRANSCRIPT)
         self._transcript = open(self.path / TRANSCRIPT, "a", encoding="utf-8")
         return self
 
