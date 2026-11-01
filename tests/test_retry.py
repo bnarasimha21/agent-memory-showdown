@@ -33,7 +33,7 @@ class FlakyModel(FakeMemoryChatModel):
 @pytest.fixture
 def sleeps(monkeypatch):
     waited: list[float] = []
-    monkeypatch.setattr(retry.time, "sleep", waited.append)
+    monkeypatch.setattr(retry, "_sleep", waited.append)
     PENDING.clear()
     yield waited
     PENDING.clear()
@@ -138,7 +138,7 @@ def real_short_sleeps(monkeypatch):
     import time as _time
 
     real = _time.sleep
-    monkeypatch.setattr(retry.time, "sleep", lambda _delay: real(0.15))
+    monkeypatch.setattr(retry, "_sleep", lambda _delay: real(0.15))
     PENDING.clear()
     yield
     PENDING.clear()

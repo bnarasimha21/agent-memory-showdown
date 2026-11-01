@@ -39,7 +39,7 @@ def fake(tmp_path, monkeypatch, fresh_config):
 @pytest.fixture
 def sleeps(monkeypatch):
     waited: list[float] = []
-    monkeypatch.setattr(retry.time, "sleep", waited.append)
+    monkeypatch.setattr(retry, "_sleep", waited.append)
     return waited
 
 

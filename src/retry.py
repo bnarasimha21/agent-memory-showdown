@@ -17,6 +17,12 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
+
+# Patched by tests. Patching time.sleep itself would also catch the polling sleeps
+# subprocess makes while waiting on a child under Python 3.11.
+def _sleep(seconds: float) -> None:
+    time.sleep(seconds)
+
 _TRANSIENT_NAMES = {"APIConnectionError", "APITimeoutError", "RateLimitError",
                     "InternalServerError", "ServiceUnavailableError", "Timeout", "ConnectTimeout",
                     "ReadTimeout", "ConnectError"}
@@ -76,7 +82,7 @@ def call_with_retry(fn: Callable[[], Any], what: str = "LLM call", max_retries: 
 
     max_retries = config.LLM_MAX_RETRIES if max_retries is None else max_retries
     base_delay = config.LLM_RETRY_BASE_S if base_delay is None else base_delay
-    sleep = sleep or time.sleep
+    sleep = sleep or _sleep
     max_pauses = config.USAGE_LIMIT_MAX_PAUSES
     attempt = 0
     pauses = 0
