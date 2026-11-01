@@ -24,6 +24,12 @@ def provider_note(caveats: dict | None) -> str:
                      "comparable with an API provider; memory read and write latencies are unaffected.")
     if caveats.get("temperature_controllable") is False:
         parts.append("Temperature cannot be set through the CLI; the model samples at its default.")
+    if caveats.get("cli_overhead_note"):
+        parts.append("Each CLI call carries about 540 tokens of fixed overhead, counted as input on every "
+                     "call, so backends that make more LLM calls per turn (summary, mem0) have inflated "
+                     "API-equivalent cost relative to buffer and vector backends.")
+    if caveats.get("judge_note"):
+        parts.append(caveats["judge_note"])
     return " ".join(parts)
 
 

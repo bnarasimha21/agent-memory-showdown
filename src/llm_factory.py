@@ -47,12 +47,15 @@ def judge_model_id() -> str:
     return config.JUDGE_MODEL
 
 
-def provider_caveats() -> dict:
+def provider_caveats(judge: bool = True) -> dict:
     """Facts about the providers in use that change how a run's numbers read.
 
-    Recorded in the manifest. Empty when no provider needs a caveat."""
+    Recorded in the manifest. Billing, latency and temperature caveats follow the
+    answering model (LLM_PROVIDER) only. A claude_cli judge that is not also the
+    answering provider gets its own `judge_note`, and only when the judge runs.
+    Empty when no provider needs a caveat."""
     out: dict = {}
-    if "claude_cli" in (config.LLM_PROVIDER, config.JUDGE_PROVIDER):
+    if config.LLM_PROVIDER == "claude_cli":
         out.update(
             billing="subscription (claude CLI); costs are API-equivalent at list price, not billed",
             cost_basis="api_equivalent",
@@ -60,7 +63,15 @@ def provider_caveats() -> dict:
             llm_latency_comparable=False,
             llm_latency_note="includes claude CLI process start-up (about 2 s per call); memory read "
                              "and write latencies are unaffected",
+            cli_overhead_note="each CLI call carries about 540 tokens of fixed overhead, counted as "
+                              "input on every call, so backends that make more LLM calls per turn "
+                              "(summary, mem0) have inflated API-equivalent cost relative to buffer "
+                              "and vector backends",
         )
+    elif judge and config.JUDGE_PROVIDER == "claude_cli":
+        out["judge_note"] = ("The judge runs on a Claude subscription through the claude CLI: its "
+                             "temperature cannot be set and its verdicts are not billed. Answering-model "
+                             "costs and latencies are unaffected.")
     return out
 
 

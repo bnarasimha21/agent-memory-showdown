@@ -127,7 +127,7 @@ def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints
         "llm_provider": config.LLM_PROVIDER,
         "llm_model": llm_model_id(),
         "judge_provider": config.JUDGE_PROVIDER if judge else None,
-        "provider_caveats": provider_caveats(),
+        "provider_caveats": provider_caveats(judge),
         "embedding_provider": config.EMBEDDING_PROVIDER,
         "embedding_model": embedding_model_id(),
         "embedding_dimension": config.EMBEDDING_DIMENSION,

@@ -321,3 +321,38 @@ def test_judge_cache_does_not_reuse_a_verdict_for_a_different_response(tmp_path)
     assert cache.get({**rec, "response": "two"}) is None
     (tmp_path / "c.jsonl").write_text((tmp_path / "c.jsonl").read_text() + '{"torn')
     assert JudgeCache(tmp_path / "c.jsonl", J()).get(rec) == {"label": "correct"}
+
+
+# ------------------------------------------------------------- second review round
+
+
+@pytest.mark.parametrize("llm,judge_provider,judge_on,billing,judge_note", [
+    ("do", "claude_cli", True, False, True),
+    ("do", "claude_cli", False, False, False),
+    ("claude_cli", "claude_cli", True, True, False),
+    ("claude_cli", "do", True, True, False),
+    ("do", "do", True, False, False),
+])
+def test_provider_caveats_follow_the_answering_provider(monkeypatch, fresh_config, llm, judge_provider,
+                                                        judge_on, billing, judge_note):
+    from src.harness import build_manifest
+    from src.report import provider_note
+
+    monkeypatch.setenv("LLM_PROVIDER", llm)
+    monkeypatch.setenv("JUDGE_PROVIDER", judge_provider)
+    fresh_config()
+    monkeypatch.setattr("src.llm_factory.llm_model_id", lambda: "x")
+    monkeypatch.setattr("src.harness.llm_model_id", lambda: "x")
+    monkeypatch.setattr("src.harness.judge_model_id", lambda: "x", raising=False)
+    m = build_manifest(["buffer"], 1, 5, {}, [5], None, judge=judge_on)
+    caveats = m["provider_caveats"]
+    assert ("cost_basis" in caveats) is billing
+    assert ("llm_latency_comparable" in caveats) is billing
+    assert ("temperature_controllable" in caveats) is billing
+    assert ("judge_note" in caveats) is judge_note
+    note = provider_note(caveats)
+    assert ("costs are API-equivalent" in note) is billing
+    assert ("The judge runs on a Claude subscription" in note) is judge_note
+    assert ("540 tokens" in note) is billing
+    if not billing and not judge_note:
+        assert caveats == {} and note == ""
