@@ -229,7 +229,52 @@ python run_benchmark.py --help
   --results-dir    output directory           (default: results/)
   --no-viz         skip chart generation
   --no-judge       matcher only, no judge LLM calls (rescore later)
+  --resume RUN_ID  continue an unfinished bundle (same options as the original run)
 ```
+
+### Running on a Claude subscription (no API key)
+
+`LLM_PROVIDER=claude_cli` runs the answering model, and `JUDGE_PROVIDER=claude_cli` the judge, through
+the `claude` CLI logged in to a Claude subscription. Embeddings stay local and free.
+
+```bash
+LLM_PROVIDER=claude_cli JUDGE_PROVIDER=claude_cli EMBEDDING_PROVIDER=local python run_benchmark.py
+```
+
+Each model call is one `claude -p --model sonnet --system-prompt ... --tools "" --strict-mcp-config
+--setting-sources "" --no-session-persistence --output-format json` process with the prompt on stdin and
+an empty temporary directory as its working directory, so only the system text and the prompt reach the
+model (about 540 tokens of fixed overhead; no CLAUDE.md, memory files, tools or MCP servers).
+`--bare` is not used because it ignores the subscription login, and `ANTHROPIC_API_KEY` is removed from
+the child's environment so a stray key cannot make a run billed. Settings: `CLAUDE_BIN` (default: `claude` on
+PATH), `CLAUDE_CLI_MODEL` (default `sonnet`), `CLAUDE_CLI_JUDGE_MODEL` (default: the same),
+`CLAUDE_CLI_TIMEOUT_S` (default 300).
+
+How the numbers read when this provider is used (the run manifest records all of it under
+`provider_caveats`, and the report, README block and results site repeat it):
+
+- **Costs are API-equivalent, not billed.** The recorded tokens (fresh input + cache writes + cache reads
+  as input, plus output) are priced at the Anthropic API list price for the real model id the CLI reports
+  (`claude-sonnet-5-5`: $2 / $10 per million tokens, `pricing.yaml`). A subscription run costs nothing per token.
+- **LLM latency is not comparable.** It includes starting the CLI process (about 2 s per call). Memory
+  read and write latencies are unaffected, because the CLI is not in the retrieval path.
+- **No temperature control.** The CLI cannot set it, so the model samples at its default.
+- **The judge is the answering model**, so it may favour its own answers; the manifest says so and the
+  matcher figures are the check.
+- **Model id.** `--model sonnet` is an alias; the manifest records the id from the CLI's `modelUsage`
+  (found with one small call before the run starts).
+- **Usage limits are waited out.** A subscription limit message ("usage limit reached", "hit your limit")
+  does not use up a retry or drop a run: the call sleeps until the reset time in the message (plus a
+  minute), or `USAGE_LIMIT_WAIT_S` (default 30 minutes) when there is none, never longer than
+  `USAGE_LIMIT_MAX_WAIT_S` (6 hours) per pause, and then repeats. The sleep is reported as retry wait,
+  never as latency, and every pause is listed in the manifest (`usage_limit_pauses`). Other transient
+  failures (timeouts, overload, a CLI crash, a non-JSON reply when mem0 asked for JSON) retry with
+  backoff like API errors.
+- Calls are made one at a time; the harness adds no concurrency.
+
+A long run can be interrupted. `python run_benchmark.py <same options> --resume <run_id>` keeps every run
+that finished, drops and repeats the ones that did not, and reuses the judge verdicts already made
+(`judge_cache.jsonl`). It refuses to resume if the options no longer match the bundle's manifest.
 
 ## Testing
 
@@ -243,6 +288,11 @@ make test              # both
 ```
 
 Integration tests run every backend through the real harness against real Qdrant and Postgres. `scripts/test_services.sh` uses `docker compose -p ams-test` when the compose plugin is installed and plain `docker run` otherwise.
+
+The `claude_cli` provider is tested against a fake `claude` executable that tests write into pytest's
+temporary directory (`tests/fake_claude.py`): argument vector, message flattening, token and model-id
+capture, error mapping, retries, usage-limit sleeps, mem0's JSON path, a short benchmark and a resumed one.
+No test runs the real CLI.
 
 A free offline run of the full pipeline (services must be up) is `make run-fake`. Its output is marked as a sample run and is not a benchmark result.
 
