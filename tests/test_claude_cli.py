@@ -266,3 +266,58 @@ def test_manifest_caveats_and_report_note(fake):
     note = provider_note(caveats)
     assert "API-equivalent" in note and "not comparable" in note and "Temperature" in note
     assert provider_note({}) == ""
+
+
+# ------------------------------------------------------------------ review fixes
+
+
+def test_every_anthropic_and_cloud_variable_is_stripped_from_the_child(fake, monkeypatch):
+    for name in ("ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK", "AWS_SECRET_ACCESS_KEY"):
+        monkeypatch.setenv(name, "x")
+    model().invoke("hello")
+    env = claude_cli._child_env() if hasattr(claude_cli, "_child_env") else None
+    if env is not None:
+        assert not [k for k in env if k.startswith(claude_cli.STRIPPED_PREFIXES)]
+    assert fake.calls()[-1]["api_key_visible"] is False
+
+
+def test_limit_detection_ignores_bare_limit_words_and_context_overflow():
+    assert claude_cli.is_usage_limit("Claude AI usage limit reached|1700000000")
+    assert claude_cli.is_usage_limit("You've hit your 5-hour limit. Resets at 3pm")
+    assert not claude_cli.is_usage_limit("The rate limit reached for this endpoint")
+    assert not claude_cli.is_usage_limit("Prompt is too long: context limit reached")
+
+
+def test_a_limit_notice_returned_as_a_normal_result_still_pauses(fake, sleeps):
+    fake.plan({"prose": "Claude AI usage limit reached|4102444800"}, "ok")
+    message, *_ = invoke_with_retry(model(), "hi")
+    assert sleeps and message.content
+
+
+def test_torn_last_line_is_cut_off_and_complete_lines_are_kept(tmp_path):
+    from src.bundle import repair_jsonl
+
+    path = tmp_path / "t.jsonl"
+    path.write_text('{"a": 1}\n{"a": 2}\n{"a": 3, "tor')
+    assert repair_jsonl(path) is True
+    assert path.read_text() == '{"a": 1}\n{"a": 2}\n'
+    assert repair_jsonl(path) is False
+    path.write_text('{"a": 1}')
+    assert repair_jsonl(path) is True and path.read_text() == '{"a": 1}\n'
+
+
+def test_judge_cache_does_not_reuse_a_verdict_for_a_different_response(tmp_path):
+    from src.scoring.rescore import JudgeCache
+
+    class J:
+        def info(self):
+            return {"judge_model": "m", "judge_prompt_hash": "h"}
+
+    rec = {"backend": "b", "run_index": 0, "checkpoint": 1, "fact_id": "p", "question": "q",
+           "answer_key": "k", "response": "one"}
+    cache = JudgeCache(tmp_path / "c.jsonl", J())
+    cache.put(rec, {"label": "correct"})
+    assert cache.get(rec) == {"label": "correct"}
+    assert cache.get({**rec, "response": "two"}) is None
+    (tmp_path / "c.jsonl").write_text((tmp_path / "c.jsonl").read_text() + '{"torn')
+    assert JudgeCache(tmp_path / "c.jsonl", J()).get(rec) == {"label": "correct"}
