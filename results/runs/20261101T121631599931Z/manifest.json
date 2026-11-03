@@ -1,0 +1,100 @@
+{
+  "methodology": "v2",
+  "created_at": "2026-11-01T12:16:31Z",
+  "git": {
+    "sha": "26d96a0e61ecd76f74fc0d4d007cdd75557167de",
+    "dirty": false
+  },
+  "llm_provider": "claude_cli",
+  "llm_model": "claude-sonnet-5-5",
+  "judge_provider": "claude_cli",
+  "provider_caveats": {
+    "billing": "subscription (claude CLI); costs are API-equivalent at list price, not billed",
+    "cost_basis": "api_equivalent",
+    "temperature_controllable": false,
+    "llm_latency_comparable": false,
+    "llm_latency_note": "includes claude CLI process start-up (about 2 s per call); memory read and write latencies are unaffected"
+  },
+  "embedding_provider": "local",
+  "embedding_model": "all-MiniLM-L6-v2",
+  "embedding_dimension": 384,
+  "k": 4,
+  "backends": [
+    "buffer",
+    "summary",
+    "qdrant",
+    "pgvector",
+    "langgraph_store",
+    "mem0"
+  ],
+  "num_runs": 5,
+  "num_turns": 50,
+  "dataset": {
+    "bank": "data/facts_v2.yaml",
+    "bank_version": "facts_v2",
+    "bank_sha256": "727ae24cc1af8f2cf02bd079c06eaacd63dcfdb2bac30955e7368c8f154da2f7",
+    "composition": {
+      "extraction": 3,
+      "update": 2,
+      "temporal": 1,
+      "multi_hop": 1,
+      "abstention": 2,
+      "sensitive": 2
+    },
+    "distractors": true,
+    "headline_excludes": [
+      "abstention",
+      "sensitive"
+    ]
+  },
+  "checkpoints": [
+    15,
+    25,
+    35,
+    50
+  ],
+  "seeds": [
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "prompt_hash": "2a6636710814e818ea943d0f7e477c0154d200ac47c691ff3614ef0f348de0b1",
+  "prompt_template": "You are a helpful assistant in a long-running conversation with one user.\nBelow is what you remember from earlier in the conversation. Use it to answer the user's latest message. If the answer is not in your memory, say that the user has not told you.\n\nMemory:\n{history}\n\nUser: {input}\nAssistant:",
+  "packages": {
+    "langchain-core": "1.7.3",
+    "langchain-huggingface": "1.2.3",
+    "langchain-openai": "1.7.3",
+    "langchain-qdrant": "1.1.0",
+    "langchain-postgres": "0.0.19",
+    "langgraph": "1.2.18",
+    "langgraph-checkpoint-postgres": "3.2.0",
+    "mem0ai": "2.2.1",
+    "qdrant-client": "1.20.0",
+    "psycopg": "3.3.6",
+    "numpy": "1.26.4",
+    "plotly": "5.24.1"
+  },
+  "environment": {
+    "python": "3.12.13",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "is_sample": false,
+  "run_id": "20261101T121631599931Z",
+  "duration_s": 20750.791586417006,
+  "claude_cli_calls": 3730,
+  "finished_at": "2026-11-01T18:52:50Z",
+  "scoring": {
+    "matcher": "matcher-v4",
+    "scored_at": "2026-11-01T18:52:50Z",
+    "judge_provider": "claude_cli",
+    "judge_model": "claude-sonnet-5-5",
+    "judge_prompt": "src/scoring/judge_prompt.md",
+    "judge_prompt_hash": "ed168a9413f1170e85a75aa1346e951872bc1ee86760e1fa56fa21b7e146dd14",
+    "judge_is_answering_model": true
+  },
+  "resumed_at": [
+    "2026-11-01T15:30:34Z"
+  ]
+}

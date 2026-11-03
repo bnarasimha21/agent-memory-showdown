@@ -265,7 +265,19 @@ def test_manifest_caveats_and_report_note(fake):
     assert caveats["temperature_controllable"] is False and caveats["llm_latency_comparable"] is False
     note = provider_note(caveats)
     assert "API-equivalent" in note and "not comparable" in note and "Temperature" in note
+    assert "540 tokens" in note
     assert provider_note({}) == ""
+
+
+def test_report_note_names_cli_overhead_for_manifests_older_than_the_key():
+    """A CLI run recorded before `cli_overhead_note` existed still carried the overhead."""
+    from src.report import provider_note
+
+    old = {"billing": "subscription (claude CLI); costs are API-equivalent at list price, not billed",
+           "cost_basis": "api_equivalent", "temperature_controllable": False,
+           "llm_latency_comparable": False}
+    assert "540 tokens" in provider_note(old)
+    assert "540 tokens" not in provider_note({"judge_note": "The judge runs on a Claude subscription."})
 
 
 # ------------------------------------------------------------------ review fixes

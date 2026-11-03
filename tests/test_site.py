@@ -491,14 +491,20 @@ def test_committed_readme_and_ts_match_the_published_bundles():
     assert export.stale(export.outputs()) == []
 
 
-def test_committed_sample_is_labelled_and_builds(tmp_path, no_network):
-    (bundle,) = published_bundles()
-    assert bundle.is_sample and bundle.manifest["llm_provider"] == "fake"
-    assert (bundle.path / TRANSCRIPT_GZ).exists() and not (bundle.path / TRANSCRIPT).exists()
-    assert not bundle.manifest["git"]["dirty"]
-    page = site_build.build([bundle], tmp_path / "site").read_text()
-    assert page.count("Sample run, not a benchmark result") == 1
-    assert all(f"<td>{label}</td>" in page for label in bundle.backends)
+def test_committed_bundles_are_labelled_and_build(tmp_path, no_network):
+    bundles = published_bundles()
+    headline = bundles[0]
+    samples = [b for b in bundles if b.is_sample]
+    # Once a real run is published it is the headline; samples are listed after it.
+    assert not headline.is_sample and headline.manifest["llm_provider"] != "fake"
+    assert all(b.manifest["llm_provider"] == "fake" for b in samples)
+    assert [b.is_sample for b in bundles] == sorted(b.is_sample for b in bundles)
+    for bundle in bundles:
+        assert (bundle.path / TRANSCRIPT_GZ).exists() and not (bundle.path / TRANSCRIPT).exists()
+        assert not bundle.manifest["git"]["dirty"]
+    page = site_build.build(bundles, tmp_path / "site").read_text()
+    assert page.count("Sample run, not a benchmark result") == len(samples)
+    assert all(f"<td>{label}</td>" in page for label in headline.backends)
 
 
 def test_headline_recall_is_the_run_mean_with_its_t_interval(runs, tmp_path):

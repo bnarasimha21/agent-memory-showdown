@@ -24,7 +24,9 @@ def provider_note(caveats: dict | None) -> str:
                      "comparable with an API provider; memory read and write latencies are unaffected.")
     if caveats.get("temperature_controllable") is False:
         parts.append("Temperature cannot be set through the CLI; the model samples at its default.")
-    if caveats.get("cli_overhead_note"):
+    # Manifests written before `cli_overhead_note` existed lack the key, but every
+    # API-equivalent run went through the CLI and carried the same overhead.
+    if caveats.get("cli_overhead_note") or caveats.get("cost_basis") == "api_equivalent":
         parts.append("Each CLI call carries about 540 tokens of fixed overhead, counted as input on every "
                      "call, so backends that make more LLM calls per turn (summary, mem0) have inflated "
                      "API-equivalent cost relative to buffer and vector backends.")

@@ -15,9 +15,24 @@ from the bundles listed in `results/latest.json` and from the v1 numbers in
 
 Interactive results, with every probe's transcript: <https://bnarasimha21.github.io/agent-memory-showdown/>
 
-**No real v2 benchmark is published yet.** The headline bundle below is a sample made offline; see *Setup* to make a real run (it needs `DO_API_KEY`) and *Results site and publishing* to publish it.
+### Latest v2 run: `20261101T121631599931Z`
 
-### Latest v2 run: `20261031T135234525464Z-sample-fake`
+> **Provider note.** Run on a Claude subscription through the claude CLI: costs are API-equivalent (the recorded tokens at the API list price), not billed. LLM latency includes CLI process start-up (about 2 s per call), so it is not comparable with an API provider; memory read and write latencies are unaffected. Temperature cannot be set through the CLI; the model samples at its default. Each CLI call carries about 540 tokens of fixed overhead, counted as input on every call, so backends that make more LLM calls per turn (summary, mem0) have inflated API-equivalent cost relative to buffer and vector backends.
+
+5 runs x 50 turns, checkpoints 15, 25, 35, 50, model `claude-sonnet-5-5`, embeddings `all-MiniLM-L6-v2`, k = 4. Source: [`manifest.json`](results/runs/20261101T121631599931Z/manifest.json), [`aggregate.json`](results/runs/20261101T121631599931Z/aggregate.json). Recall leaves out the `abstention` and `sensitive` categories (reported on their own on the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% Student t interval over runs (when every run scores the same, which would make it zero width, the Wilson interval over the pooled probes, marked as such); the per-probe Wilson interval is approximate, since probes in one run are not independent. Judge `claude-sonnet-5-5`; matcher/judge agreement: Cohen's kappa 0.364 over 864 probes (every disagreement is listed in `aggregate.json`). It is also the answering model, so it may favour its own answers (self-preference); the matcher figures in `aggregate.json` are the check on that.
+
+Seeds paired: every backend is scored on runs 0 (seed 42), 1 (seed 43), 2 (seed 44), 3 (seed 45), 4 (seed 46).
+
+| Backend | Recall, run mean [95% t CI] | Per probe [approx. Wilson] | Probes in recall | Cost / 1K conv | Cost / correct recall | Latency p50 / p95 | Memory at end |
+|---------|----------------:|------------------:|-------:|---------------:|----------------------:|------------------:|--------------:|
+| buffer | 100.0% [95, 100] (runs identical: pooled Wilson) | 100.0% [95, 100] | 76 | $1,437.06 | $0.1326 | 6,704 / 10,399 ms | 100 messages |
+| summary | 83.3% [54, 100] | 84.2% [74, 91] | 76 | $3,618.96 | $0.2992 | 27,066 / 56,232 ms | 16,977 summary_chars |
+| qdrant | 94.6% [84, 100] | 94.7% [87, 98] | 76 | $476.02 | $0.0381 | 7,329 / 11,649 ms | 50 points |
+| pgvector | 96.0% [91, 100] | 96.1% [89, 99] | 76 | $492.95 | $0.0387 | 7,301 / 11,552 ms | 50 rows |
+| langgraph_store | 97.2% [93, 100] | 97.4% [91, 99] | 76 | $487.08 | $0.0380 | 7,074 / 10,613 ms | 50 items |
+| mem0 | 98.8% [95, 100] | 98.7% [93, 100] | 76 | $1,864.61 | $0.1270 | 9,917 / 13,604 ms | 98 memories |
+
+### Earlier v2 run: `20261031T135234525464Z-sample-fake`
 
 > **Sample run, not a benchmark result.** At least one of the chat model, the judge and the embeddings was fake (`LLM_PROVIDER=fake`, `JUDGE_PROVIDER=fake`, `EMBEDDING_PROVIDER=fake`). It shows the bundle format, the site and the charts. The numbers describe the harness, not any model or memory backend; costs are what the recorded token counts would cost at the listed price.
 

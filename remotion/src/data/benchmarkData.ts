@@ -99,25 +99,21 @@ export const QDRANT_VS_PGVECTOR = [
   { metric: "Cost/1K", qdrant: "$418", pgvector: "$416", winner: "Tie" },
 ] as const;
 
-/** Headline v2 bundle, results/runs/20261031T135234525464Z-sample-fake: a SAMPLE run made with the fake LLM: not a benchmark result. */
+/** Headline v2 bundle, results/runs/20261101T121631599931Z: a real v2 run. */
 export const LATEST_RUN = {
-  runId: "20261031T135234525464Z-sample-fake",
-  isSample: true,
+  runId: "20261101T121631599931Z",
+  isSample: false,
   methodology: "v2",
-  llmModel: "fake-memory-v1",
-  numRuns: 2,
-  numTurns: 20,
-  checkpoints: [10, 20],
+  llmModel: "claude-sonnet-5-5",
+  numRuns: 5,
+  numTurns: 50,
+  checkpoints: [15, 25, 35, 50],
   backends: [
-    { label: "buffer", recallPct: 79.5, recallCi95Pct: [0.0, 100.0], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 80.0, perProbeApproxCi95Pct: [54.8, 93.0], recallProbes: 15, costPer1kUsd: 17.32, latencyP50Ms: 0.2, tokensPerConversation: 5149 },
-    { label: "summary", recallPct: 47.3, recallCi95Pct: [0.0, 100.0], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 46.7, perProbeApproxCi95Pct: [24.8, 69.9], recallProbes: 15, costPer1kUsd: 33.75, latencyP50Ms: 0.3, tokensPerConversation: 6696 },
-    { label: "qdrant@k2", recallPct: 73.2, recallCi95Pct: [50.5, 95.9], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 73.3, perProbeApproxCi95Pct: [48.0, 89.1], recallProbes: 15, costPer1kUsd: 8.15, latencyP50Ms: 3.3, tokensPerConversation: 2088 },
-    { label: "qdrant@k4", recallPct: 73.2, recallCi95Pct: [50.5, 95.9], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 73.3, perProbeApproxCi95Pct: [48.0, 89.1], recallProbes: 15, costPer1kUsd: 10.21, latencyP50Ms: 5.1, tokensPerConversation: 2770 },
-    { label: "pgvector@k2", recallPct: 73.2, recallCi95Pct: [50.5, 95.9], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 73.3, perProbeApproxCi95Pct: [48.0, 89.1], recallProbes: 15, costPer1kUsd: 8.16, latencyP50Ms: 6.3, tokensPerConversation: 2084 },
-    { label: "pgvector@k4", recallPct: 73.2, recallCi95Pct: [50.5, 95.9], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 73.3, perProbeApproxCi95Pct: [48.0, 89.1], recallProbes: 15, costPer1kUsd: 10.27, latencyP50Ms: 6.4, tokensPerConversation: 2792 },
-    { label: "langgraph_store@k2", recallPct: 73.2, recallCi95Pct: [50.5, 95.9], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 73.3, perProbeApproxCi95Pct: [48.0, 89.1], recallProbes: 15, costPer1kUsd: 8.18, latencyP50Ms: 3.9, tokensPerConversation: 2090 },
-    { label: "langgraph_store@k4", recallPct: 73.2, recallCi95Pct: [50.5, 95.9], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 73.3, perProbeApproxCi95Pct: [48.0, 89.1], recallProbes: 15, costPer1kUsd: 10.33, latencyP50Ms: 2.6, tokensPerConversation: 2802 },
-    { label: "mem0@k2", recallPct: 73.2, recallCi95Pct: [50.5, 95.9], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 73.3, perProbeApproxCi95Pct: [48.0, 89.1], recallProbes: 15, costPer1kUsd: 326.3, latencyP50Ms: 6.8, tokensPerConversation: 107200 },
-    { label: "mem0@k4", recallPct: 73.2, recallCi95Pct: [50.5, 95.9], recallRuns: 2, recallCiMethod: "t", perProbeRecallPct: 73.3, perProbeApproxCi95Pct: [48.0, 89.1], recallProbes: 15, costPer1kUsd: 327.09, latencyP50Ms: 6.2, tokensPerConversation: 107461 },
+    { label: "buffer", recallPct: 100.0, recallCi95Pct: [95.2, 100.0], recallRuns: 5, recallCiMethod: "wilson-pooled", perProbeRecallPct: 100.0, perProbeApproxCi95Pct: [95.2, 100.0], recallProbes: 76, costPer1kUsd: 1437.06, latencyP50Ms: 6704.2, tokensPerConversation: 614499 },
+    { label: "summary", recallPct: 83.3, recallCi95Pct: [54.1, 100.0], recallRuns: 5, recallCiMethod: "t", perProbeRecallPct: 84.2, perProbeApproxCi95Pct: [74.4, 90.7], recallProbes: 76, costPer1kUsd: 3618.96, latencyP50Ms: 27066.3, tokensPerConversation: 790032 },
+    { label: "qdrant", recallPct: 94.6, recallCi95Pct: [83.8, 100.0], recallRuns: 5, recallCiMethod: "t", perProbeRecallPct: 94.7, perProbeApproxCi95Pct: [87.2, 97.9], recallProbes: 76, costPer1kUsd: 476.02, latencyP50Ms: 7329.4, tokensPerConversation: 134283 },
+    { label: "pgvector", recallPct: 96.0, recallCi95Pct: [91.4, 100.0], recallRuns: 5, recallCiMethod: "t", perProbeRecallPct: 96.1, perProbeApproxCi95Pct: [89.0, 98.6], recallProbes: 76, costPer1kUsd: 492.95, latencyP50Ms: 7300.7, tokensPerConversation: 137003 },
+    { label: "langgraph_store", recallPct: 97.2, recallCi95Pct: [92.5, 100.0], recallRuns: 5, recallCiMethod: "t", perProbeRecallPct: 97.4, perProbeApproxCi95Pct: [90.9, 99.3], recallProbes: 76, costPer1kUsd: 487.08, latencyP50Ms: 7074.2, tokensPerConversation: 134218 },
+    { label: "mem0", recallPct: 98.8, recallCi95Pct: [95.3, 100.0], recallRuns: 5, recallCiMethod: "t", perProbeRecallPct: 98.7, perProbeApproxCi95Pct: [92.9, 99.8], recallProbes: 76, costPer1kUsd: 1864.61, latencyP50Ms: 9916.6, tokensPerConversation: 807645 },
   ],
 } as const;
