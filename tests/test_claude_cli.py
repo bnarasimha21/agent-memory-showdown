@@ -277,7 +277,7 @@ def test_report_note_names_cli_overhead_for_manifests_older_than_the_key():
            "cost_basis": "api_equivalent", "temperature_controllable": False,
            "llm_latency_comparable": False}
     assert "540 tokens" in provider_note(old)
-    assert "540 tokens" not in provider_note({"judge_note": "The judge runs on a Claude subscription."})
+    assert "540 tokens" not in provider_note({"cost_basis": "billed", "llm_latency_comparable": False})
 
 
 # ------------------------------------------------------------------ review fixes
