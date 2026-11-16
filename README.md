@@ -53,6 +53,10 @@ From the 2026-04-17 run of the v1 harness (source: [`v1_published.json`](results
 
 ## Architecture
 
+The reasoning behind the design (requirements, each decision and its cost, measured numbers, threats
+to validity, what changes at 100 times the scale) is in the [design record](docs/DESIGN.md), with a
+decision-flow diagram and a deployment diagram.
+
 ```mermaid
 flowchart TD
     E[".env / env vars"] --> C[config.py]
@@ -356,6 +360,9 @@ agent-memory-showdown/
 ├── Dockerfile
 ├── requirements.txt
 ├── .env.example
+├── docs/
+│   ├── DESIGN.md             # design record: decisions, trade-offs, numbers, scale
+│   └── images/               # decision-flow.svg, deployment.svg
 ├── data/
 │   └── facts_v2.yaml         # fact bank: templates, slots, distractors, filler
 ├── src/
@@ -379,6 +386,7 @@ agent-memory-showdown/
 │       └── mem0_memory.py    # mem0 on the compose Qdrant
 ├── scripts/
 │   ├── setup_droplet.sh      # Provision Qdrant + Postgres on DO Droplet
+│   ├── memory_latency.py     # memory read and write latency per backend, no paid calls
 │   └── init_pgvector.sql     # DB schema for pgvector backend
 ├── remotion/                 # Animated explainer video (React + Remotion)
 │   ├── src/
