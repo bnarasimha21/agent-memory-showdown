@@ -15,30 +15,24 @@ from the bundles listed in `results/latest.json` and from the v1 numbers in
 
 Interactive results, with every probe's transcript: <https://bnarasimha21.github.io/agent-memory-showdown/>
 
-Which backend to pick, with the cost of each, is in the generated guide: [Which memory, when, at what cost](docs/GUIDE.md) (currently built from the sample below, so it shows the format only).
+Which backend to pick, with the cost of each, is in the generated guide: [Which memory, when, at what cost](docs/GUIDE.md).
 
-**No real v2 benchmark is published yet.** The headline bundle below is a sample made offline; see *Setup* to make a real run (it needs `DO_API_KEY`) and *Results site and publishing* to publish it.
+### Latest v2 run: `20261116T155056861215Z-v2`
 
-### Latest v2 run: `20261031T135234525464Z-sample-fake`
+> **Provider note.** Conversations and judge calls ran 12 at a time, not one after another. Recall, tokens and cost are unaffected. Latency was measured under the benchmark's own load and is not comparable with a one-at-a-time run; for memory read and write latency use scripts/memory_latency.py.
 
-> **Sample run, not a benchmark result.** At least one of the chat model, the judge and the embeddings was fake (`LLM_PROVIDER=fake`, `JUDGE_PROVIDER=fake`, `EMBEDDING_PROVIDER=fake`). It shows the bundle format, the site and the charts. The numbers describe the harness, not any model or memory backend; costs are what the recorded token counts would cost at the listed price.
+3 runs x 30 turns, checkpoints 10, 20, 30, model `anthropic-claude-sonnet-5.5`, embeddings `all-MiniLM-L6-v2`, k = 4. Source: [`manifest.json`](results/runs/20261116T155056861215Z-v2/manifest.json), [`aggregate.json`](results/runs/20261116T155056861215Z-v2/aggregate.json). Recall leaves out the `abstention` and `sensitive` categories (reported on their own on the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% Student t interval over runs (when every run scores the same, which would make it zero width, the Wilson interval over the pooled probes, marked as such); the per-probe Wilson interval is approximate, since probes in one run are not independent. Judge `openai-gpt-6-sol`; matcher/judge agreement: Cohen's kappa 0.333 over 420 probes (every disagreement is listed in `aggregate.json`).
 
-2 runs x 20 turns, checkpoints 10, 20, model `fake-memory-v1`, embeddings `fake-hashing-384`, k = 2, 4. Source: [`manifest.json`](results/runs/20261031T135234525464Z-sample-fake/manifest.json), [`aggregate.json`](results/runs/20261031T135234525464Z-sample-fake/aggregate.json). Recall leaves out the `abstention` and `sensitive` categories (reported on their own on the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% Student t interval over runs (when every run scores the same, which would make it zero width, the Wilson interval over the pooled probes, marked as such); the per-probe Wilson interval is approximate, since probes in one run are not independent. Judge `fake-judge-v1` is the offline fake, which applies the matcher rules, so its agreement with the matcher says nothing about a real judge.
-
-Seeds paired: every backend is scored on runs 0 (seed 42), 1 (seed 43).
+Seeds paired: every backend is scored on runs 0 (seed 42), 1 (seed 43), 2 (seed 44).
 
 | Backend | Recall, run mean [95% t CI] | Per probe [approx. Wilson] | Probes in recall | Cost / 1K conv | Cost / correct recall | Latency p50 / p95 | Memory at end |
 |---------|----------------:|------------------:|-------:|---------------:|----------------------:|------------------:|--------------:|
-| buffer | 79.5% [0, 100] | 80.0% [55, 93] | 15 | $17.32 | $0.0045 | 0.2 / 0.5 ms | 40 messages |
-| summary | 47.3% [0, 100] | 46.7% [25, 70] | 15 | $33.75 | $0.0107 | 0.3 / 0.4 ms | 385 summary_chars |
-| qdrant@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.15 | $0.0020 | 3.3 / 6.2 ms | 20 points |
-| qdrant@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.21 | $0.0025 | 5.1 / 7.1 ms | 20 points |
-| pgvector@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.16 | $0.0020 | 6.3 / 9.7 ms | 20 rows |
-| pgvector@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.27 | $0.0025 | 6.4 / 7.8 ms | 20 rows |
-| langgraph_store@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.18 | $0.0020 | 3.9 / 4.8 ms | 20 items |
-| langgraph_store@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.33 | $0.0026 | 2.6 / 3.7 ms | 20 items |
-| mem0@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $326.30 | $0.0598 | 6.8 / 7.9 ms | 16 memories |
-| mem0@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $327.09 | $0.0600 | 6.2 / 9.1 ms | 16 memories |
+| buffer | 100.0% [91, 100] (runs identical: pooled Wilson) | 100.0% [91, 100] | 37 | $390.63 | $0.0485 | 3,899 / 7,563 ms | 60 messages |
+| summary | 100.0% [91, 100] (runs identical: pooled Wilson) | 100.0% [91, 100] | 37 | $1,862.19 | $0.1666 | 19,321 / 48,429 ms | 28,129 summary_chars |
+| qdrant | 88.9% [57, 100] | 89.2% [75, 96] | 37 | $212.08 | $0.0243 | 4,962 / 8,062 ms | 30 points |
+| pgvector | 94.7% [83, 100] | 94.6% [82, 99] | 37 | $193.49 | $0.0211 | 4,377 / 7,064 ms | 30 rows |
+| langgraph_store | 86.5% [55, 100] | 86.5% [72, 94] | 37 | $195.83 | $0.0229 | 4,586 / 7,289 ms | 30 items |
+| mem0 | 100.0% [91, 100] (runs identical: pooled Wilson) | 100.0% [91, 100] | 37 | $962.95 | $0.0795 | 4,609 / 10,560 ms | 34 memories |
 
 ### v1 published numbers (v1 methodology, known limits)
 
@@ -239,7 +233,29 @@ python run_benchmark.py --help
   --budget USD     spend ceiling for the whole bundle, across resumes (default: BUDGET_USD, else none)
 ```
 
-### The v2 run that gets published
+### The v2 run that is published
+
+The run in *Results* is smaller than the design below: 3 runs of 30 turns, checkpoints after turns
+10, 20 and 30, k = 4, with 12 conversations at a time (`PARALLEL=12`), answered by
+`anthropic-claude-sonnet-5.5` and judged by `openai-gpt-6-sol`. It was run on 2026-11-16 with:
+
+```bash
+PARALLEL=12 LLM_MAX_RETRIES=12 LLM_RETRY_BASE_S=3 LLM_PROVIDER=do JUDGE_PROVIDER=do EMBEDDING_PROVIDER=local JUDGE=1 \
+  LLM_MODEL=anthropic-claude-sonnet-5.5 JUDGE_MODEL=openai-gpt-6-sol \
+  python run_benchmark.py --runs 3 --turns 30 --checkpoints 10 20 30 --k 4 --budget 60 --label v2
+```
+
+It took 15 minutes and cost $18.70 at list prices, $3.27 of that a first attempt at 18
+conversations at a time that the provider rate limited. The full design was started first and
+stopped: at one call at a time a 50-turn `summary` conversation took 49 minutes, which put the whole
+run at about ten hours. What the results show and how far they go is in
+[the design record](docs/DESIGN.md), section 5.
+
+`PARALLEL` above 1 runs that many conversations, and then that many judge calls, at once. Recall,
+tokens and cost are unaffected. Latency is then measured under the benchmark's own load, so the
+manifest and every generated report say it is not comparable.
+
+### The full v2 run
 
 One command runs the benchmark that is meant to be published: 5 runs of 50 turns, checkpoints after
 turns 15, 25, 35 and 50, all six backends, a k sweep over 2, 4 and 8 for the four top-k backends,
@@ -501,6 +517,7 @@ agent-memory-showdown/
 ## Status
 
 The v1 benchmark ran on April 17, 2026 and its numbers are above, labelled as v1. The v2 harness
-(six backends, read-only probes, matcher plus judge scoring, run bundles, results site) is complete;
-*Results* says whether the published v2 headline bundle is a real run or a sample. The real run
-is one command, `make run-v2 BUDGET=<usd>` (see *The v2 run that gets published*).
+(six backends, read-only probes, matcher plus judge scoring, run bundles, results site) is complete,
+and one real v2 run is published: 3 runs of 30 turns at one retrieval depth, on 2026-11-16 (see
+*The v2 run that is published*). The full design, `make run-v2 BUDGET=<usd>`, has not been
+completed.

@@ -358,6 +358,9 @@ def run_benchmark(
         prior_calls = int(writer.manifest.get("claude_cli_calls") or 0)
         prior_pauses = list(writer.manifest.get("usage_limit_pauses") or [])
         writer.manifest.setdefault("resumed_at", []).append(utc_now())
+        # A resume may run at a different PARALLEL; the bundle should say what its runs ran under.
+        writer.manifest["parallel"] = manifest["parallel"]
+        writer.manifest["provider_caveats"] = manifest["provider_caveats"]
         writer.write_json("manifest.json", writer.manifest)
     else:
         # The judge preflight is the one paid call made before a bundle exists:

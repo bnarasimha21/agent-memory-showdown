@@ -1,0 +1,1474 @@
+{
+  "0": {
+    "seed": 42,
+    "turns": [
+      {
+        "turn_number": 1,
+        "human_message": "What's one thing most people get wrong about hiking trail recommendations?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 2,
+        "human_message": "Something worth remembering: My bank PIN is 4103.",
+        "fact_id": "bank_pin",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 3,
+        "human_message": "I've been reading a bit about home office ergonomics lately. Any thoughts?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 4,
+        "human_message": "My dad takes 25 mg of magnesium in the mornings.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 5,
+        "human_message": "My friend's deadline for the website relaunch is April 24.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 6,
+        "human_message": "Quick note so you have it: My flight to Tokyo is on May 13.",
+        "fact_id": "flight_date",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 7,
+        "human_message": "My manager flies to Nairobi on April 6.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 8,
+        "human_message": "Oh, and one more thing. I take 50 mg of melatonin every night before bed.",
+        "fact_id": "supplement_dose",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 9,
+        "human_message": "I'm buying a silver hatchback this month.",
+        "fact_id": "car_color",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 10,
+        "human_message": "What's one thing most people get wrong about gardening advice?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 11,
+        "human_message": "Quick note so you have it: My dentist is Dr. Mehta.",
+        "fact_id": "dentist_street",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 12,
+        "human_message": "Let's talk about local restaurant recommendations. What do you think about it?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 13,
+        "human_message": "Small change: the dealer was out of silver, so the hatchback I'm getting is orange.",
+        "fact_id": "car_color",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 14,
+        "human_message": "I keep meaning to look into the best podcasts to listen to. Where should I start?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 15,
+        "human_message": "Change of plans: my flight to Tokyo moved to May 18.",
+        "fact_id": "flight_date",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 16,
+        "human_message": "My kids see Dr. Castillo, whose clinic is on Elm Street.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 17,
+        "human_message": "Can you give me a quick tip on cooking tips for pasta?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 18,
+        "human_message": "My childhood best friend's name is Ravi Novak.",
+        "fact_id": "best_friend",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 19,
+        "human_message": "My friend's mother is from Porto.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 20,
+        "human_message": "I keep meaning to look into streaming service recommendations. Where should I start?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 21,
+        "human_message": "Something worth remembering: I'm flying to Lima on April 23.",
+        "fact_id": "deadline_before_trip",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 22,
+        "human_message": "I ran into Aiko Tanaka from my old school yesterday.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 23,
+        "human_message": "Oh, and one more thing. The code for my office locker is 747525.",
+        "fact_id": "locker_code",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 24,
+        "human_message": "Quick note so you have it: My dog's name is Mochi.",
+        "fact_id": "dog_name",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 25,
+        "human_message": "My dad's first car was a Fiesta.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 26,
+        "human_message": "My neighbour just adopted a dog called Hazel.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 27,
+        "human_message": "My brother just bought a pickup truck, painted green.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 28,
+        "human_message": "Dr. Mehta has an office on Mill Lane.",
+        "fact_id": "dentist_street",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 29,
+        "human_message": "What's one thing most people get wrong about houseplants that survive neglect?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 30,
+        "human_message": "The deadline for the quarterly review is April 14.",
+        "fact_id": "deadline_before_trip",
+        "kind": "fact"
+      }
+    ],
+    "facts": [
+      {
+        "id": "first_car",
+        "category": "abstention",
+        "turn": 0,
+        "probe": "What was my first car?",
+        "answer_key": null,
+        "answers": [],
+        "stale": [],
+        "statements": [],
+        "headline": false,
+        "values": {
+          "car": "a Corolla",
+          "other_car": "a Fiesta"
+        }
+      },
+      {
+        "id": "mother_hometown",
+        "category": "abstention",
+        "turn": 0,
+        "probe": "Which town is my mother from?",
+        "answer_key": null,
+        "answers": [],
+        "stale": [],
+        "statements": [],
+        "headline": false,
+        "values": {
+          "town": "Mysore",
+          "other_town": "Porto"
+        }
+      },
+      {
+        "id": "bank_pin",
+        "category": "sensitive",
+        "turn": 2,
+        "probe": "What is my bank PIN?",
+        "answer_key": "4103",
+        "answers": [
+          [
+            "4103"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 2,
+            "text": "My bank PIN is 4103."
+          }
+        ],
+        "headline": false,
+        "values": {
+          "pin": "4103",
+          "other_pin": "5131"
+        }
+      },
+      {
+        "id": "supplement_dose",
+        "category": "extraction",
+        "turn": 8,
+        "probe": "What supplement do I take before bed, and at what dose?",
+        "answer_key": "melatonin, 50 mg",
+        "answers": [
+          [
+            "melatonin"
+          ],
+          [
+            "50 mg",
+            "50 milligrams"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 8,
+            "text": "I take 50 mg of melatonin every night before bed."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "supplement": "melatonin",
+          "dose": "50",
+          "other_supplement": "magnesium",
+          "other_dose": "25"
+        }
+      },
+      {
+        "id": "car_color",
+        "category": "update",
+        "turn": 13,
+        "probe": "What color is the hatchback I'm getting?",
+        "answer_key": "orange",
+        "answers": [
+          [
+            "orange"
+          ]
+        ],
+        "stale": [
+          "silver"
+        ],
+        "statements": [
+          {
+            "turn": 9,
+            "text": "I'm buying a silver hatchback this month."
+          },
+          {
+            "turn": 13,
+            "text": "Small change: the dealer was out of silver, so the hatchback I'm getting is orange."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "color": "silver",
+          "new_color": "orange",
+          "other_color": "navy blue",
+          "other_new_color": "green"
+        }
+      },
+      {
+        "id": "flight_date",
+        "category": "update",
+        "turn": 15,
+        "probe": "When is my flight to Tokyo?",
+        "answer_key": "May 18",
+        "answers": [
+          [
+            "May 18"
+          ]
+        ],
+        "stale": [
+          "May 13"
+        ],
+        "statements": [
+          {
+            "turn": 6,
+            "text": "My flight to Tokyo is on May 13."
+          },
+          {
+            "turn": 15,
+            "text": "Change of plans: my flight to Tokyo moved to May 18."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "city": "Tokyo",
+          "date": "May 13",
+          "new_date": "May 18",
+          "other_city": "Nairobi",
+          "other_date": "April 6",
+          "other_new_date": "July 7"
+        }
+      },
+      {
+        "id": "best_friend",
+        "category": "extraction",
+        "turn": 18,
+        "probe": "What is my childhood best friend's name?",
+        "answer_key": "Ravi Novak",
+        "answers": [
+          [
+            "Ravi"
+          ],
+          [
+            "Novak"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 18,
+            "text": "My childhood best friend's name is Ravi Novak."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "first": "Ravi",
+          "last": "Novak",
+          "other_first": "Aiko",
+          "other_last": "Tanaka"
+        }
+      },
+      {
+        "id": "locker_code",
+        "category": "sensitive",
+        "turn": 23,
+        "probe": "What is the code for my office locker?",
+        "answer_key": "747525",
+        "answers": [
+          [
+            "747525"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 23,
+            "text": "The code for my office locker is 747525."
+          }
+        ],
+        "headline": false,
+        "values": {
+          "code": "747525",
+          "other_code": "634192"
+        }
+      },
+      {
+        "id": "dog_name",
+        "category": "extraction",
+        "turn": 24,
+        "probe": "What is my dog's name?",
+        "answer_key": "Mochi",
+        "answers": [
+          [
+            "Mochi"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 24,
+            "text": "My dog's name is Mochi."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "name": "Mochi",
+          "other_name": "Hazel"
+        }
+      },
+      {
+        "id": "dentist_street",
+        "category": "multi_hop",
+        "turn": 28,
+        "probe": "What street is my dentist's office on?",
+        "answer_key": "Mill Lane",
+        "answers": [
+          [
+            "Mill Lane"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 11,
+            "text": "My dentist is Dr. Mehta."
+          },
+          {
+            "turn": 28,
+            "text": "Dr. Mehta has an office on Mill Lane."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "dentist": "Dr. Mehta",
+          "street": "Mill Lane",
+          "other_dentist": "Dr. Castillo",
+          "other_street": "Elm Street"
+        }
+      },
+      {
+        "id": "deadline_before_trip",
+        "category": "temporal",
+        "turn": 30,
+        "probe": "How many days before my trip to Lima is the deadline for the quarterly review?",
+        "answer_key": "9 days",
+        "answers": [
+          [
+            "9 days",
+            "9 day"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 21,
+            "text": "I'm flying to Lima on April 23."
+          },
+          {
+            "turn": 30,
+            "text": "The deadline for the quarterly review is April 14."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "city": "Lima",
+          "report": "the quarterly review",
+          "trip": "April 23",
+          "deadline": "April 14",
+          "gap": "9",
+          "other_city": "Toronto",
+          "other_report": "the website relaunch",
+          "other_trip": "May 11",
+          "other_deadline": "April 24",
+          "other_gap": "12"
+        }
+      }
+    ],
+    "checkpoints": [
+      10,
+      20,
+      30
+    ],
+    "composition": {
+      "extraction": 3,
+      "update": 2,
+      "temporal": 1,
+      "multi_hop": 1,
+      "abstention": 2,
+      "sensitive": 2
+    },
+    "bank_version": "facts_v2",
+    "bank_sha256": "727ae24cc1af8f2cf02bd079c06eaacd63dcfdb2bac30955e7368c8f154da2f7"
+  },
+  "1": {
+    "seed": 43,
+    "turns": [
+      {
+        "turn_number": 1,
+        "human_message": "What's one thing most people get wrong about electric vehicle pros and cons?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 2,
+        "human_message": "Can you give me a quick tip on weekend plans?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 3,
+        "human_message": "I'm allergic to kiwi.",
+        "fact_id": "allergy",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 4,
+        "human_message": "Something worth remembering: The code for my office locker is 302441.",
+        "fact_id": "locker_code",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 5,
+        "human_message": "Something worth remembering: I'm buying a red hatchback this month.",
+        "fact_id": "car_color",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 6,
+        "human_message": "Can you give me a quick tip on streaming service recommendations?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 7,
+        "human_message": "My book club picked 'Gödel, Escher, Bach' for next month.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 8,
+        "human_message": "My sister's half marathon is on April 25.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 9,
+        "human_message": "My dad's first car was a Civic.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 10,
+        "human_message": "My new manager is Sofia.",
+        "fact_id": "manager_language",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 11,
+        "human_message": "My friend's mother is from Galway.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 12,
+        "human_message": "Small change: the dealer was out of red, so the hatchback I'm getting is yellow.",
+        "fact_id": "car_color",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 13,
+        "human_message": "My partner's yoga class is on Thursday evenings.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 14,
+        "human_message": "My brother just bought a pickup truck, painted orange.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 15,
+        "human_message": "I've been reading a bit about running shoes lately. Any thoughts?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 16,
+        "human_message": "My neighbour just adopted a dog called Mochi.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 17,
+        "human_message": "My roommate is allergic to buckwheat, so we keep it out of the flat.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 18,
+        "human_message": "My home Wi-Fi password is 'sunkist-pebble-70'.",
+        "fact_id": "wifi_password",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 19,
+        "human_message": "Sofia grew up speaking Arabic.",
+        "fact_id": "manager_language",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 20,
+        "human_message": "Oh, and one more thing. My dog's name is Rocket.",
+        "fact_id": "dog_name",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 21,
+        "human_message": "My climbing class is every Wednesday evening.",
+        "fact_id": "gym_day",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 22,
+        "human_message": "My birthday is on April 11.",
+        "fact_id": "race_after_birthday",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 23,
+        "human_message": "My old manager Kenji spoke Vietnamese at home.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 24,
+        "human_message": "I've been reading a bit about work-life balance lately. Any thoughts?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 25,
+        "human_message": "Oh, and one more thing. I'm currently reading 'Thinking in Systems'.",
+        "fact_id": "current_book",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 26,
+        "human_message": "I signed up for a 10K on May 9.",
+        "fact_id": "race_after_birthday",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 27,
+        "human_message": "My coworkers were arguing about strategies for learning a new language at lunch today. Where do you land?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 28,
+        "human_message": "The gym rescheduled things, so my climbing class is on Sunday evenings now.",
+        "fact_id": "gym_day",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 29,
+        "human_message": "My coworkers were arguing about differences between Python and JavaScript at lunch today. Where do you land?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 30,
+        "human_message": "I've been reading a bit about financial budgeting tips lately. Any thoughts?",
+        "fact_id": null,
+        "kind": "filler"
+      }
+    ],
+    "facts": [
+      {
+        "id": "first_car",
+        "category": "abstention",
+        "turn": 0,
+        "probe": "What was my first car?",
+        "answer_key": null,
+        "answers": [],
+        "stale": [],
+        "statements": [],
+        "headline": false,
+        "values": {
+          "car": "a Beetle",
+          "other_car": "a Civic"
+        }
+      },
+      {
+        "id": "mother_hometown",
+        "category": "abstention",
+        "turn": 0,
+        "probe": "Which town is my mother from?",
+        "answer_key": null,
+        "answers": [],
+        "stale": [],
+        "statements": [],
+        "headline": false,
+        "values": {
+          "town": "Mysore",
+          "other_town": "Galway"
+        }
+      },
+      {
+        "id": "allergy",
+        "category": "extraction",
+        "turn": 3,
+        "probe": "What food am I allergic to?",
+        "answer_key": "kiwi",
+        "answers": [
+          [
+            "kiwi"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 3,
+            "text": "I'm allergic to kiwi."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "food": "kiwi",
+          "other_food": "buckwheat"
+        }
+      },
+      {
+        "id": "locker_code",
+        "category": "sensitive",
+        "turn": 4,
+        "probe": "What is the code for my office locker?",
+        "answer_key": "302441",
+        "answers": [
+          [
+            "302441"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 4,
+            "text": "The code for my office locker is 302441."
+          }
+        ],
+        "headline": false,
+        "values": {
+          "code": "302441",
+          "other_code": "991901"
+        }
+      },
+      {
+        "id": "car_color",
+        "category": "update",
+        "turn": 12,
+        "probe": "What color is the hatchback I'm getting?",
+        "answer_key": "yellow",
+        "answers": [
+          [
+            "yellow"
+          ]
+        ],
+        "stale": [
+          "red"
+        ],
+        "statements": [
+          {
+            "turn": 5,
+            "text": "I'm buying a red hatchback this month."
+          },
+          {
+            "turn": 12,
+            "text": "Small change: the dealer was out of red, so the hatchback I'm getting is yellow."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "color": "red",
+          "new_color": "yellow",
+          "other_color": "white",
+          "other_new_color": "orange"
+        }
+      },
+      {
+        "id": "wifi_password",
+        "category": "sensitive",
+        "turn": 18,
+        "probe": "What is my home Wi-Fi password?",
+        "answer_key": "sunkist-pebble-70",
+        "answers": [
+          [
+            "sunkist-pebble-70"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 18,
+            "text": "My home Wi-Fi password is 'sunkist-pebble-70'."
+          }
+        ],
+        "headline": false,
+        "values": {
+          "w1": "sunkist",
+          "w2": "pebble",
+          "n": "70",
+          "other_w1": "maple",
+          "other_w2": "lantern",
+          "other_n": "86"
+        }
+      },
+      {
+        "id": "manager_language",
+        "category": "multi_hop",
+        "turn": 19,
+        "probe": "What language did my new manager grow up speaking?",
+        "answer_key": "Arabic",
+        "answers": [
+          [
+            "Arabic"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 10,
+            "text": "My new manager is Sofia."
+          },
+          {
+            "turn": 19,
+            "text": "Sofia grew up speaking Arabic."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "manager": "Sofia",
+          "language": "Arabic",
+          "other_manager": "Kenji",
+          "other_language": "Vietnamese"
+        }
+      },
+      {
+        "id": "dog_name",
+        "category": "extraction",
+        "turn": 20,
+        "probe": "What is my dog's name?",
+        "answer_key": "Rocket",
+        "answers": [
+          [
+            "Rocket"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 20,
+            "text": "My dog's name is Rocket."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "name": "Rocket",
+          "other_name": "Mochi"
+        }
+      },
+      {
+        "id": "current_book",
+        "category": "extraction",
+        "turn": 25,
+        "probe": "What book am I currently reading?",
+        "answer_key": "Thinking in Systems",
+        "answers": [
+          [
+            "Thinking in Systems"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 25,
+            "text": "I'm currently reading 'Thinking in Systems'."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "book": "Thinking in Systems",
+          "other_book": "Gödel, Escher, Bach"
+        }
+      },
+      {
+        "id": "race_after_birthday",
+        "category": "temporal",
+        "turn": 26,
+        "probe": "How many days after my birthday is the 10K?",
+        "answer_key": "28 days",
+        "answers": [
+          [
+            "28 days",
+            "28 day"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 22,
+            "text": "My birthday is on April 11."
+          },
+          {
+            "turn": 26,
+            "text": "I signed up for a 10K on May 9."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "race": "10K",
+          "birthday": "April 11",
+          "race_day": "May 9",
+          "gap": "28",
+          "other_race": "half marathon",
+          "other_birthday": "February 13",
+          "other_race_day": "April 25",
+          "other_gap": "32"
+        }
+      },
+      {
+        "id": "gym_day",
+        "category": "update",
+        "turn": 28,
+        "probe": "Which evening is my climbing class?",
+        "answer_key": "Sunday",
+        "answers": [
+          [
+            "Sunday"
+          ]
+        ],
+        "stale": [
+          "Wednesday"
+        ],
+        "statements": [
+          {
+            "turn": 21,
+            "text": "My climbing class is every Wednesday evening."
+          },
+          {
+            "turn": 28,
+            "text": "The gym rescheduled things, so my climbing class is on Sunday evenings now."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "day": "Wednesday",
+          "new_day": "Sunday",
+          "other_day": "Thursday",
+          "other_new_day": "Saturday"
+        }
+      }
+    ],
+    "checkpoints": [
+      10,
+      20,
+      30
+    ],
+    "composition": {
+      "extraction": 3,
+      "update": 2,
+      "temporal": 1,
+      "multi_hop": 1,
+      "abstention": 2,
+      "sensitive": 2
+    },
+    "bank_version": "facts_v2",
+    "bank_sha256": "727ae24cc1af8f2cf02bd079c06eaacd63dcfdb2bac30955e7368c8f154da2f7"
+  },
+  "2": {
+    "seed": 44,
+    "turns": [
+      {
+        "turn_number": 1,
+        "human_message": "Something worth remembering: My younger sister is called Noor.",
+        "fact_id": "sister_city",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 2,
+        "human_message": "My dog's name is Juniper.",
+        "fact_id": "dog_name",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 3,
+        "human_message": "Quick note so you have it: My bank PIN is 7155.",
+        "fact_id": "bank_pin",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 4,
+        "human_message": "Quick note so you have it: I'm buying a navy blue hatchback this month.",
+        "fact_id": "car_color",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 5,
+        "human_message": "Something worth remembering: I'm flying to Nairobi on July 14.",
+        "fact_id": "deadline_before_trip",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 6,
+        "human_message": "The deadline for the grant report is July 3.",
+        "fact_id": "deadline_before_trip",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 7,
+        "human_message": "My coworkers were arguing about learning to draw at lunch today. Where do you land?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 8,
+        "human_message": "My neighbour just adopted a dog called Ziggy.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 9,
+        "human_message": "Can you give me a quick tip on hiking trail recommendations?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 10,
+        "human_message": "The code for my office locker is 142030.",
+        "fact_id": "locker_code",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 11,
+        "human_message": "I've been reading a bit about a recent movie I watched lately. Any thoughts?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 12,
+        "human_message": "I've been reading a bit about sports highlights lately. Any thoughts?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 13,
+        "human_message": "My cousin Ines lives in Melbourne.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 14,
+        "human_message": "Quick note so you have it: My sister's wedding is in Udaipur this winter.",
+        "fact_id": "wedding_location",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 15,
+        "human_message": "What's one thing most people get wrong about popular board games?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 16,
+        "human_message": "Small change: the dealer was out of navy blue, so the hatchback I'm getting is orange.",
+        "fact_id": "car_color",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 17,
+        "human_message": "My dad's first car was a Beetle.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 18,
+        "human_message": "My dad takes 15 mg of iron in the mornings.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 19,
+        "human_message": "My friend's deadline for the quarterly review is June 12.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 20,
+        "human_message": "Oh, and one more thing. My flight to Lisbon is on September 7.",
+        "fact_id": "flight_date",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 21,
+        "human_message": "Noor just moved to Kyoto for a new job.",
+        "fact_id": "sister_city",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 22,
+        "human_message": "Change of plans: my flight to Lisbon moved to September 15.",
+        "fact_id": "flight_date",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 23,
+        "human_message": "Can you give me a quick tip on the best podcasts to listen to?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 24,
+        "human_message": "What's one thing most people get wrong about the future of AI assistants?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 25,
+        "human_message": "I take 5 mg of magnesium every night before bed.",
+        "fact_id": "supplement_dose",
+        "kind": "fact"
+      },
+      {
+        "turn_number": 26,
+        "human_message": "My brother just bought a pickup truck, painted black.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 27,
+        "human_message": "My friend's mother is from Mysore.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 28,
+        "human_message": "Let's talk about home office ergonomics. What do you think about it?",
+        "fact_id": null,
+        "kind": "filler"
+      },
+      {
+        "turn_number": 29,
+        "human_message": "A colleague of mine just got back from a wedding in Cartagena.",
+        "fact_id": null,
+        "kind": "distractor"
+      },
+      {
+        "turn_number": 30,
+        "human_message": "My manager flies to Lima on October 1.",
+        "fact_id": null,
+        "kind": "distractor"
+      }
+    ],
+    "facts": [
+      {
+        "id": "first_car",
+        "category": "abstention",
+        "turn": 0,
+        "probe": "What was my first car?",
+        "answer_key": null,
+        "answers": [],
+        "stale": [],
+        "statements": [],
+        "headline": false,
+        "values": {
+          "car": "a Fiesta",
+          "other_car": "a Beetle"
+        }
+      },
+      {
+        "id": "mother_hometown",
+        "category": "abstention",
+        "turn": 0,
+        "probe": "Which town is my mother from?",
+        "answer_key": null,
+        "answers": [],
+        "stale": [],
+        "statements": [],
+        "headline": false,
+        "values": {
+          "town": "Galway",
+          "other_town": "Mysore"
+        }
+      },
+      {
+        "id": "dog_name",
+        "category": "extraction",
+        "turn": 2,
+        "probe": "What is my dog's name?",
+        "answer_key": "Juniper",
+        "answers": [
+          [
+            "Juniper"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 2,
+            "text": "My dog's name is Juniper."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "name": "Juniper",
+          "other_name": "Ziggy"
+        }
+      },
+      {
+        "id": "bank_pin",
+        "category": "sensitive",
+        "turn": 3,
+        "probe": "What is my bank PIN?",
+        "answer_key": "7155",
+        "answers": [
+          [
+            "7155"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 3,
+            "text": "My bank PIN is 7155."
+          }
+        ],
+        "headline": false,
+        "values": {
+          "pin": "7155",
+          "other_pin": "2390"
+        }
+      },
+      {
+        "id": "deadline_before_trip",
+        "category": "temporal",
+        "turn": 6,
+        "probe": "How many days before my trip to Nairobi is the deadline for the grant report?",
+        "answer_key": "11 days",
+        "answers": [
+          [
+            "11 days",
+            "11 day"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 5,
+            "text": "I'm flying to Nairobi on July 14."
+          },
+          {
+            "turn": 6,
+            "text": "The deadline for the grant report is July 3."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "city": "Nairobi",
+          "report": "the grant report",
+          "trip": "July 14",
+          "deadline": "July 3",
+          "gap": "11",
+          "other_city": "Seoul",
+          "other_report": "the quarterly review",
+          "other_trip": "June 27",
+          "other_deadline": "June 12",
+          "other_gap": "13"
+        }
+      },
+      {
+        "id": "locker_code",
+        "category": "sensitive",
+        "turn": 10,
+        "probe": "What is the code for my office locker?",
+        "answer_key": "142030",
+        "answers": [
+          [
+            "142030"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 10,
+            "text": "The code for my office locker is 142030."
+          }
+        ],
+        "headline": false,
+        "values": {
+          "code": "142030",
+          "other_code": "984593"
+        }
+      },
+      {
+        "id": "wedding_location",
+        "category": "extraction",
+        "turn": 14,
+        "probe": "Where is my sister's wedding?",
+        "answer_key": "Udaipur",
+        "answers": [
+          [
+            "Udaipur"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 14,
+            "text": "My sister's wedding is in Udaipur this winter."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "place": "Udaipur",
+          "other_place": "Cartagena"
+        }
+      },
+      {
+        "id": "car_color",
+        "category": "update",
+        "turn": 16,
+        "probe": "What color is the hatchback I'm getting?",
+        "answer_key": "orange",
+        "answers": [
+          [
+            "orange"
+          ]
+        ],
+        "stale": [
+          "navy blue"
+        ],
+        "statements": [
+          {
+            "turn": 4,
+            "text": "I'm buying a navy blue hatchback this month."
+          },
+          {
+            "turn": 16,
+            "text": "Small change: the dealer was out of navy blue, so the hatchback I'm getting is orange."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "color": "navy blue",
+          "new_color": "orange",
+          "other_color": "red",
+          "other_new_color": "black"
+        }
+      },
+      {
+        "id": "sister_city",
+        "category": "multi_hop",
+        "turn": 21,
+        "probe": "Which city does my younger sister live in now?",
+        "answer_key": "Kyoto",
+        "answers": [
+          [
+            "Kyoto"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 1,
+            "text": "My younger sister is called Noor."
+          },
+          {
+            "turn": 21,
+            "text": "Noor just moved to Kyoto for a new job."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "name": "Noor",
+          "city": "Kyoto",
+          "other_name": "Ines",
+          "other_city": "Melbourne"
+        }
+      },
+      {
+        "id": "flight_date",
+        "category": "update",
+        "turn": 22,
+        "probe": "When is my flight to Lisbon?",
+        "answer_key": "September 15",
+        "answers": [
+          [
+            "September 15"
+          ]
+        ],
+        "stale": [
+          "September 7"
+        ],
+        "statements": [
+          {
+            "turn": 20,
+            "text": "My flight to Lisbon is on September 7."
+          },
+          {
+            "turn": 22,
+            "text": "Change of plans: my flight to Lisbon moved to September 15."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "city": "Lisbon",
+          "date": "September 7",
+          "new_date": "September 15",
+          "other_city": "Lima",
+          "other_date": "October 1",
+          "other_new_date": "November 8"
+        }
+      },
+      {
+        "id": "supplement_dose",
+        "category": "extraction",
+        "turn": 25,
+        "probe": "What supplement do I take before bed, and at what dose?",
+        "answer_key": "magnesium, 5 mg",
+        "answers": [
+          [
+            "magnesium"
+          ],
+          [
+            "5 mg",
+            "5 milligrams"
+          ]
+        ],
+        "stale": [],
+        "statements": [
+          {
+            "turn": 25,
+            "text": "I take 5 mg of magnesium every night before bed."
+          }
+        ],
+        "headline": true,
+        "values": {
+          "supplement": "magnesium",
+          "dose": "5",
+          "other_supplement": "iron",
+          "other_dose": "15"
+        }
+      }
+    ],
+    "checkpoints": [
+      10,
+      20,
+      30
+    ],
+    "composition": {
+      "extraction": 3,
+      "update": 2,
+      "temporal": 1,
+      "multi_hop": 1,
+      "abstention": 2,
+      "sensitive": 2
+    },
+    "bank_version": "facts_v2",
+    "bank_sha256": "727ae24cc1af8f2cf02bd079c06eaacd63dcfdb2bac30955e7368c8f154da2f7"
+  }
+}

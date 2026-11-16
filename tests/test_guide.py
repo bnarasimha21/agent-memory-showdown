@@ -9,7 +9,9 @@ from pathlib import Path
 import pytest
 
 from src.site import export, guide
-from src.site.data import Bundle, published_bundles
+from src.site.data import RUNS_DIR, Bundle, load_bundle, published_bundles
+
+SAMPLE = RUNS_DIR / "20261031T135234525464Z-sample-fake"
 
 
 def _rate(rate, n=10):
@@ -153,11 +155,12 @@ def test_a_self_judged_real_run_and_an_unpriced_model_are_stated():
     assert "| buffer | n/a | n/a | n/a | n/a | 12,345 |" in text and "cheapest backend" not in text
 
 
-def test_the_committed_guide_is_generated_from_the_headline_bundle_and_marked_as_a_sample():
+def test_the_committed_guide_is_generated_from_the_headline_bundle_which_is_a_real_run():
     headline = published_bundles()[0]
     committed = guide.GUIDE.read_text(encoding="utf-8")
     assert committed == guide.render(headline) == export.outputs()[guide.GUIDE]
-    assert headline.is_sample and "SAMPLE DATA. THIS IS NOT A BENCHMARK RESULT" in committed
+    assert not headline.is_sample and "SAMPLE DATA" not in committed
+    assert "SAMPLE DATA. THIS IS NOT A BENCHMARK RESULT" in guide.render(load_bundle(SAMPLE))
     assert "[Which memory, when, at what cost](docs/GUIDE.md)" in export.outputs()[export.README]
 
 
@@ -169,12 +172,13 @@ def test_export_check_catches_a_hand_edited_guide(tmp_path, monkeypatch):
     monkeypatch.setattr(export, "outputs", lambda *a, **k: generated)
     target.write_text(generated[target])
     assert export.main(["--check"]) == 0
-    target.write_text(generated[target].replace("79.5%", "99.9%"))
+    assert "94.7%" in generated[target]
+    target.write_text(generated[target].replace("94.7%", "99.9%"))
     assert export.main(["--check"]) == 1
 
 
 def test_cli_previews_a_named_bundle_on_stdout_and_writes_only_where_told(tmp_path, capsys):
-    headline = published_bundles()[0]
+    headline = load_bundle(SAMPLE)
     assert guide.main([str(headline.path)]) == 0
     assert capsys.readouterr().out == guide.render(headline)
     out = tmp_path / "docs" / "preview.md"

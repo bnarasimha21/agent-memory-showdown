@@ -292,9 +292,45 @@ Each decision lists the choice, the option not taken, the reason, and the cost.
 
 ## 5. Measured results
 
-**v2: no real run is published.** The headline bundle in `results/runs/` is a sample made offline
-with fake models. It shows the format, the site and the charts, and its numbers describe the
-harness, not any model or backend. The README says so in a block generated from the bundle.
+**v2: one real run is published** (2026-11-16, bundle `20261116T155056861215Z-v2`). It is smaller
+than the design in `make run-v2`: 3 runs of 30 turns, checkpoints at 10, 20 and 30, one retrieval
+depth (k = 4), with 12 conversations at a time. Claude Sonnet 5.5 answered and GPT-6 Sol judged.
+The generated tables are in the README and `docs/GUIDE.md`; these are the headline figures.
+
+| Backend | Recall [95% CI] | Cost per conversation | Of which memory upkeep | Cost per correct recall |
+|---------|----------------:|----------------------:|-----------------------:|------------------------:|
+| buffer | 100% [91, 100] | $0.39 | $0.00 | $0.049 |
+| summary | 100% [91, 100] | $1.86 | $1.49 | $0.167 |
+| qdrant | 88.9% [57, 100] | $0.21 | $0.00 | $0.024 |
+| pgvector | 94.7% [83, 100] | $0.19 | $0.00 | $0.021 |
+| langgraph_store | 86.5% [55, 100] | $0.20 | $0.00 | $0.023 |
+| mem0 | 100% [91, 100] | $0.96 | $0.86 | $0.080 |
+
+What it shows, and how far each statement goes:
+
+- **No backend is separated from the best on recall.** Every interval overlaps. With 37 headline
+  probes per backend over 3 runs, this run can rank cost and cannot rank recall.
+- **The vector stores cost about half as much as the full buffer** per conversation at 30 turns,
+  and less than half per correct recall.
+- **Every vector-store miss was a corrected fact.** The three vector stores scored 50% to 80% on
+  the `update` category and 100% on everything else. Retrieval returned both the original
+  statement and the correction with nothing to say which came later, and the model often took the
+  original for the newer one. Buffer, summary and mem0 scored 100% on `update`.
+- **The rolling summary cost 4.8 times the buffer.** Its rewrites made up $1.49 of $1.86, and the
+  summary reached about 28,000 characters by turn 30: it did not compress. It also gave back
+  sensitive values only 20% of the time, against 93% to 100% for the others.
+- **mem0 cost 2.5 times the buffer**, $0.86 of it fact extraction, for the same recall.
+- **The two scorers agree on 88.8% of 420 probes (kappa 0.33).** The disagreements are mostly the
+  matcher being wrong: it marked 11 stale `update` answers correct because the right value appeared
+  somewhere in the reply, and marked 23 correct abstentions wrong because a distractor's value was
+  mentioned as someone else's. Reading those answers supports the judge, so the headline uses it.
+
+Limits of this run: 3 runs, so wide intervals; 30 turns, where the whole buffer fits in context
+with room to spare; one retrieval depth; one answering model; latency measured under the run's own
+parallel load and not comparable. The first attempt at the full design (5 runs of 50 turns, k = 2,
+4, 8, one call at a time) was stopped after buffer and one summary conversation because it would
+have taken about ten hours. Its one 50-turn summary conversation cost about $9.50 against about
+$2.20 for a 50-turn buffer conversation. That bundle is unfinished and is not published.
 
 **v1** (2026-04-17, four backends, 5 runs of 50 turns, Claude Sonnet 4.5). These are the numbers
 quoted elsewhere. They carry every limit listed in section 1 and are not comparable with v2:
@@ -356,10 +392,11 @@ noticing.
 
 ## 7. What stands between this and a result worth quoting
 
-1. **No real v2 run.** Everything in v2 has been tested, but the only published bundle is a sample.
-2. **The separate judge is set up but unproven.** `pricing.yaml` now prices a second DigitalOcean
+1. **One small real run.** The published v2 run has 3 runs of 30 turns at one retrieval depth.
+   The full design in `make run-v2` (5 runs of 50 turns, k = 2, 4, 8) has not been completed.
+2. **The separate judge has one run behind it.** `pricing.yaml` now prices a second DigitalOcean
    model (`openai-gpt-6-sol`), `make run-v2` uses it as the judge, and `publish` refuses a real run
-   judged by its own answering model. No real run has used it yet, and its verdicts have not been
+   judged by its own answering model. The published run used it, and its verdicts have not been
    checked against hand labels.
 3. **One answering model.** Whether the ranking holds on a smaller, cheaper model, where memory
    quality probably matters more, is unknown. DigitalOcean's model list gives

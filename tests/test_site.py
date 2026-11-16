@@ -22,6 +22,7 @@ from src.bundle import TRANSCRIPT, TRANSCRIPT_GZ, read_transcript, transcript_pa
 from src.harness import run_benchmark
 from src.site import build as site_build
 from src.site import export, publish
+from src.site.data import RUNS_DIR  # noqa: E402
 from src.site.data import (
     LEGACY_V1, headline_row, load_bundle, load_legacy, published_bundles, read_latest, self_judged,
 )
@@ -564,7 +565,7 @@ def test_committed_readme_and_ts_match_the_published_bundles():
 
 
 def test_committed_sample_is_labelled_and_builds(tmp_path, no_network):
-    (bundle,) = published_bundles()
+    bundle = load_bundle(RUNS_DIR / "20261031T135234525464Z-sample-fake")
     assert bundle.is_sample and bundle.manifest["llm_provider"] == "fake"
     assert (bundle.path / TRANSCRIPT_GZ).exists() and not (bundle.path / TRANSCRIPT).exists()
     assert not bundle.manifest["git"]["dirty"]
@@ -668,3 +669,13 @@ def test_identical_runs_show_the_pooled_wilson_interval_and_say_so(runs, tmp_pat
     assert next(b for b in summary if b["label"] == label)["recallCiMethod"] == "wilson-pooled"
     page = site_build.build([bundle], tmp_path / "site").read_text()
     assert "(runs identical: pooled Wilson)" in page
+
+
+def test_the_published_headline_is_a_real_run_judged_by_another_model(tmp_path, no_network):
+    (bundle,) = published_bundles()
+    assert not bundle.is_sample and bundle.manifest["llm_provider"] == "do"
+    assert not self_judged(bundle)
+    assert (bundle.path / TRANSCRIPT_GZ).exists() and not (bundle.path / TRANSCRIPT).exists()
+    page = site_build.build([bundle], tmp_path / "site").read_text()
+    assert "Sample run, not a benchmark result" not in page
+    assert all(f"<td>{label}</td>" in page for label in bundle.backends)
