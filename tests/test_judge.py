@@ -139,3 +139,80 @@ def test_a_judge_grading_its_own_model_is_flagged(monkeypatch, fresh_config, cap
     monkeypatch.setenv("JUDGE_PROVIDER", "do")
     fresh_config()
     assert not judge_mod.get_judge(answering_model="m-0").same_as_answerer
+
+
+def test_preflight_passes_on_a_working_judge_and_names_the_fix_on_a_broken_one():
+    import pytest
+
+    verdict = Judge(FakeMemoryChatModel(), "fake", "fake-judge-v1").preflight()
+    assert verdict["label"] == "correct" and verdict["input_tokens"] > 0
+
+    class Rejects(FakeMemoryChatModel):
+        def _generate(self, *args, **kwargs):
+            raise ValueError("model 'no-such-model' not found")
+
+    with pytest.raises(RuntimeError, match="no-such-model.*JUDGE_TEMPERATURE=default"):
+        Judge(Rejects(), "do", "no-such-model").preflight()
+
+
+def test_a_paid_judge_is_called_once_before_any_conversation(tmp_path, monkeypatch):
+    """A judge model id the provider rejects must not cost a whole run to find out."""
+    import pytest
+
+    import src.scoring.judge as judge_mod
+    from src.backends.registry import AVAILABLE_BACKENDS
+    from src.harness import run_benchmark
+
+    class Rejects(FakeMemoryChatModel):
+        def _generate(self, *args, **kwargs):
+            raise ValueError("unknown model")
+
+    kwargs = dict(num_runs=1, num_turns=10, checkpoints=[10], composition={"extraction": 1},
+                  results_dir=tmp_path, judge=True)
+    started = []
+    monkeypatch.setattr(AVAILABLE_BACKENDS["buffer"], "setup", lambda self: started.append(1))
+    monkeypatch.setattr(judge_mod, "get_judge", lambda: Judge(Rejects(), "do", "fake-judge-v1"))
+    with pytest.raises(RuntimeError, match="preflight"):
+        run_benchmark([AVAILABLE_BACKENDS["buffer"]], **kwargs)
+    assert started == [] and not (tmp_path / "runs").exists()
+
+    # a working paid judge: the preflight call is made, and its tokens are in the spend
+    calls = []
+
+    class Counts(FakeMemoryChatModel):
+        def _generate(self, *args, **kwargs):
+            calls.append(1)
+            return super()._generate(*args, **kwargs)
+
+    monkeypatch.setattr(judge_mod, "get_judge", lambda: Judge(Counts(), "do", "fake-judge-v1"))
+    from src.bundle import load_manifest, read_transcript
+
+    bundle = run_benchmark([AVAILABLE_BACKENDS["buffer"]], **kwargs)
+    probes = [r for r in read_transcript(bundle) if r["type"] == "probe"]
+    assert len(calls) == len(probes) + 1
+    scores = [json.loads(line) for line in (bundle / "scores.jsonl").read_text().splitlines()]
+    from src.pricing import price_for
+
+    scored = price_for("fake-judge-v1").cost(sum(s["judge_input_tokens"] for s in scores),
+                                             sum(s["judge_output_tokens"] for s in scores))
+    assert load_manifest(bundle)["spend"]["judge_usd"] > scored
+
+
+def test_judge_temperature_defaults_to_zero_and_can_be_left_to_the_model(monkeypatch, fresh_config):
+    import src.llm_factory as factory
+
+    monkeypatch.setenv("LLM_PROVIDER", "do")
+    monkeypatch.setenv("JUDGE_PROVIDER", "do")
+    monkeypatch.setenv("DO_API_KEY", "test-key-not-used")
+    monkeypatch.setenv("JUDGE_MODEL", "openai-gpt-6-sol")
+    cfg = fresh_config()
+    assert cfg.JUDGE_TEMPERATURE == 0.0
+    assert factory.get_judge_llm().temperature == 0.0
+    assert "judge_note" not in factory.provider_caveats()
+
+    monkeypatch.setenv("JUDGE_TEMPERATURE", "default")
+    assert fresh_config().JUDGE_TEMPERATURE is None
+    judge_llm = factory.get_judge_llm()
+    assert judge_llm.temperature is None and judge_llm.model_name == "openai-gpt-6-sol"
+    assert "default temperature" in factory.provider_caveats()["judge_note"]
+    assert factory.get_llm().temperature == 0.0  # the answering model is unaffected

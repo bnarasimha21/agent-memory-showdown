@@ -11,6 +11,29 @@ models:
     note: standard tier, prompts up to 200K tokens
     source: https://docs.digitalocean.com/products/gradient-ai-platform/details/pricing/
     checked_on: "2026-10-30"
+  # Answering model of the published v2 run (`make run-v2`). Chosen because
+  # anthropic-claude-4.5-sonnet is listed with a tentative end of support of
+  # November 30, 2026. The id answers on the Chat Completions API (checked with
+  # one call on 2026-11-16).
+  anthropic-claude-sonnet-5.5:
+    display_name: Claude Sonnet 5.5 (DigitalOcean Serverless Inference)
+    input_per_mtok: 2.00
+    output_per_mtok: 10.00
+    note: standard processing, all prompt lengths; cache rates are not used
+    source: https://docs.digitalocean.com/products/gradient-ai-platform/details/pricing/
+    checked_on: "2026-11-16"
+  # Recommended judge: a different model family from the answering model, so the
+  # judge does not grade its own answers (JUDGE_MODEL=openai-gpt-6-sol, used by
+  # `make run-v2`). The model id is from DigitalOcean's model list
+  # (https://docs.digitalocean.com/products/gradient-ai-platform/details/models/),
+  # which lists it as served on the Chat Completions API the harness uses.
+  openai-gpt-6-sol:
+    display_name: GPT-6 Sol (DigitalOcean Serverless Inference)
+    input_per_mtok: 2.00
+    output_per_mtok: 10.00
+    note: standard processing, prompts up to 272K tokens
+    source: https://docs.digitalocean.com/products/gradient-ai-platform/details/pricing/
+    checked_on: "2026-11-16"
   # Claude subscription via the `claude` CLI (LLM_PROVIDER=claude_cli). The key is
   # the real model id the CLI reports in modelUsage for `--model sonnet`. Costs
   # computed from this entry are API-equivalent (what the same tokens would cost

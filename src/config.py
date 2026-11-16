@@ -24,6 +24,18 @@ def _opt_int(raw: str | None) -> int | None:
     return int(raw) if raw not in (None, "") else None
 
 
+def _opt_float(raw: str | None) -> float | None:
+    return float(raw) if raw not in (None, "") else None
+
+
+def _temperature(raw: str | None) -> float | None:
+    """A temperature, or None ("default"/"none"/empty) to leave it to the model."""
+    if raw is None:
+        return 0.0
+    raw = raw.strip().lower()
+    return None if raw in ("", "default", "none") else float(raw)
+
+
 class Config:
     def __init__(self) -> None:
         self.reload()
@@ -57,6 +69,14 @@ class Config:
         self.JUDGE_PROVIDER: str = (env("JUDGE_PROVIDER") or self.LLM_PROVIDER).strip().lower()
         self.JUDGE_MODEL: str = env("JUDGE_MODEL", "anthropic-claude-4.5-sonnet")
         self.JUDGE_ENABLED: bool = env("JUDGE", "1").strip().lower() not in ("0", "false", "no")
+        # Judge temperature on the 'do' provider: 0 by default. Some reasoning
+        # models reject the parameter; JUDGE_TEMPERATURE=default leaves it out,
+        # and the run's provider note then says so.
+        self.JUDGE_TEMPERATURE: float | None = _temperature(env("JUDGE_TEMPERATURE"))
+
+        # Spend ceiling in USD for one bundle, across resumes (src/budget.py).
+        # Unset = no ceiling. `--budget` overrides it.
+        self.BUDGET_USD: float | None = _opt_float(env("BUDGET_USD"))
 
         # Retries for model calls on HTTP 429/5xx, connection errors and timeouts
         # (src/retry.py): up to LLM_MAX_RETRIES retries, waiting
@@ -98,6 +118,10 @@ class Config:
 
         # Benchmark parameters
         self.NUM_RUNS: int = int(env("NUM_RUNS", "5"))
+        # Conversations (one backend, one run) and judge calls run at once. 1 keeps the
+        # original one-call-at-a-time behaviour. Above 1 the run is faster and its
+        # latency figures are not comparable, which the manifest records.
+        self.PARALLEL: int = max(1, int(env("PARALLEL", "1")))
         self.NUM_TURNS: int = int(env("NUM_TURNS", "50"))
         self.BASE_SEED: int = int(env("BASE_SEED", "42"))
         if env("SEED_TURNS") is not None:

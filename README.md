@@ -15,28 +15,24 @@ from the bundles listed in `results/latest.json` and from the v1 numbers in
 
 Interactive results, with every probe's transcript: <https://bnarasimha21.github.io/agent-memory-showdown/>
 
-**No real v2 benchmark is published yet.** The headline bundle below is a sample made offline; see *Setup* to make a real run (it needs `DO_API_KEY`) and *Results site and publishing* to publish it.
+Which backend to pick, with the cost of each, is in the generated guide: [Which memory, when, at what cost](docs/GUIDE.md).
 
-### Latest v2 run: `20261031T135234525464Z-sample-fake`
+### Latest v2 run: `20261116T155056861215Z-v2`
 
-> **Sample run, not a benchmark result.** At least one of the chat model, the judge and the embeddings was fake (`LLM_PROVIDER=fake`, `JUDGE_PROVIDER=fake`, `EMBEDDING_PROVIDER=fake`). It shows the bundle format, the site and the charts. The numbers describe the harness, not any model or memory backend; costs are what the recorded token counts would cost at the listed price.
+> **Provider note.** Conversations and judge calls ran 12 at a time, not one after another. Recall, tokens and cost are unaffected. Latency was measured under the benchmark's own load and is not comparable with a one-at-a-time run; for memory read and write latency use scripts/memory_latency.py.
 
-2 runs x 20 turns, checkpoints 10, 20, model `fake-memory-v1`, embeddings `fake-hashing-384`, k = 2, 4. Source: [`manifest.json`](results/runs/20261031T135234525464Z-sample-fake/manifest.json), [`aggregate.json`](results/runs/20261031T135234525464Z-sample-fake/aggregate.json). Recall leaves out the `abstention` and `sensitive` categories (reported on their own on the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% Student t interval over runs (when every run scores the same, which would make it zero width, the Wilson interval over the pooled probes, marked as such); the per-probe Wilson interval is approximate, since probes in one run are not independent. Judge `fake-judge-v1` is the offline fake, which applies the matcher rules, so its agreement with the matcher says nothing about a real judge.
+3 runs x 30 turns, checkpoints 10, 20, 30, model `anthropic-claude-sonnet-5.5`, embeddings `all-MiniLM-L6-v2`, k = 4. Source: [`manifest.json`](results/runs/20261116T155056861215Z-v2/manifest.json), [`aggregate.json`](results/runs/20261116T155056861215Z-v2/aggregate.json). Recall leaves out the `abstention` and `sensitive` categories (reported on their own on the results site and in `aggregate.json`). Recall is the mean of per-run recall with a 95% Student t interval over runs (when every run scores the same, which would make it zero width, the Wilson interval over the pooled probes, marked as such); the per-probe Wilson interval is approximate, since probes in one run are not independent. Judge `openai-gpt-6-sol`; matcher/judge agreement: Cohen's kappa 0.333 over 420 probes (every disagreement is listed in `aggregate.json`).
 
-Seeds paired: every backend is scored on runs 0 (seed 42), 1 (seed 43).
+Seeds paired: every backend is scored on runs 0 (seed 42), 1 (seed 43), 2 (seed 44).
 
 | Backend | Recall, run mean [95% t CI] | Per probe [approx. Wilson] | Probes in recall | Cost / 1K conv | Cost / correct recall | Latency p50 / p95 | Memory at end |
 |---------|----------------:|------------------:|-------:|---------------:|----------------------:|------------------:|--------------:|
-| buffer | 79.5% [0, 100] | 80.0% [55, 93] | 15 | $17.32 | $0.0045 | 0.2 / 0.5 ms | 40 messages |
-| summary | 47.3% [0, 100] | 46.7% [25, 70] | 15 | $33.75 | $0.0107 | 0.3 / 0.4 ms | 385 summary_chars |
-| qdrant@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.15 | $0.0020 | 3.3 / 6.2 ms | 20 points |
-| qdrant@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.21 | $0.0025 | 5.1 / 7.1 ms | 20 points |
-| pgvector@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.16 | $0.0020 | 6.3 / 9.7 ms | 20 rows |
-| pgvector@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.27 | $0.0025 | 6.4 / 7.8 ms | 20 rows |
-| langgraph_store@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $8.18 | $0.0020 | 3.9 / 4.8 ms | 20 items |
-| langgraph_store@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $10.33 | $0.0026 | 2.6 / 3.7 ms | 20 items |
-| mem0@k2 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $326.30 | $0.0598 | 6.8 / 7.9 ms | 16 memories |
-| mem0@k4 | 73.2% [51, 96] | 73.3% [48, 89] | 15 | $327.09 | $0.0600 | 6.2 / 9.1 ms | 16 memories |
+| buffer | 100.0% [91, 100] (runs identical: pooled Wilson) | 100.0% [91, 100] | 37 | $390.63 | $0.0485 | 3,899 / 7,563 ms | 60 messages |
+| summary | 100.0% [91, 100] (runs identical: pooled Wilson) | 100.0% [91, 100] | 37 | $1,862.19 | $0.1666 | 19,321 / 48,429 ms | 28,129 summary_chars |
+| qdrant | 88.9% [57, 100] | 89.2% [75, 96] | 37 | $212.08 | $0.0243 | 4,962 / 8,062 ms | 30 points |
+| pgvector | 94.7% [83, 100] | 94.6% [82, 99] | 37 | $193.49 | $0.0211 | 4,377 / 7,064 ms | 30 rows |
+| langgraph_store | 86.5% [55, 100] | 86.5% [72, 94] | 37 | $195.83 | $0.0229 | 4,586 / 7,289 ms | 30 items |
+| mem0 | 100.0% [91, 100] (runs identical: pooled Wilson) | 100.0% [91, 100] | 37 | $962.95 | $0.0795 | 4,609 / 10,560 ms | 34 memories |
 
 ### v1 published numbers (v1 methodology, known limits)
 
@@ -56,6 +52,10 @@ From the 2026-04-17 run of the v1 harness (source: [`v1_published.json`](results
 The reasoning behind the design (requirements, each decision and its cost, measured numbers, threats
 to validity, what changes at 100 times the scale) is in the [design record](docs/DESIGN.md), with a
 decision-flow diagram and a deployment diagram.
+
+![Six backends, one harness, and the published run](docs/images/architecture.svg)
+
+The same structure as a graph, with the repository's default model:
 
 ```mermaid
 flowchart TD
@@ -132,7 +132,7 @@ Notes on the newer backends:
 - **One prompt for every backend** (`src/prompts.py`). Each backend only decides what goes into the Memory section; the surrounding wording is identical, and its sha256 is recorded in the run manifest.
 - **Scoring (v2):** every probe response gets two labels from `correct | partial | wrong | refused | abstained`:
   - a deterministic **matcher** (`src/scoring/matcher.py`): accents, punctuation, ordinals, number words and dates are normalized (`src/scoring/normalize.py`), each answer is a list of required parts with accepted aliases (melatonin needs the drug *and* the 10 mg dose), aliases match on token boundaries only. Number words up to ninety-nine become digits, ordinal words next to a month are days ("March twenty-first", "the first of May"), and numeric dates become month names. A slash pair is a date only with a year (`4/9/2027`) or a date cue just before it ("on 4/9", "due 4/9", "appointment is 4/9"), and never with "of" after it, so "24/7" and "3/4 of the way" stay numbers. It is read month first (April 9), unless the first number is over 12 (`15/4` is 15 April), and ISO dates (`2026-04-09`) are understood. Refusal language is labelled `refused` only on `sensitive` facts, even when the value is present there; elsewhere "I can't say for certain, but it's Mochi" is graded by the value it gives. A stale value named only as what was replaced ("it moved from April 3, I don't know the new date") is `abstained`, not wrong. On `abstention` probes, saying it was not told is correct only when no value comes with it: a hedged guess ("I'm not sure, but your cat might be Miso") or any value the dataset could have used, offered as the user's, is `wrong`. A value said about someone else in the same clause ("you never told me your blood type; your brother is O positive") is not offered as the user's, and a hedge that only introduces more abstention or advice ("it may be that you never told me", "maybe ask your doctor") is not a guess;
-  - an **LLM judge** (`src/scoring/judge.py`) with a fixed rubric in [`src/scoring/judge_prompt.md`](src/scoring/judge_prompt.md). The judge model is `JUDGE_MODEL` (default `anthropic-claude-4.5-sonnet` via DO Serverless Inference, temperature 0); the model and the prompt's sha256 are written to the run manifest and `scoring.json`. By default the judge is the same model as the answering model, because it is the only model this repo is configured and priced for; a model grading its own answers may favour them (self-preference). The run records `judge_is_answering_model`, logs a warning, and the generated *Results* text says so; the matcher figures are the independent check. Set `JUDGE_MODEL` to a different DO model to avoid it.
+  - an **LLM judge** (`src/scoring/judge.py`) with a fixed rubric in [`src/scoring/judge_prompt.md`](src/scoring/judge_prompt.md). The judge model is `JUDGE_MODEL` (default `anthropic-claude-4.5-sonnet` via DO Serverless Inference, temperature 0); the model and the prompt's sha256 are written to the run manifest and `scoring.json`. A model grading its own answers may favour them (self-preference), so the run that gets published uses a judge from another model family: `JUDGE_MODEL=openai-gpt-6-sol`, priced in `pricing.yaml` and set by `make run-v2` and `.env.example`. If `JUDGE_MODEL` is left unset the judge is still the answering model; the run then records `judge_is_answering_model`, logs a warning, and `python -m src.site.publish` refuses to publish it unless `--allow-self-judged` is passed, in which case the generated *Results* text says so. The matcher figures are the independent check either way. A paid judge gets one call before any conversation starts, so a wrong `JUDGE_MODEL` fails before money is spent on conversations. The judge runs at temperature 0; `JUDGE_TEMPERATURE=default` leaves the parameter out for a model that rejects it, and the run's provider note says so.
   - Headline recall uses the judge label (the matcher label where the judge output could not be parsed). Matcher figures, Cohen's kappa between the two scorers, and every disagreement are written to `aggregate.json` for spot checks.
   - **Observed agreement:** reported for each published run in *Results* (that sentence is generated from the bundle). A run scored with the offline fake judge says so there, because the fake judge applies the matcher rules and its agreement is meaningless.
 - **Intervals:** headline recall is the mean of the per-run recall rates with a 95% Student t interval over runs (`recall_run_mean`; no interval for a single run). With a handful of runs that interval is wide, and it is meant to be: a bootstrap over 3 to 5 values only resamples the values seen and comes out too narrow (it is kept as `bootstrap_ci95`). Every rate also carries a Wilson interval over probes, labelled approximate: probes in one run share a memory, so they are not independent and that interval is too narrow.
@@ -234,7 +234,87 @@ python run_benchmark.py --help
   --no-viz         skip chart generation
   --no-judge       matcher only, no judge LLM calls (rescore later)
   --resume RUN_ID  continue an unfinished bundle (same options as the original run)
+  --budget USD     spend ceiling for the whole bundle, across resumes (default: BUDGET_USD, else none)
 ```
+
+### The v2 run that is published
+
+The run in *Results* is smaller than the design below: 3 runs of 30 turns, checkpoints after turns
+10, 20 and 30, k = 4, with 12 conversations at a time (`PARALLEL=12`), answered by
+`anthropic-claude-sonnet-5.5` and judged by `openai-gpt-6-sol`. It was run on 2026-11-16 with:
+
+```bash
+PARALLEL=12 LLM_MAX_RETRIES=12 LLM_RETRY_BASE_S=3 LLM_PROVIDER=do JUDGE_PROVIDER=do EMBEDDING_PROVIDER=local JUDGE=1 \
+  LLM_MODEL=anthropic-claude-sonnet-5.5 JUDGE_MODEL=openai-gpt-6-sol \
+  python run_benchmark.py --runs 3 --turns 30 --checkpoints 10 20 30 --k 4 --budget 60 --label v2
+```
+
+It took 15 minutes and cost $18.70 at list prices, $3.27 of that a first attempt at 18
+conversations at a time that the provider rate limited. The full design was started first and
+stopped: at one call at a time a 50-turn `summary` conversation took 49 minutes, which put the whole
+run at about ten hours. What the results show and how far they go is in
+[the design record](docs/DESIGN.md), section 5.
+
+`PARALLEL` above 1 runs that many conversations, and then that many judge calls, at once. Recall,
+tokens and cost are unaffected. Latency is then measured under the benchmark's own load, so the
+manifest and every generated report say it is not comparable.
+
+### The full v2 run
+
+One command runs the benchmark that is meant to be published: 5 runs of 50 turns, checkpoints after
+turns 15, 25, 35 and 50, all six backends, a k sweep over 2, 4 and 8 for the four top-k backends,
+the answering model `anthropic-claude-sonnet-5.5`, the judge `openai-gpt-6-sol` (a different model
+family, so the judge does not grade its own answers) and a spend ceiling.
+
+```bash
+# .env must hold DO_API_KEY; Docker must be running (the target starts Qdrant and Postgres)
+make run-v2 BUDGET=150
+```
+
+`BUDGET` is required and has no default. It is a ceiling in US dollars that you choose, not a
+forecast: this repository has no real v2 run to forecast from. The only reference is v1, whose 20
+conversations on four backends cost about $37 on Claude Sonnet 4.5 ($3 and $15 per million tokens
+against $2 and $10 for the model used here), and this run has
+70 conversations (buffer, summary, and four backends at three depths, 5 runs each), a judge call
+per probe and mem0's extraction calls. The run uses Claude Sonnet 5.5 and not the repository's
+default `anthropic-claude-4.5-sonnet`, because DigitalOcean's model list gives the older model a
+tentative end of support of November 30, 2026 (read 2026-11-16). `V2_LLM_MODEL` overrides it with
+any model that has a price in `pricing.yaml`. The target expands to:
+
+```bash
+LLM_PROVIDER=do JUDGE_PROVIDER=do EMBEDDING_PROVIDER=local JUDGE=1 \
+  LLM_MODEL=anthropic-claude-sonnet-5.5 JUDGE_MODEL=openai-gpt-6-sol \
+  python run_benchmark.py --runs 5 --turns 50 --checkpoints 15 25 35 50 --k 2 4 8 --budget 150 --label v2
+```
+
+**Budget.** Spend is computed from the tokens recorded so far and the prices in `pricing.yaml`
+(answering model and judge), and is written to the bundle's `manifest.json` under `spend`. It is a
+list-price figure computed by the harness, not DigitalOcean's invoice. The budget is checked before
+each (backend, run) and before each judge call, so a run can pass it by at most one conversation.
+When it is reached the run stops with exit code 3 and says where. The bundle is left without an
+`aggregate.json`, so it cannot be published by mistake. With a budget set, a model that has no
+price in `pricing.yaml` is refused before any call is made.
+
+**Resume.** After a budget stop, a crash or a kill, continue the same bundle. The budget covers the
+whole bundle, so after a budget stop pass a higher one:
+
+```bash
+make run-v2 BUDGET=250 RESUME=<run_id>
+```
+
+Finished runs and judge verdicts are kept; unfinished runs are run again, and what they cost the
+first time stays in the spend.
+
+**Publish.** When the run has finished:
+
+```bash
+make publish BUNDLE=results/runs/<run_id>
+git add results/runs/<run_id> results/latest.json README.md docs/GUIDE.md remotion/src/data/benchmarkData.ts
+```
+
+That makes it the headline run and regenerates the README results block, `benchmarkData.ts` and
+the guide ([docs/GUIDE.md](docs/GUIDE.md), "Which memory, when, at what cost") from the bundle.
+See *Results site and publishing* for what `publish` checks.
 
 ### Running on a Claude subscription (no API key)
 
@@ -324,13 +404,28 @@ To publish a run:
 ```bash
 python -m src.site.publish results/runs/<run_id>         # make it the headline run
 python -m src.site.publish results/runs/<run_id> --add   # list it after the current ones
-git add results/runs/<run_id> results/latest.json README.md remotion/src/data/benchmarkData.ts
+git add results/runs/<run_id> results/latest.json README.md docs/GUIDE.md remotion/src/data/benchmarkData.ts
 ```
 
 `publish` gzips the bundle's transcript (bundles read `transcript.jsonl` or `transcript.jsonl.gz`),
-records the run in `results/latest.json` and regenerates the README block above and
-`remotion/src/data/benchmarkData.ts`. `make export` regenerates those two files alone and
-`make site-check` fails if they are stale. `benchmarkData.ts` keeps the v1 constants the video
+records the run in `results/latest.json` and regenerates the README block above,
+`remotion/src/data/benchmarkData.ts` and `docs/GUIDE.md`. `make export` regenerates those three
+files alone and `make site-check` fails if any of them is stale.
+
+`publish` refuses a real run whose judge was the answering model, and says why: a model may favour
+its own answers, so the recall could be inflated. Rescore the bundle with a different judge, or
+pass `--allow-self-judged` to publish it anyway; the generated text then states that the judge was
+the answering model. Sample runs are not affected. An unfinished bundle (no `aggregate.json`, for
+example after a budget stop) cannot be published at all.
+
+**The guide.** `docs/GUIDE.md` ("Which memory, when, at what cost") is generated by
+`python -m src.site.guide` (`make guide`) from the headline bundle's `aggregate.json`: recall with
+intervals, cost per conversation and per correct recall, memory-layer latency, recall by category,
+and a "pick this when" section whose lines are produced by fixed rules (for example the cheapest
+backend whose recall interval overlaps the best one's). No number in it is written by hand. While
+the headline bundle is a sample, the guide says so at the top and marks every pick as sample
+output. `python -m src.site.guide results/runs/<run_id>` previews the guide for another bundle on
+stdout. `benchmarkData.ts` keeps the v1 constants the video
 narrates, read from `results/legacy/v1_published.json`, and adds `LATEST_RUN`, a summary of the
 headline v2 bundle.
 
@@ -355,13 +450,14 @@ npx remotion render src/index.ts AgentMemoryShowdown out/video.mp4  # render
 ```
 agent-memory-showdown/
 ├── run_benchmark.py          # entry point
-├── Makefile                  # make run / make run-quick / make clean
+├── Makefile                  # make run / make run-v2 / make publish / make run-quick / make clean
 ├── docker-compose.yml        # Qdrant + PostgreSQL + benchmark app
 ├── Dockerfile
 ├── requirements.txt
 ├── .env.example
 ├── docs/
 │   ├── DESIGN.md             # design record: decisions, trade-offs, numbers, scale
+│   ├── GUIDE.md              # generated: which memory, when, at what cost
 │   └── images/               # decision-flow.svg, deployment.svg
 ├── data/
 │   └── facts_v2.yaml         # fact bank: templates, slots, distractors, filler
@@ -374,7 +470,8 @@ agent-memory-showdown/
 │   ├── visualize.py          # Plotly + Matplotlib charts
 │   ├── bundle.py             # run bundle files: manifest, transcript, scores
 │   ├── scoring/              # matcher, LLM judge, judge_prompt.md, rescore
-│   ├── site/                 # results site: build.py, publish.py, export.py
+│   ├── budget.py             # spend from recorded tokens and pricing.yaml; the --budget ceiling
+│   ├── site/                 # results site: build.py, publish.py, export.py, guide.py
 │   └── backends/
 │       ├── base.py           # BaseMemoryBackend: the shared agent loop
 │       ├── registry.py       # name -> backend class
@@ -424,5 +521,7 @@ agent-memory-showdown/
 ## Status
 
 The v1 benchmark ran on April 17, 2026 and its numbers are above, labelled as v1. The v2 harness
-(six backends, read-only probes, matcher plus judge scoring, run bundles, results site) is complete;
-*Results* says whether the published v2 headline bundle is a real run or a sample.
+(six backends, read-only probes, matcher plus judge scoring, run bundles, results site) is complete,
+and one real v2 run is published: 3 runs of 30 turns at one retrieval depth, on 2026-11-16 (see
+*The v2 run that is published*). The full design, `make run-v2 BUDGET=<usd>`, has not been
+completed.

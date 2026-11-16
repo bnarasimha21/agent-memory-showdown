@@ -75,8 +75,28 @@ class JudgeCache:
                                 ensure_ascii=False) + "\n")
 
 
-def score_probes(records: Iterable[dict], judge=None, cache: "JudgeCache | None" = None) -> list[dict]:
-    """One score per probe record: matcher label always, judge label if a judge is given."""
+def score_probes(records: Iterable[dict], judge=None, cache: "JudgeCache | None" = None,
+                 parallel: int = 1) -> list[dict]:
+    """One score per probe record: matcher label always, judge label if a judge is given.
+
+    With `parallel` above 1 the verdicts not already cached are requested at once, that many
+    at a time, and saved to the cache as they arrive; the scores come out in record order."""
+    records = list(records)
+    if judge is not None and cache is not None and parallel > 1:
+        import threading
+        from concurrent.futures import ThreadPoolExecutor
+
+        todo = [r for r in records if r.get("type") == "probe" and cache.get(r) is None]
+        lock = threading.Lock()
+
+        def one(rec: dict) -> None:
+            verdict = judge.judge(rec)
+            with lock:
+                cache.put(rec, verdict)
+
+        with ThreadPoolExecutor(max_workers=parallel) as pool:
+            for future in [pool.submit(one, r) for r in todo]:
+                future.result()
     scores = []
     for rec in records:
         if rec.get("type") != "probe":

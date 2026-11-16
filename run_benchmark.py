@@ -6,6 +6,7 @@ Usage:
     python run_benchmark.py --backends buffer summary     # subset
     python run_benchmark.py --runs 3 --turns 50
     python run_benchmark.py --k 2 4 8                     # retrieval-depth sweep
+    python run_benchmark.py --budget 150                  # stop cleanly at $150 of recorded spend
     LLM_PROVIDER=fake EMBEDDING_PROVIDER=fake python run_benchmark.py   # free, offline
 
 Each invocation writes a run bundle to results/runs/<run_id>/.
@@ -75,6 +76,11 @@ def parse_args(argv=None):
     parser.add_argument("--resume", default=None, metavar="RUN_ID_OR_PATH",
                         help="Continue an unfinished bundle with the same options: finished runs are "
                              "kept, the rest are rerun, judge verdicts already made are reused")
+    parser.add_argument("--budget", type=float, default=None, metavar="USD",
+                        help="Spend ceiling for the whole bundle, across resumes, from recorded tokens "
+                             "and pricing.yaml (default: BUDGET_USD, else none). Checked before each "
+                             "(backend, run) and each judge call; when reached the run stops with exit "
+                             "code 3 and the bundle can be resumed. Needs a price for every model used")
     return parser.parse_args(argv)
 
 
@@ -94,19 +100,13 @@ def main(argv=None):
         len(backend_classes), args.runs, args.turns, config.LLM_PROVIDER,
     )
 
-    bundle = run_benchmark(
-        backend_classes=backend_classes,
-        num_runs=args.runs,
-        num_turns=args.turns,
-        checkpoints=args.checkpoints,
-        composition=parse_composition(args.facts) if args.facts else None,
-        distractors=False if args.no_distractors else None,
-        results_dir=args.results_dir,
-        run_label=args.label,
-        judge=False if args.no_judge else None,
-        ks=args.k,
-        resume=args.resume,
-    )
+    from src.budget import BudgetExceeded
+
+    try:
+        bundle = _run(args, backend_classes)
+    except BudgetExceeded as exc:
+        print(f"STOPPED ON BUDGET. {exc}", file=sys.stderr)
+        return 3
     aggregate_path = bundle / "aggregate.json"
     logger.info("Benchmark complete. Bundle: %s", bundle)
 
@@ -119,6 +119,23 @@ def main(argv=None):
 
     print(format_summary(json.loads(aggregate_path.read_text())))
     return 0
+
+
+def _run(args, backend_classes) -> Path:
+    return run_benchmark(
+        backend_classes=backend_classes,
+        num_runs=args.runs,
+        num_turns=args.turns,
+        checkpoints=args.checkpoints,
+        composition=parse_composition(args.facts) if args.facts else None,
+        distractors=False if args.no_distractors else None,
+        results_dir=args.results_dir,
+        run_label=args.label,
+        judge=False if args.no_judge else None,
+        ks=args.k,
+        resume=args.resume,
+        budget_usd=args.budget,
+    )
 
 
 if __name__ == "__main__":

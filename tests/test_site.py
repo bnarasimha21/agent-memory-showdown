@@ -22,8 +22,9 @@ from src.bundle import TRANSCRIPT, TRANSCRIPT_GZ, read_transcript, transcript_pa
 from src.harness import run_benchmark
 from src.site import build as site_build
 from src.site import export, publish
+from src.site.data import RUNS_DIR  # noqa: E402
 from src.site.data import (
-    LEGACY_V1, headline_row, load_bundle, load_legacy, published_bundles, read_latest,
+    LEGACY_V1, headline_row, load_bundle, load_legacy, published_bundles, read_latest, self_judged,
 )
 
 NODE = shutil.which("node")
@@ -125,6 +126,78 @@ def test_a_sample_never_displaces_a_real_headline(runs, made_bundle, capsys):
     assert "stays the headline" in capsys.readouterr().err
     assert publish.publish(sample, latest=latest, runs_dir=runs_dir, regenerate=False) == [sample.name]
     assert "replaces the real run" in capsys.readouterr().err
+
+
+def _self_judged(made_bundle: Path, runs_dir: Path, run_id: str, real: bool = True,
+                 flag: bool | None = True) -> Path:
+    """A copy of the bundle whose judge is its answering model (as a real default run is)."""
+    dest = _copy_run(made_bundle, runs_dir, run_id, real=real)
+    manifest = json.loads((dest / "manifest.json").read_text())
+    aggregate = json.loads((dest / "aggregate.json").read_text())
+    aggregate["scoring"]["judge_model"] = manifest["llm_model"]
+    if real:
+        aggregate["scoring"]["judge_provider"] = "do"
+    if flag is None:
+        del aggregate["scoring"]["judge_is_answering_model"]  # a bundle from before the flag
+    else:
+        aggregate["scoring"]["judge_is_answering_model"] = flag
+    (dest / "aggregate.json").write_text(json.dumps(aggregate))
+    return dest
+
+
+@pytest.mark.parametrize("flag", [True, None])
+def test_publish_refuses_a_real_run_judged_by_its_answering_model(runs, made_bundle, flag):
+    runs_dir, latest, _ = runs
+    real = _self_judged(made_bundle, runs_dir, "20990101T000000000000Z-selfjudged", flag=flag)
+    with pytest.raises(publish.SelfJudgedError) as refused:
+        publish.publish(real, latest=latest, runs_dir=runs_dir, regenerate=False)
+    reason = str(refused.value)
+    assert "judge is the answering model" in reason and "self-preference" in reason
+    assert "--allow-self-judged" in reason and "rescore" in reason
+    # refused before anything was written
+    assert not latest.exists() and (real / TRANSCRIPT).exists() and not (real / TRANSCRIPT_GZ).exists()
+
+    # the override publishes it, and the generated results say what the judge was
+    assert publish.publish(real, latest=latest, runs_dir=runs_dir, regenerate=False,
+                           allow_self_judged=True) == [real.name]
+    assert "It is also the answering model" in export.readme_block(
+        published_bundles(latest, runs_dir), load_legacy())
+
+
+def test_publish_allows_samples_separate_judges_and_matcher_only_runs(runs, made_bundle):
+    runs_dir, latest, sample = runs
+    # a sample is never refused, whatever its judge
+    self_judged_sample = _self_judged(made_bundle, runs_dir, "20990101T000000000000Z-s", real=False)
+    assert publish.publish(self_judged_sample, latest=latest, runs_dir=runs_dir, regenerate=False)
+    # a real run with a separate judge
+    separate = _copy_run(made_bundle, runs_dir, "20990101T000000000000Z-separate", real=True)
+    assert not self_judged(load_bundle(separate))
+    assert publish.publish(separate, latest=latest, runs_dir=runs_dir, regenerate=False)
+    # a real run scored by the matcher only has no judge to prefer anything
+    matcher_only = _copy_run(made_bundle, runs_dir, "20990101T000000000000Z-matcher", real=True)
+    aggregate = json.loads((matcher_only / "aggregate.json").read_text())
+    aggregate["scoring"].update(judge_model=None, judge_provider=None, judge_is_answering_model=False)
+    (matcher_only / "aggregate.json").write_text(json.dumps(aggregate))
+    assert publish.publish(matcher_only, latest=latest, runs_dir=runs_dir, regenerate=False)
+
+
+def test_publish_cli_explains_the_refusal_and_takes_the_override(runs, made_bundle, monkeypatch, capsys):
+    runs_dir, latest, _ = runs
+    real = _self_judged(made_bundle, runs_dir, "20990101T000000000000Z-cli")
+    seen = {}
+
+    def fake_publish(bundle, add=False, allow_self_judged=False):
+        seen["allow"] = allow_self_judged
+        return publish.__dict__["_real_publish"](bundle, add=add, latest=latest, runs_dir=runs_dir,
+                                                 regenerate=False, allow_self_judged=allow_self_judged)
+
+    monkeypatch.setitem(publish.__dict__, "_real_publish", publish.publish)
+    monkeypatch.setattr(publish, "publish", fake_publish)
+    assert publish.main([str(real)]) == 2
+    err = capsys.readouterr().err
+    assert "refusing to publish" in err and "--allow-self-judged" in err and not latest.exists()
+    assert publish.main([str(real), "--allow-self-judged"]) == 0 and seen["allow"] is True
+    assert json.loads(latest.read_text()) == {"runs": [real.name]}
 
 
 def test_publish_drops_missing_and_duplicate_ids_and_validates_before_writing(
@@ -492,7 +565,7 @@ def test_committed_readme_and_ts_match_the_published_bundles():
 
 
 def test_committed_sample_is_labelled_and_builds(tmp_path, no_network):
-    (bundle,) = published_bundles()
+    bundle = load_bundle(RUNS_DIR / "20261031T135234525464Z-sample-fake")
     assert bundle.is_sample and bundle.manifest["llm_provider"] == "fake"
     assert (bundle.path / TRANSCRIPT_GZ).exists() and not (bundle.path / TRANSCRIPT).exists()
     assert not bundle.manifest["git"]["dirty"]
@@ -596,3 +669,13 @@ def test_identical_runs_show_the_pooled_wilson_interval_and_say_so(runs, tmp_pat
     assert next(b for b in summary if b["label"] == label)["recallCiMethod"] == "wilson-pooled"
     page = site_build.build([bundle], tmp_path / "site").read_text()
     assert "(runs identical: pooled Wilson)" in page
+
+
+def test_the_published_headline_is_a_real_run_judged_by_another_model(tmp_path, no_network):
+    (bundle,) = published_bundles()
+    assert not bundle.is_sample and bundle.manifest["llm_provider"] == "do"
+    assert not self_judged(bundle)
+    assert (bundle.path / TRANSCRIPT_GZ).exists() and not (bundle.path / TRANSCRIPT).exists()
+    page = site_build.build([bundle], tmp_path / "site").read_text()
+    assert "Sample run, not a benchmark result" not in page
+    assert all(f"<td>{label}</td>" in page for label in bundle.backends)

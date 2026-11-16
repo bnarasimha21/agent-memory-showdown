@@ -116,6 +116,18 @@ def headline_row(data: dict) -> dict:
     }
 
 
+def self_judged(bundle: Bundle) -> bool:
+    """True when the judge that produced the bundle's labels is its answering model.
+
+    Read from the scoring in effect (the aggregate, else the manifest); an
+    older bundle without the flag is decided by comparing the two model ids."""
+    scoring = bundle.aggregate.get("scoring") or bundle.manifest.get("scoring") or {}
+    judge_model = scoring.get("judge_model")
+    if not judge_model:
+        return False  # matcher only: no judge to prefer anything
+    return bool(scoring.get("judge_is_answering_model")) or judge_model == bundle.manifest.get("llm_model")
+
+
 def seed_pairing(bundle: Bundle) -> dict | None:
     """How the backends' runs line up, in words both the site and the README use.
 

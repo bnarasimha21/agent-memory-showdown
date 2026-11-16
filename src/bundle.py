@@ -138,11 +138,14 @@ def repair_jsonl(path: Path) -> bool:
 
 
 class BundleWriter:
+    _record_lock = __import__("threading").RLock()
+
     def __init__(self, root: str | Path, run_id: str, manifest: dict) -> None:
         self.run_id = run_id
         self.path = Path(root) / run_id
         self.path.mkdir(parents=True, exist_ok=False)
         self.manifest = dict(manifest, run_id=run_id)
+        self.on_record = None
         self._write_json("manifest.json", self.manifest)
         self._transcript = open(self.path / "transcript.jsonl", "a", encoding="utf-8")
 
@@ -151,6 +154,7 @@ class BundleWriter:
         """Continue an unfinished bundle: same run id and manifest, transcript appended to."""
         self = cls.__new__(cls)
         self.path = Path(path)
+        self.on_record = None
         self.manifest = load_manifest(self.path)
         self.run_id = self.manifest["run_id"]
         if not (self.path / TRANSCRIPT).exists():
@@ -205,8 +209,11 @@ class BundleWriter:
         self._write_json("dataset.json", datasets)
 
     def record(self, record: dict) -> None:
-        self._transcript.write(json.dumps(record, ensure_ascii=False) + "\n")
-        self._transcript.flush()
+        with self._record_lock:  # conversations may run in parallel threads (PARALLEL > 1)
+            if self.on_record is not None:  # the spend meter, when the model is priced
+                self.on_record(record)
+            self._transcript.write(json.dumps(record, ensure_ascii=False) + "\n")
+            self._transcript.flush()
 
     def finalize(self, **manifest_updates: Any) -> None:
         self.close_transcript()
