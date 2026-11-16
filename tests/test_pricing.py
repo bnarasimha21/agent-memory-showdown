@@ -80,3 +80,12 @@ def test_cost_per_correct_recall_uses_the_headline_probes_only():
     assert b["cost"]["per_correct_recall_usd"] == pytest.approx(conv + 100 * 3 / 1e6)
     # probe spend reported per run still covers every probe
     assert b["cost"]["probes_per_run_usd"] == pytest.approx(800 * 3 / 1e6)
+
+
+def test_repo_pricing_has_a_judge_from_another_family_than_the_default_model():
+    judge = price_for("openai-gpt-6-sol")
+    assert (judge.input_per_mtok, judge.output_per_mtok) == (2.0, 10.0)
+    assert judge.source.startswith("https://docs.digitalocean.com/") and judge.checked_on == "2026-11-16"
+    from src.config import Config
+
+    assert Config().LLM_MODEL == "anthropic-claude-4.5-sonnet"  # the default answering model is unchanged
