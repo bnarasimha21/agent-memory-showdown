@@ -364,7 +364,7 @@ noticing.
 3. **One answering model.** Whether the ranking holds on a smaller, cheaper model, where memory
    quality probably matters more, is unknown. DigitalOcean's model list gives
    `anthropic-claude-4.5-sonnet` a tentative end of support of November 30, 2026 (read 2026-11-16),
-   so a run after that date needs another answering model and a price for it.
+   so `make run-v2` answers with `anthropic-claude-sonnet-5.5`. The repository default is unchanged.
 4. **No k sweep has been run.** k = 4 is a default, not a tuned choice, and recall against k is the
    main dial for the vector backends. `make run-v2` sweeps k over 2, 4 and 8.
 5. **A short conversation.** At 50 turns the whole buffer fits easily in context, so buffer wins on

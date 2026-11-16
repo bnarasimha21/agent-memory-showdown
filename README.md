@@ -243,7 +243,7 @@ python run_benchmark.py --help
 
 One command runs the benchmark that is meant to be published: 5 runs of 50 turns, checkpoints after
 turns 15, 25, 35 and 50, all six backends, a k sweep over 2, 4 and 8 for the four top-k backends,
-the answering model `anthropic-claude-4.5-sonnet`, the judge `openai-gpt-6-sol` (a different model
+the answering model `anthropic-claude-sonnet-5.5`, the judge `openai-gpt-6-sol` (a different model
 family, so the judge does not grade its own answers) and a spend ceiling.
 
 ```bash
@@ -253,15 +253,17 @@ make run-v2 BUDGET=150
 
 `BUDGET` is required and has no default. It is a ceiling in US dollars that you choose, not a
 forecast: this repository has no real v2 run to forecast from. The only reference is v1, whose 20
-conversations on four backends cost about $37 at the same answering-model price, and this run has
+conversations on four backends cost about $37 on Claude Sonnet 4.5 ($3 and $15 per million tokens
+against $2 and $10 for the model used here), and this run has
 70 conversations (buffer, summary, and four backends at three depths, 5 runs each), a judge call
-per probe and mem0's extraction calls. DigitalOcean's model list gives
-`anthropic-claude-4.5-sonnet` a tentative end of support of November 30, 2026 (read 2026-11-16);
-after that, set `V2_LLM_MODEL` to a model that has a price in `pricing.yaml`. The target expands to:
+per probe and mem0's extraction calls. The run uses Claude Sonnet 5.5 and not the repository's
+default `anthropic-claude-4.5-sonnet`, because DigitalOcean's model list gives the older model a
+tentative end of support of November 30, 2026 (read 2026-11-16). `V2_LLM_MODEL` overrides it with
+any model that has a price in `pricing.yaml`. The target expands to:
 
 ```bash
 LLM_PROVIDER=do JUDGE_PROVIDER=do EMBEDDING_PROVIDER=local JUDGE=1 \
-  LLM_MODEL=anthropic-claude-4.5-sonnet JUDGE_MODEL=openai-gpt-6-sol \
+  LLM_MODEL=anthropic-claude-sonnet-5.5 JUDGE_MODEL=openai-gpt-6-sol \
   python run_benchmark.py --runs 5 --turns 50 --checkpoints 15 25 35 50 --k 2 4 8 --budget 150 --label v2
 ```
 

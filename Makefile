@@ -51,7 +51,7 @@ run-fake:
 #     make run-v2 BUDGET=150
 # If it stops (budget reached, crash, kill), continue the same bundle with
 #     make run-v2 BUDGET=250 RESUME=<run_id>
-V2_LLM_MODEL ?= anthropic-claude-4.5-sonnet
+V2_LLM_MODEL ?= anthropic-claude-sonnet-5.5
 V2_JUDGE_MODEL ?= openai-gpt-6-sol
 V2_K ?= 2 4 8
 V2_LABEL ?= v2
