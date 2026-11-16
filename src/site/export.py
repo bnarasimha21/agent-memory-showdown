@@ -1,7 +1,7 @@
-"""Generate the README results block and the video's data file from committed data.
+"""Generate the README results block, the video's data file and the guide from committed data.
 
-    python -m src.site.export           # rewrite both
-    python -m src.site.export --check   # exit 1, with a diff, if either is stale (CI)
+    python -m src.site.export           # rewrite all three
+    python -m src.site.export --check   # exit 1, with a diff, if any is stale (CI)
 
 Sources: `results/legacy/v1_published.json` (the v1 numbers, the only record of
 that run) and the bundles listed in `results/latest.json`.
@@ -11,6 +11,8 @@ that run) and the bundles listed in `results/latest.json`.
   unchanged in value, plus `LATEST_RUN`, a summary of the headline v2 bundle.
   The video keeps the v1 numbers until a real (non-sample) v2 run replaces
   the narration; `LATEST_RUN.isSample` says whether the v2 numbers are real.
+- docs/GUIDE.md: "Which memory, when, at what cost", from the headline bundle
+  (src/site/guide.py).
 """
 
 from __future__ import annotations
@@ -175,6 +177,10 @@ def v1_markdown(legacy: dict) -> list[str]:
 
 def readme_block(bundles: list[Bundle], legacy: dict) -> str:
     lines = [f"Interactive results, with every probe's transcript: <{PAGES_URL}>", ""]
+    lines += ["Which backend to pick, with the cost of each, is in the generated guide: "
+              "[Which memory, when, at what cost](docs/GUIDE.md)"
+              + (" (currently built from the sample below, so it shows the format only)."
+                 if bundles[0].is_sample else "."), ""]
     if bundles[0].is_sample:
         real = [b.run_id for b in bundles if not b.is_sample]
         lines += [("**No real v2 benchmark is published yet.** The headline bundle below is a sample "
@@ -312,12 +318,15 @@ def render_benchmark_data_ts(legacy: dict, headline: Bundle) -> str:
 
 
 def outputs_for(bundles: list[Bundle], readme_text: str | None = None) -> dict[Path, str]:
-    """README and benchmarkData.ts as they should be for these bundles (headline first)."""
+    """README, benchmarkData.ts and the guide as they should be for these bundles (headline first)."""
+    from src.site import guide
+
     legacy = load_legacy()
     text = README.read_text(encoding="utf-8") if readme_text is None else readme_text
     return {
         README: render_readme(text, readme_block(bundles, legacy)),
         BENCHMARK_DATA_TS: render_benchmark_data_ts(legacy, bundles[0]),
+        guide.GUIDE: guide.render(bundles[0]),
     }
 
 
@@ -351,7 +360,7 @@ def write_all(latest: Path = LATEST, runs_dir: Path = RUNS_DIR) -> list[Path]:
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="Generate README results and benchmarkData.ts")
+    parser = argparse.ArgumentParser(description="Generate README results, benchmarkData.ts and docs/GUIDE.md")
     parser.add_argument("--check", action="store_true",
                         help="do not write; exit 1 if the committed files differ from the generated ones")
     args = parser.parse_args(argv)
@@ -363,7 +372,7 @@ def main(argv=None) -> int:
             print("\nGenerated results are stale: run `python -m src.site.export` and commit.",
                   file=sys.stderr)
             return 1
-        print("README results block and benchmarkData.ts are up to date.")
+        print("README results block, benchmarkData.ts and docs/GUIDE.md are up to date.")
         return 0
     written = write_all()
     print("updated: " + (", ".join(_rel(p) for p in written) if written else "nothing (already current)"))
