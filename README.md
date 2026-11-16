@@ -53,6 +53,10 @@ The reasoning behind the design (requirements, each decision and its cost, measu
 to validity, what changes at 100 times the scale) is in the [design record](docs/DESIGN.md), with a
 decision-flow diagram and a deployment diagram.
 
+![Six backends, one harness, and the published run](docs/images/architecture.svg)
+
+The same structure as a graph, with the repository's default model:
+
 ```mermaid
 flowchart TD
     E[".env / env vars"] --> C[config.py]

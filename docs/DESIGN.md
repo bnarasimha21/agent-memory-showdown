@@ -55,6 +55,8 @@ How it has to behave:
 One harness, six backends behind one interface, and two scorers. The run bundle connects them to
 everything published.
 
+![Six backends, one harness, and the published run](images/architecture.svg)
+
 ```mermaid
 flowchart LR
     subgraph Inputs
