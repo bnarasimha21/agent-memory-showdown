@@ -1,4 +1,4 @@
-.PHONY: run build up down clean run-local run-quick run-fake venv test test-unit test-integration test-services-up test-services-down site export site-check
+.PHONY: run build up down clean run-local run-quick run-fake run-v2 need-budget publish guide venv test test-unit test-integration test-services-up test-services-down site export site-check
 
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
@@ -45,6 +45,31 @@ run-fake:
 	LLM_PROVIDER=fake EMBEDDING_PROVIDER=fake JUDGE_PROVIDER=fake $(PYTHON) run_benchmark.py --runs 2 --turns 30 \
 		--checkpoints 15 30 --facts extraction=1,update=1,temporal=1,multi_hop=1,abstention=1,sensitive=1
 
+# The run that gets published (paid: needs DO_API_KEY). 5 runs of 50 turns, all
+# six backends, a k sweep, a judge from a different model family than the
+# answering model, and a spend ceiling. BUDGET is required and has no default:
+#     make run-v2 BUDGET=150
+# If it stops (budget reached, crash, kill), continue the same bundle with
+#     make run-v2 BUDGET=250 RESUME=<run_id>
+V2_LLM_MODEL ?= anthropic-claude-4.5-sonnet
+V2_JUDGE_MODEL ?= openai-gpt-6-sol
+V2_K ?= 2 4 8
+V2_LABEL ?= v2
+need-budget:
+	@test -n "$(BUDGET)" || { echo "run-v2 needs a spend ceiling in USD, for example: make run-v2 BUDGET=150"; exit 2; }
+
+run-v2: need-budget up
+	LLM_PROVIDER=do JUDGE_PROVIDER=do EMBEDDING_PROVIDER=local JUDGE=1 \
+		LLM_MODEL=$(V2_LLM_MODEL) JUDGE_MODEL=$(V2_JUDGE_MODEL) \
+		$(PYTHON) run_benchmark.py --runs 5 --turns 50 --checkpoints 15 25 35 50 --k $(V2_K) --budget $(BUDGET) \
+		$(if $(RESUME),--resume $(RESUME),--label $(V2_LABEL))
+
+# Publish a finished bundle as the headline run: make publish BUNDLE=results/runs/<run_id>
+# Refuses a real run whose judge was the answering model.
+publish:
+	@test -n "$(BUNDLE)" || { echo "usage: make publish BUNDLE=results/runs/<run_id>"; exit 2; }
+	$(PYTHON) -m src.site.publish $(BUNDLE)
+
 # Create the local virtualenv used by the test targets
 venv:
 	python3 -m venv .venv
@@ -70,10 +95,14 @@ test-integration: test-services-up
 site:
 	$(PYTHON) -m src.site.build
 
-# Regenerate the README results block and remotion/src/data/benchmarkData.ts
+# Regenerate the README results block, remotion/src/data/benchmarkData.ts and docs/GUIDE.md
 export:
 	$(PYTHON) -m src.site.export
 
-# Fail if the README block or benchmarkData.ts no longer match the published bundles
+# docs/GUIDE.md ("Which memory, when, at what cost") from the headline bundle in results/latest.json
+guide:
+	$(PYTHON) -m src.site.guide
+
+# Fail if the README block, benchmarkData.ts or docs/GUIDE.md no longer match the published bundles
 site-check:
 	$(PYTHON) -m src.site.export --check

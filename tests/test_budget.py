@@ -159,3 +159,28 @@ def test_meter_without_a_limit_never_stops():
     meter = SpendMeter(price_for("fake-memory-v1"), None)
     meter.add_record({"type": "turn", "input_tokens": 10**9, "output_tokens": 0})
     assert meter.total_usd == pytest.approx(3000.0) and not meter.exceeded()
+
+
+def test_make_run_v2_is_the_documented_run_and_needs_a_budget():
+    """5 runs of 50 turns, a k sweep, the separate priced judge and a budget, in one target."""
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    dry = subprocess.run(["make", "-n", "run-v2", "BUDGET=150"], cwd=root, capture_output=True, text=True)
+    command = " ".join(dry.stdout.replace("\\\n", " ").split())
+    for part in ("LLM_PROVIDER=do", "JUDGE_PROVIDER=do", "EMBEDDING_PROVIDER=local",
+                 "LLM_MODEL=anthropic-claude-4.5-sonnet", "JUDGE_MODEL=openai-gpt-6-sol",
+                 "run_benchmark.py --runs 5 --turns 50 --checkpoints 15 25 35 50 --k 2 4 8 --budget 150",
+                 "--label v2"):
+        assert part in command, part
+    assert price_for("openai-gpt-6-sol") is not None  # the budget needs the judge priced
+    args = cli.parse_args(command.split("run_benchmark.py", 1)[1].split())
+    assert sorted(args.backends) == sorted(AVAILABLE_BACKENDS) and len(args.backends) == 6
+    resumed = subprocess.run(["make", "-n", "run-v2", "BUDGET=250", "RESUME=some-run"], cwd=root,
+                             capture_output=True, text=True).stdout
+    assert "--resume some-run" in resumed and "--label" not in resumed
+    assert "make run-v2 BUDGET=150" in (root / "README.md").read_text()
+    # without BUDGET the target stops before starting services or the benchmark
+    refused = subprocess.run(["make", "run-v2"], cwd=root, capture_output=True, text=True)
+    assert refused.returncode != 0 and "needs a spend ceiling" in refused.stdout
