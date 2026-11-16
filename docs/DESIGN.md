@@ -45,9 +45,9 @@ How it has to behave:
 |---|-------------|-----------------|
 | N1 | Measure memory, not prompt wording | One prompt template for every backend. Its sha256 is in every manifest |
 | N2 | A run that cannot be trusted is dropped, never averaged in | Probe isolation check, paired seeds, failed seeds dropped for every backend (section 4, D2 and D6) |
-| N3 | Do not spend money on a run that is going to fail | Preflight before the first paid call: probes exist, embeddings load, judge resolves, resume matches |
+| N3 | Do not spend money on a run that is going to fail, or more than was agreed | Preflight before the first conversation: probes exist, embeddings load, judge resolves and answers one call, resume matches. A spend budget stops the run cleanly (D9) |
 | N4 | Show the uncertainty honestly | Interval over runs, not a too-narrow bootstrap. Per-probe intervals marked approximate |
-| N5 | A sample run cannot be mistaken for a result | `is_sample` on any fake component, stated at the top of the generated results, never the headline over a real run |
+| N5 | A sample run cannot be mistaken for a result | `is_sample` on any fake component, stated at the top of the generated results and the generated guide, never the headline over a real run |
 | N6 | Reproducible | Seeded datasets, recorded package versions, git sha, model ids, prompt and judge hashes |
 
 ## 3. Architecture
@@ -202,10 +202,12 @@ Each decision lists the choice, the option not taken, the reason, and the cost.
   never checked the melatonin dose, and scored "I won't repeat your PIN 7294" as correct. A matcher
   alone cannot follow paraphrase. A judge alone cannot be audited. Two scorers that mostly agree,
   with the disagreements listed, can be.
-- **Cost.** One judge call per probe. By default **the judge is the answering model**, because it is
-  the only model the repository is priced for, and a model may favour its own answers. The run
-  records `judge_is_answering_model` and the generated results say so. Fixing it is phase 3 of the
-  plan.
+- **Cost.** One judge call per probe, on a second model. A model may favour its own answers, so the
+  published run uses a judge from another family: `openai-gpt-6-sol`, priced in `pricing.yaml` and
+  set by `make run-v2`. If `JUDGE_MODEL` is left unset the judge is still the answering model. The
+  run then records `judge_is_answering_model`, and `publish` refuses it unless
+  `--allow-self-judged` is passed, in which case the generated results say so. The judge has not
+  been calibrated against hand labels; kappa against the matcher is the only check.
 
 ### D5. Headline recall leaves out abstention and sensitive facts
 
@@ -250,7 +252,8 @@ Each decision lists the choice, the option not taken, the reason, and the cost.
 
 - **Choice.** Each run writes `manifest.json`, `dataset.json`, a transcript line per turn and probe,
   `scores.jsonl` and `aggregate.json`. The README results block, the site and the video data are
-  generated from bundles listed in `latest.json`. CI fails if the README drifts from them.
+  generated from bundles listed in `latest.json`, and so is the guide (`docs/GUIDE.md`, from the
+  headline bundle). CI fails if the README or the guide drifts from them.
 - **Not taken.** Hand-written result tables, which is how v1 was published.
 - **Why.** No v1 run bundle exists. The v1 numbers survive only as copied constants, so they cannot be
   re-scored with the v2 matcher, and the refusal question cannot be answered. Re-scoring a bundle
@@ -260,8 +263,12 @@ Each decision lists the choice, the option not taken, the reason, and the cost.
 
 ### D9. Fail before paying, resume after failing
 
-- **Choice.** A preflight runs before the first paid call: at least one headline probe, an embedding
-  model that loads, a judge that resolves. Model calls retry on 429, 5xx and connection errors with
+- **Choice.** A preflight runs before the first conversation: at least one headline probe, an
+  embedding model that loads, a judge that resolves and, on a paid provider, answers one test call
+  (so a wrong judge model id costs one call, not a run). `--budget` sets a spend ceiling for the
+  bundle, computed from recorded tokens and `pricing.yaml` and checked before each (backend, run)
+  and each judge call; when it is reached the run stops and can be resumed, and an unpriced model
+  is refused up front. Model calls retry on 429, 5xx and connection errors with
   exponential backoff, and the wait is not counted as latency. Subscription usage limits are waited
   out. `--resume` keeps finished runs, reruns unfinished ones, and refuses if the options no longer
   match the manifest or regenerate the same datasets. Judge verdicts are cached.
@@ -323,7 +330,7 @@ is under 1% of a turn. The answering model is the latency, and the backend choic
 recall, not speed. Not measured here: `summary` and `mem0` writes, which are LLM calls and so time the
 fake model; stores across a network; stores holding more than 50 turns.
 
-**Tests.** 283 unit tests, offline, about 30 seconds. 12 integration tests run every backend through the
+**Tests.** 315 unit tests, offline, about 30 seconds. 12 integration tests run every backend through the
 real harness against real Qdrant and Postgres. The README results block matches the published bundles
 (`make site-check`).
 
@@ -337,25 +344,29 @@ noticing.
 | Probes write to memory and flatter later checkpoints | Read-only probes, fingerprint check aborts the run | None known |
 | Prompt wording differs between backends | One template, hash in the manifest | Backends that rely on their own framework's prompt are measured without it |
 | A probe has two right answers | Unique values per conversation, tested over 2,000 seeds | Paraphrased values the normaliser does not fold |
-| Scorer is wrong | Matcher and judge, kappa and disagreements published | Judge is the answering model by default (self-preference) |
+| Scorer is wrong | Matcher and judge, kappa and disagreements published. A real run judged by its own answering model is refused at publish | The judge is not calibrated against hand labels |
 | Refusals counted as forgetting | `refused` label, sensitive facts outside the headline | The judge has to tell refusal from not knowing, which a matcher cannot check |
 | Empty memory scores well | Abstention outside the headline | Headline shows no hallucination rate |
 | One backend gets an easier conversation | Paired seeds; a failed seed is dropped for all | None known |
 | Intervals too narrow | t over runs, per-probe Wilson marked approximate | Five runs give wide intervals; differences may not be resolvable |
 | Retry waits counted as latency | Waits recorded apart and subtracted | None known |
-| A sample is quoted as a result | `is_sample`, generated warning, cannot displace a real headline | A copy taken out of the repository loses the warning |
+| A sample is quoted as a result | `is_sample`, generated warning in the README and at the top of the guide, cannot displace a real headline | A copy taken out of the repository loses the warning |
 | Synthetic dataset overstates or understates real use | Nothing yet | Template text, 11 facts per 50 turns, one user, English only |
 | The resume and LinkedIn quote numbers the benchmark no longer stands behind | Nothing in this repository | v1 numbers are still quoted in `my-resume`; phase 3 replaces them |
 
 ## 7. What stands between this and a result worth quoting
 
 1. **No real v2 run.** Everything in v2 has been tested, but the only published bundle is a sample.
-2. **The judge grades its own model's answers** unless `JUDGE_MODEL` is set to a different model, and
-   `pricing.yaml` prices only one DigitalOcean model.
+2. **The separate judge is set up but unproven.** `pricing.yaml` now prices a second DigitalOcean
+   model (`openai-gpt-6-sol`), `make run-v2` uses it as the judge, and `publish` refuses a real run
+   judged by its own answering model. No real run has used it yet, and its verdicts have not been
+   checked against hand labels.
 3. **One answering model.** Whether the ranking holds on a smaller, cheaper model, where memory
-   quality probably matters more, is unknown.
+   quality probably matters more, is unknown. DigitalOcean's model list gives
+   `anthropic-claude-4.5-sonnet` a tentative end of support of November 30, 2026 (read 2026-11-16),
+   so a run after that date needs another answering model and a price for it.
 4. **No k sweep has been run.** k = 4 is a default, not a tuned choice, and recall against k is the
-   main dial for the vector backends.
+   main dial for the vector backends. `make run-v2` sweeps k over 2, 4 and 8.
 5. **A short conversation.** At 50 turns the whole buffer fits easily in context, so buffer wins on
    recall by construction. The interesting crossover, where a long buffer gets expensive or worse,
    is past the default length.
@@ -377,10 +388,10 @@ is built. It shows where the current seams are and what goes behind them.
 | Probe isolation | Fingerprint reads the whole store twice per checkpoint | Snapshot or version counter per store (Qdrant collection snapshot, Postgres row count plus max id), with a full digest only on a sample of checkpoints | `memory_fingerprint()` is per backend |
 | Execution | One process, one call at a time | A queue of (backend, k, seed) jobs, one worker per job, concurrency capped per provider rate limit. Each job is already independent | `run_single()` takes one backend, one dataset, one run index |
 | Stores | Docker on one machine, per-session collections | Managed Qdrant and Postgres, one namespace per job, measured across the network like a real deployment | Each backend sets up and tears down its own session |
-| Models | One answering model, judge is the same model | A matrix of answering models, with a fixed judge from a different family, and the judge calibrated against a hand-labelled set of probe answers | `JUDGE_MODEL`, `pricing.yaml`, `judge_is_answering_model` |
+| Models | One answering model, one judge from a different family (`make run-v2`) | A matrix of answering models, with a fixed judge from a different family, and the judge calibrated against a hand-labelled set of probe answers | `JUDGE_MODEL`, `pricing.yaml`, `judge_is_answering_model` |
 | Embeddings | One local model on CPU | Embedding model as a swept dimension, served on GPU or a hosted API | `EMBEDDING_MODEL` and `EMBEDDING_DIMENSION` |
 | Dataset | Template facts, one user | A mix of template facts and real, consented, reviewed conversations; more facts per turn; other languages | Fact bank is data, with its version and hash in the manifest |
-| Cost control | Preflight and resume | A budget per run, enforced before each job, from token estimates by backend | Token counts per component already recorded |
+| Cost control | Preflight, resume, and a budget per bundle checked after each (backend, run) from recorded tokens | A budget enforced before each job from token estimates by backend, so a job that would cross it never starts | Token counts per component already recorded; `src/budget.py` |
 | Results | Bundles committed to git, static site | Bundles in object storage with an index, a site that compares runs over time, and a regression gate when a new model or library version changes recall | `aggregate.json` per bundle, `latest.json` index, `site-check` in CI |
 | Statistics | t interval over 5 runs | Enough runs per cell to separate the differences that matter, chosen from a pilot run's variance | `recall_run_mean` and per-run rates already in the aggregate |
 
