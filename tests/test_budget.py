@@ -170,7 +170,7 @@ def test_make_run_v2_is_the_documented_run_and_needs_a_budget():
     dry = subprocess.run(["make", "-n", "run-v2", "BUDGET=150"], cwd=root, capture_output=True, text=True)
     command = " ".join(dry.stdout.replace("\\\n", " ").split())
     for part in ("LLM_PROVIDER=do", "JUDGE_PROVIDER=do", "EMBEDDING_PROVIDER=local",
-                 "LLM_MODEL=anthropic-claude-4.5-sonnet", "JUDGE_MODEL=openai-gpt-6-sol",
+                 "LLM_MODEL=anthropic-claude-sonnet-5.5", "JUDGE_MODEL=openai-gpt-6-sol",
                  "run_benchmark.py --runs 5 --turns 50 --checkpoints 15 25 35 50 --k 2 4 8 --budget 150",
                  "--label v2"):
         assert part in command, part
