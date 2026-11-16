@@ -72,10 +72,16 @@ def provider_caveats(judge: bool = True) -> dict:
         out["judge_note"] = ("The judge runs on a Claude subscription through the claude CLI: its "
                              "temperature cannot be set and its verdicts are not billed. Answering-model "
                              "costs and latencies are unaffected.")
+    if judge and config.JUDGE_PROVIDER == "do" and config.JUDGE_TEMPERATURE != 0.0:
+        out["judge_note"] = (
+            "The judge ran at the model's default temperature (JUDGE_TEMPERATURE=default), so its "
+            "verdicts may vary between runs." if config.JUDGE_TEMPERATURE is None else
+            f"The judge ran at temperature {config.JUDGE_TEMPERATURE:g}, not 0, so its verdicts may "
+            "vary between runs.")
     return out
 
 
-def _do_chat_model(model: str) -> BaseChatModel:
+def _do_chat_model(model: str, temperature: float | None = 0.0) -> BaseChatModel:
     if not config.DO_API_KEY:
         raise RuntimeError(
             "The 'do' provider needs DO_API_KEY in the environment or .env. "
@@ -87,7 +93,7 @@ def _do_chat_model(model: str) -> BaseChatModel:
         model=model,
         openai_api_key=config.DO_API_KEY,
         openai_api_base=config.DO_INFERENCE_URL,
-        temperature=0.0,
+        temperature=temperature,  # None leaves the parameter out of the request
         # src/retry.py does the retrying, so every attempt is counted once
         max_retries=0,
     )
@@ -108,7 +114,7 @@ def get_judge_llm() -> BaseChatModel:
         return _claude_cli_model(config.CLAUDE_CLI_JUDGE_MODEL)
     if config.JUDGE_PROVIDER != "do":
         raise ValueError(f"Unknown JUDGE_PROVIDER {config.JUDGE_PROVIDER!r} (use 'do', 'claude_cli' or 'fake')")
-    return _do_chat_model(config.JUDGE_MODEL)
+    return _do_chat_model(config.JUDGE_MODEL, config.JUDGE_TEMPERATURE)
 
 
 def get_llm() -> BaseChatModel:

@@ -201,6 +201,7 @@ def run_benchmark(
     judge: bool | None = None,
     ks: list[int] | None = None,
     resume: str | Path | None = None,
+    budget_usd: float | None = None,
 ) -> Path:
     """Run the benchmark and write a bundle. Returns the bundle directory.
 
@@ -214,15 +215,32 @@ def run_benchmark(
     already made are reused. The configuration must match the bundle's
     manifest and regenerate the same datasets, otherwise it is refused.
 
+    `budget_usd` (default BUDGET_USD) is a spend ceiling for the whole bundle,
+    across resumes, computed from recorded tokens and pricing.yaml
+    (src/budget.py). It is checked before each (backend, run) and before each
+    judge call; when it is reached the bundle is left unfinished and resumable
+    and `BudgetExceeded` is raised. With a budget set, an unpriced answering
+    or judge model is refused before any work. Spend is recorded in the
+    manifest whenever the models are priced, budget or not.
+
     `ks` sweeps the retrieval depth: with more than one value, every backend
     that retrieves top-k (`uses_k`) runs once per k and is reported as
     `name@k<k>`; backends that ignore k run once. A single value just sets k.
     """
     from src.aggregate import aggregate_bundle
     from src.bundle import read_transcript
+    from src.budget import BudgetExceeded, MeteredJudge, SpendMeter, require_prices
+    from src.llm_factory import judge_model_id
+    from src.pricing import price_for
     from src.scoring.rescore import JudgeCache, score_probes, scoring_info, write_jsonl
 
     use_judge = config.JUDGE_ENABLED if judge is None else judge
+    budget_usd = config.BUDGET_USD if budget_usd is None else budget_usd
+    if budget_usd is not None:
+        if budget_usd <= 0:
+            raise ValueError(f"the budget must be positive, got {budget_usd}")
+        # Before anything else: a budget that cannot be computed protects nothing.
+        require_prices(llm_model_id(), judge_model_id() if use_judge else None)
     # Calls and usage-limit pauses are counted from here, so two benchmarks in
     # one process (a resume in a test, say) do not count each other's.
     calls_before, pauses_before = _cli_calls(), len(USAGE_LIMIT_PAUSES)
@@ -303,6 +321,8 @@ def run_benchmark(
     )
     prior_s, prior_calls, prior_pauses = 0.0, 0, []
     done: set[tuple[str, int]] = set()
+    answering_price = price_for(llm_model_id())
+    meter = None  # spend is tracked whenever the answering model is priced
     if resume:
         bundle_dir = Path(resume)
         if not bundle_dir.exists():
@@ -313,6 +333,15 @@ def run_benchmark(
         done = {(r["backend"], r["run_index"]) for r in old
                 if r["type"] == "run_end" and r.get("error") is None}
         started_keys = {(r["backend"], r["run_index"]) for r in old if r["type"] == "run_start"}
+        if answering_price is not None:
+            meter = SpendMeter(answering_price, price_for(judge_model_id()) if use_judge else None,
+                               budget_usd, prior=writer.manifest.get("spend"))
+            for r in old:
+                # Dropped runs were paid for, so they stay in the spend.
+                if (r.get("backend"), r.get("run_index")) in started_keys - done:
+                    meter.add_dropped([r])
+                else:
+                    meter.add_record(r)
         dropped = writer.drop_runs(started_keys - done)
         logger.info("RESUMING %s: %d run(s) already finished, %d unfinished or failed run(s) "
                     "dropped (%d records) and rerun", writer.run_id, len(done),
@@ -323,31 +352,71 @@ def run_benchmark(
         writer.manifest.setdefault("resumed_at", []).append(utc_now())
         writer.write_json("manifest.json", writer.manifest)
     else:
+        # The judge preflight is the one paid call made before a bundle exists:
+        # a judge that cannot answer stops the run here, with nothing written.
+        preflight = judge_obj.preflight() if judge_obj is not None and judge_obj.provider == "do" else None
         writer = BundleWriter(runs_root, new_run_id(run_label), manifest)
         writer.write_dataset({str(i): d.to_dict() for i, d in enumerate(datasets)})
+        if answering_price is not None:
+            meter = SpendMeter(answering_price, price_for(judge_model_id()) if use_judge else None,
+                               budget_usd)
+            if preflight:
+                meter.add_judge(preflight["input_tokens"], preflight["output_tokens"])
 
     started = time.perf_counter()
+
+    def save_spend() -> None:
+        if meter is not None:
+            writer.manifest["spend"] = meter.to_dict()
+        writer.manifest.update(_counters(prior_s + time.perf_counter() - started, prior_calls,
+                                         prior_pauses, calls_before, pauses_before))
+        writer.write_json("manifest.json", writer.manifest)
+
+    def stop(where: str) -> None:
+        """Leave the bundle unfinished and resumable, and say how to go on."""
+        meter.stopped = where
+        writer.close_transcript()
+        save_spend()
+        raise BudgetExceeded(
+            f"Budget reached {where}: ${meter.total_usd:.2f} spent of ${meter.limit:.2f} "
+            f"(answering ${meter.answering_usd + meter.dropped_usd:.2f}, judge ${meter.judge_usd:.2f}; "
+            "recorded tokens at pricing.yaml prices). Nothing was aggregated and the bundle cannot be "
+            f"published yet. To continue, rerun the same command with a higher --budget and "
+            f"--resume {writer.run_id}; finished runs and judge verdicts are kept.", writer.path)
+
+    if meter is not None:
+        meter.stopped = None
+        writer.on_record = meter.add_record
     for label, backend_cls, kwargs in plan:
         logger.info("Benchmarking backend: %s", label)
         for run_idx, dataset in enumerate(datasets):
             if (label, run_idx) in done:
                 logger.info("  Run %d / %d already finished, skipped", run_idx + 1, num_runs)
                 continue
+            if meter is not None and meter.exceeded():
+                stop(f"before {label} run {run_idx + 1} of {num_runs}")
             logger.info("  Run %d / %d", run_idx + 1, num_runs)
             run_single(backend_cls, dataset, run_idx, writer, kwargs, sweep)
             # Totals so far, so a killed process still leaves honest counters for a resume.
-            writer.manifest.update(_counters(prior_s + time.perf_counter() - started, prior_calls,
-                                             prior_pauses, calls_before, pauses_before))
-            writer.write_json("manifest.json", writer.manifest)
+            save_spend()
+            if meter is not None:
+                logger.info("  Spend so far: $%.2f%s", meter.total_usd,
+                            f" of ${meter.limit:.2f}" if meter.limit is not None else "")
 
     duration = prior_s + time.perf_counter() - started
     writer.close_transcript()
+    if meter is not None and judge_obj is not None:
+        if meter.exceeded():
+            stop("before judging")
+        judge_obj = MeteredJudge(judge_obj, meter, on_stop=stop, on_progress=save_spend)
     cache = JudgeCache(writer.path / "judge_cache.jsonl", judge_obj) if judge_obj is not None else None
     scores = score_probes(read_transcript(writer.path), judge_obj, cache)
     info = scoring_info(judge_obj)
     write_jsonl(writer.path / "scores.jsonl", scores)
     writer.write_json("scoring.json", info)
     extra = _counters(duration, prior_calls, prior_pauses, calls_before, pauses_before)
+    if meter is not None:
+        extra["spend"] = meter.to_dict()
     writer.finalize(finished_at=utc_now(), scoring=info, **extra)
     writer.write_aggregate(aggregate_bundle(writer.path))
     logger.info("Run bundle written to %s", writer.path)

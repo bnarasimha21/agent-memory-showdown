@@ -25,6 +25,14 @@ PROMPT_PATH = Path(__file__).with_name("judge_prompt.md")
 INPUT_MARKER = "JUDGE_INPUT_JSON:"
 
 
+# A probe with an obvious verdict, used by `Judge.preflight`.
+PREFLIGHT_RECORD = {
+    "question": "What is my dog's name?", "answer_key": "Juniper", "answers": [["juniper"]],
+    "stale": [], "category": "extraction", "candidates": [],
+    "response": "Your dog's name is Juniper.",
+}
+
+
 def load_prompt() -> str:
     return PROMPT_PATH.read_text(encoding="utf-8")
 
@@ -95,6 +103,23 @@ class Judge:
             "judge_prompt_hash": prompt_hash(),
             "judge_is_answering_model": self.same_as_answerer,
         }
+
+    def preflight(self) -> dict:
+        """One real judge call on a fixed probe, made before any conversation is paid for.
+
+        A judge model id the provider does not know, a model that rejects the
+        request (a temperature it does not accept, an API it is not served on)
+        or one that does not follow the rubric's output format would otherwise
+        only show after every conversation had run. Raises RuntimeError with
+        the reason; returns the verdict (with its token counts) when it works.
+        """
+        verdict = self.judge(PREFLIGHT_RECORD)
+        if verdict["label"] == "error":
+            raise RuntimeError(
+                f"the judge ({self.model}) failed its preflight call, so nothing was run: "
+                f"{verdict['rationale']}. Check JUDGE_MODEL against the provider's model list; if the "
+                "model rejects the temperature parameter, set JUDGE_TEMPERATURE=default.")
+        return verdict
 
     def judge(self, record: dict) -> dict:
         try:
