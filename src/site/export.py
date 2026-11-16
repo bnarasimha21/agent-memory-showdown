@@ -24,7 +24,7 @@ from pathlib import Path
 from src.report import provider_note
 from src.site.data import (
     LATEST, LEGACY_V1, PAGES_URL, REPO_ROOT, RUNS_DIR, Bundle, headline_row, load_legacy,
-    published_bundles, seed_pairing,
+    published_bundles, seed_pairing, self_judged,
 )
 
 README = REPO_ROOT / "README.md"
@@ -145,7 +145,7 @@ def agreement_text(bundle: Bundle) -> str:
                 "so its agreement with the matcher says nothing about a real judge.")
     same = (" It is also the answering model, so it may favour its own answers (self-preference); "
             "the matcher figures in `aggregate.json` are the check on that."
-            if scoring.get("judge_is_answering_model") else "")
+            if self_judged(bundle) else "")
     return (f"Judge `{scoring['judge_model']}`; matcher/judge agreement: Cohen's kappa "
             f"{fmt(agreement.get('kappa'), '.3f')} over {agreement.get('n', 0)} probes "
             "(every disagreement is listed in `aggregate.json`)." + same)

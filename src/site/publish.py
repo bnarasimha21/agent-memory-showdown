@@ -3,11 +3,15 @@
     python -m src.site.publish results/runs/<run_id>          # make it the published run
     python -m src.site.publish results/runs/<run_id> --add    # add it as the headline, keep the others
 
+A real (non-sample) run whose judge was the answering model is refused, because
+a model may favour its own answers; `--allow-self-judged` overrides that and
+the generated results then say so.
+
 The transcript is gzipped (`transcript.jsonl.gz`, reproducible: no timestamp
 or file name in the header) after checking that it decompresses to the same
 records; every reader accepts either form. Charts are not part of a published
 bundle (they are rebuilt by `make site`). Finally the README results block and
-`remotion/src/data/benchmarkData.ts` are regenerated.
+`remotion/src/data/benchmarkData.ts` and `docs/GUIDE.md` are regenerated.
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ from pathlib import Path
 
 from src.bundle import TRANSCRIPT, TRANSCRIPT_GZ, read_transcript, validate_run_id
 from src.site import export
-from src.site.data import LATEST, RUNS_DIR, Bundle, load_bundle, read_latest
+from src.site.data import LATEST, RUNS_DIR, Bundle, load_bundle, read_latest, self_judged
 
 
 def gzip_transcript(bundle: Path) -> Path:
@@ -81,8 +85,27 @@ def plan_runs(new: Bundle, add: bool, latest: Path, runs_dir: Path) -> tuple[lis
     return [new.run_id] + kept, warnings
 
 
+class SelfJudgedError(ValueError):
+    """A real run was graded by the model that gave the answers."""
+
+
+def check_judge(bundle: Bundle, allow_self_judged: bool = False) -> None:
+    """Refuse a real run graded by its own answering model, unless overridden."""
+    if bundle.is_sample or allow_self_judged or not self_judged(bundle):
+        return
+    model = bundle.manifest.get("llm_model")
+    raise SelfJudgedError(
+        f"refusing to publish {bundle.run_id}: its judge is the answering model ({model}). A model "
+        "grading its own answers may favour them (self-preference), so the recall figures could be "
+        "inflated. Rescore it with a judge from another model family (set JUDGE_MODEL and run "
+        f"`python -m src.scoring.rescore {bundle.path}`), or rerun with a separate judge "
+        "(`make run-v2`). To publish it as it is, pass --allow-self-judged; the generated results "
+        "will say that the judge is the answering model.")
+
+
 def publish(bundle: str | Path, add: bool = False, latest: Path = LATEST,
-            runs_dir: Path = RUNS_DIR, regenerate: bool = True) -> list[str]:
+            runs_dir: Path = RUNS_DIR, regenerate: bool = True,
+            allow_self_judged: bool = False) -> list[str]:
     """Validate and render everything first; only then gzip and write files."""
     bundle = Path(bundle).resolve()
     if bundle.parent != runs_dir.resolve():
@@ -91,6 +114,7 @@ def publish(bundle: str | Path, add: bool = False, latest: Path = LATEST,
     validate_run_id(loaded.run_id)
     if loaded.run_id != bundle.name:
         raise ValueError(f"manifest run_id {loaded.run_id!r} does not match directory {bundle.name!r}")
+    check_judge(loaded, allow_self_judged)
     runs, warnings = plan_runs(loaded, add, latest, runs_dir)
     bundles = [loaded if r == loaded.run_id else load_bundle(runs_dir / r) for r in runs]
     generated = export.outputs_for(bundles) if regenerate else {}
@@ -108,9 +132,17 @@ def main(argv=None) -> int:
     parser.add_argument("--add", action="store_true",
                         help="keep the current published runs; this one becomes the headline "
                              "unless it is a sample and a real run is published")
+    parser.add_argument("--allow-self-judged", action="store_true",
+                        help="publish a real run even though its judge was the answering model "
+                             "(refused by default: a model may favour its own answers)")
     args = parser.parse_args(argv)
-    runs = publish(args.bundle, add=args.add)
-    print(f"published: {', '.join(runs)} (results/latest.json); README and benchmarkData.ts regenerated")
+    try:
+        runs = publish(args.bundle, add=args.add, allow_self_judged=args.allow_self_judged)
+    except SelfJudgedError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(f"published: {', '.join(runs)} (results/latest.json); README, benchmarkData.ts and "
+          "docs/GUIDE.md regenerated")
     return 0
 
 
