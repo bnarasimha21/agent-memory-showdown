@@ -30,6 +30,8 @@ def provider_note(caveats: dict | None) -> str:
                      "API-equivalent cost relative to buffer and vector backends.")
     if caveats.get("judge_note"):
         parts.append(caveats["judge_note"])
+    if caveats.get("parallel_note"):
+        parts.append(caveats["parallel_note"])
     return " ".join(parts)
 
 

@@ -118,6 +118,10 @@ class Config:
 
         # Benchmark parameters
         self.NUM_RUNS: int = int(env("NUM_RUNS", "5"))
+        # Conversations (one backend, one run) and judge calls run at once. 1 keeps the
+        # original one-call-at-a-time behaviour. Above 1 the run is faster and its
+        # latency figures are not comparable, which the manifest records.
+        self.PARALLEL: int = max(1, int(env("PARALLEL", "1")))
         self.NUM_TURNS: int = int(env("NUM_TURNS", "50"))
         self.BASE_SEED: int = int(env("BASE_SEED", "42"))
         if env("SEED_TURNS") is not None:

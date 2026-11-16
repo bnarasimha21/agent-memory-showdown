@@ -78,6 +78,12 @@ def provider_caveats(judge: bool = True) -> dict:
             "verdicts may vary between runs." if config.JUDGE_TEMPERATURE is None else
             f"The judge ran at temperature {config.JUDGE_TEMPERATURE:g}, not 0, so its verdicts may "
             "vary between runs.")
+    if config.PARALLEL > 1:
+        out["parallel_note"] = (
+            f"Conversations and judge calls ran {config.PARALLEL} at a time, not one after another. "
+            "Recall, tokens and cost are unaffected. Latency was measured under the benchmark's own "
+            "load and is not comparable with a one-at-a-time run; for memory read and write latency "
+            "use scripts/memory_latency.py.")
     return out
 
 

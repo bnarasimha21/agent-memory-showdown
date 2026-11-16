@@ -34,6 +34,9 @@ from src.retry import USAGE_LIMIT_PAUSES
 logger = logging.getLogger(__name__)
 
 
+_SETUP_LOCK = __import__("threading").Lock()
+
+
 class ProbeIsolationError(RuntimeError):
     """A probe changed the memory it was supposed to only read."""
 
@@ -58,7 +61,10 @@ def run_single(
     error = None
     memory_stats = None
     try:
-        backend.setup()
+        # One setup at a time: with PARALLEL > 1, two PGVector stores being created at once
+        # race on SQLAlchemy's shared table definitions.
+        with _SETUP_LOCK:
+            backend.setup()
         for turn in dataset.turns:
             exchange = backend.chat(turn.human_message)
             writer.record(
@@ -147,6 +153,8 @@ def build_manifest(backend_names, num_runs, num_turns, dataset_info, checkpoints
         # Any fake component that took part (chat model, embeddings, or the
         # judge when judging is on) makes the numbers a sample.
         "is_sample": is_sample_config(judge),
+        # Conversations and judge calls run at once when above 1; latency is then not comparable.
+        "parallel": config.PARALLEL,
     }
 
 
@@ -387,21 +395,53 @@ def run_benchmark(
     if meter is not None:
         meter.stopped = None
         writer.on_record = meter.add_record
+    jobs = []
     for label, backend_cls, kwargs in plan:
-        logger.info("Benchmarking backend: %s", label)
         for run_idx, dataset in enumerate(datasets):
             if (label, run_idx) in done:
-                logger.info("  Run %d / %d already finished, skipped", run_idx + 1, num_runs)
+                logger.info("%s run %d / %d already finished, skipped", label, run_idx + 1, num_runs)
                 continue
+            jobs.append((label, backend_cls, kwargs, run_idx, dataset))
+
+    parallel = config.PARALLEL
+    if parallel <= 1:
+        for label, backend_cls, kwargs, run_idx, dataset in jobs:
             if meter is not None and meter.exceeded():
                 stop(f"before {label} run {run_idx + 1} of {num_runs}")
-            logger.info("  Run %d / %d", run_idx + 1, num_runs)
+            logger.info("Benchmarking backend: %s, run %d / %d", label, run_idx + 1, num_runs)
             run_single(backend_cls, dataset, run_idx, writer, kwargs, sweep)
             # Totals so far, so a killed process still leaves honest counters for a resume.
             save_spend()
             if meter is not None:
                 logger.info("  Spend so far: $%.2f%s", meter.total_usd,
                             f" of ${meter.limit:.2f}" if meter.limit is not None else "")
+    else:
+        # Conversations are independent (each has its own backend session), so they can
+        # run at once. A conversation that has started is finished; the budget is checked
+        # before each one starts, so the overshoot is at most the conversations in flight.
+        import threading
+        from concurrent.futures import ThreadPoolExecutor
+
+        lock = threading.Lock()
+        skipped: list[str] = []
+
+        def work(job) -> None:
+            label, backend_cls, kwargs, run_idx, dataset = job
+            if meter is not None and meter.exceeded():
+                skipped.append(f"{label} run {run_idx + 1}")
+                return
+            logger.info("Benchmarking backend: %s, run %d / %d", label, run_idx + 1, num_runs)
+            run_single(backend_cls, dataset, run_idx, writer, kwargs, sweep)
+            with lock:
+                save_spend()
+                if meter is not None:
+                    logger.info("  %s run %d done. Spend so far: $%.2f", label, run_idx + 1, meter.total_usd)
+
+        with ThreadPoolExecutor(max_workers=parallel) as pool:
+            for future in [pool.submit(work, job) for job in jobs]:
+                future.result()
+        if skipped:
+            stop(f"before {len(skipped)} conversation(s): {', '.join(sorted(skipped))}")
 
     duration = prior_s + time.perf_counter() - started
     writer.close_transcript()
@@ -410,7 +450,7 @@ def run_benchmark(
             stop("before judging")
         judge_obj = MeteredJudge(judge_obj, meter, on_stop=stop, on_progress=save_spend)
     cache = JudgeCache(writer.path / "judge_cache.jsonl", judge_obj) if judge_obj is not None else None
-    scores = score_probes(read_transcript(writer.path), judge_obj, cache)
+    scores = score_probes(read_transcript(writer.path), judge_obj, cache, parallel=config.PARALLEL)
     info = scoring_info(judge_obj)
     write_jsonl(writer.path / "scores.jsonl", scores)
     writer.write_json("scoring.json", info)
